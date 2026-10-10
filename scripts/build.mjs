@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync, existsSync } from "node:fs";
 import { resolve, join, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -11,7 +11,10 @@ if (!source.includes('"__STYLES__"') || !source.includes('"__CLIENT__"')) throw 
 const bundled = source.replace('"__STYLES__"', JSON.stringify(styles)).replace('"__CLIENT__"', JSON.stringify(client));
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(join(dist, "server"), { recursive: true });
-mkdirSync(join(dist, ".openai"), { recursive: true });
 writeFileSync(join(dist, "server/index.js"), bundled);
-copyFileSync(join(root, ".openai/hosting.json"), join(dist, ".openai/hosting.json"));
+const sitesHosting = join(root, ".openai/hosting.json");
+if (existsSync(sitesHosting)) {
+  mkdirSync(join(dist, ".openai"), { recursive: true });
+  copyFileSync(sitesHosting, join(dist, ".openai/hosting.json"));
+}
 console.log(`Built ${dist}`);
