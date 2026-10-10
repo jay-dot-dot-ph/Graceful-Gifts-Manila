@@ -11,7 +11,7 @@ const screenshots = resolve('.sites-runtime');
 mkdirSync(screenshots, { recursive: true });
 
 try {
-  for (const [label, width, height] of [['desktop', 1440, 900], ['tablet', 820, 1180], ['mobile', 390, 844], ['small-mobile', 320, 568], ['short-mobile', 320, 480], ['landscape-mobile', 667, 375]]) {
+  for (const [label, width, height] of [['desktop', 1440, 900], ['compact-desktop', 1100, 700], ['tablet', 820, 1180], ['mobile', 390, 844], ['small-mobile', 320, 568], ['short-mobile', 320, 480], ['landscape-mobile', 667, 375]]) {
     if (process.argv[3] && process.argv[3] !== label) continue;
     const context = await browser.newContext({ viewport: { width, height }, reducedMotion: label === 'tablet' ? 'reduce' : 'no-preference' });
     const page = await context.newPage();
@@ -65,7 +65,7 @@ try {
     assert.equal(state.fadeDuration, label === 'tablet' ? '0.001s' : '0.55s', `${label}: fade should respect reduced motion`);
     assert.equal(state.inert, true, `${label}: homepage should not receive focus during opening`);
     assert.ok(state.scrollWidth <= state.viewportWidth + 1, `${label}: no horizontal overflow`);
-    const [minimum, maximum] = label === 'desktop' ? [12, 16] : label === 'tablet' ? [3, 5] : [2, 3];
+    const [minimum, maximum] = label.includes('desktop') ? [20, 28] : label === 'tablet' ? [3, 5] : [2, 3];
     assert.ok(state.visibleCount >= minimum && state.visibleCount <= maximum, `${label}: expected ${minimum}–${maximum} pictures together; saw ${state.visibleCount} visible / ${state.activeCount} active`);
     assert.equal(state.overlap, false, `${label}: pictures must clear the loading logo and message`);
     assert.equal(state.logoTopmost && state.logoVisible, true, `${label}: the centered brand mark must remain visible above the collage`);
