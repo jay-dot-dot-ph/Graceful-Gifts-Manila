@@ -4,7 +4,10 @@ const money = (value) => value === null || value === undefined ? 'Price on reque
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[char]);
 const watchUrl = (watch) => location.origin + '/watch/' + encodeURIComponent(watch.id);
 const watchImage = (watch) => watch.localImage || '/image/' + encodeURIComponent(watch.id);
-const watchName = (watch) => (watch.brand + ' ' + (watch.model || 'Watch')).trim();
+const watchName = (watch) => {
+  const model = (watch.model || 'Watch').trim();
+  return model.toLowerCase().startsWith(watch.brand.toLowerCase() + ' ') ? model : (watch.brand + ' ' + model).trim();
+};
 const stockText = (watch) => watch.stock === 0 ? 'Sold out' : watch.stock === null ? 'Availability on request' : watch.stock === 1 ? 'Only 1 remaining' : `${watch.stock} available`;
 const stored = () => { try { return JSON.parse(localStorage.getItem('ggm-favorites') || '[]'); } catch { return []; } };
 let favorites = new Set(stored());

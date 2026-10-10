@@ -6,7 +6,7 @@ const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}`;
 const FACEBOOK = "https://www.facebook.com/GracefulGifts.Manila";
 const MESSENGER = "https://m.me/GracefulGifts.Manila";
 const BRAND_TABS = [
-  ["AP", "105059328"], ["BVLGARI", "153669170"], ["CARTIER", "327287243"],
+  ["AP", "1994018057"], ["BVLGARI", "153669170"], ["CARTIER", "327287243"],
   ["CHARRIOL", "976443302"], ["COACH", "1611498834"], ["FOSSIL", "949872863"],
   ["HUBLOT", "1825202400"], ["INVICTA", "1839212129"], ["MARCJACOBS", "1217338794"],
   ["MK", "35068659"], ["MS", "535083943"], ["OMEGA", "1895499623"],
@@ -19,6 +19,10 @@ let catalogCache = null;
 let catalogPromise = null;
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 const slug = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const watchName = (watch) => {
+  const model = String(watch.model || watch.id).trim();
+  return model.toLowerCase().startsWith(watch.brand.toLowerCase() + " ") ? model : `${watch.brand} ${model}`.trim();
+};
 
 export function parseCsv(input) {
   const rows = [];
@@ -104,11 +108,18 @@ async function loadBrand([name, gid]) {
   const csv = `${SHEET_BASE}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
   const page = `${SHEET_BASE}/edit?gid=${encodeURIComponent(gid)}`;
   const [data, imagePage] = await Promise.all([fetchText(csv), fetchText(page).catch(() => null)]);
-  return { watches: normalizeRows(data, name, imagePage ? extractImages(imagePage) : new Map()), missingImages: !imagePage };
+  let images = imagePage ? extractImages(imagePage) : new Map();
+  const watches = normalizeRows(data, name, images);
+  if (watches.length && !watches.some((watch) => watch.image)) {
+    for (let attempt = 0; attempt < 2 && !images.size; attempt++) {
+      const retryPage = await fetchText(page).catch(() => null);
+      if (retryPage) images = extractImages(retryPage);
+    }
+  }
+  return { watches: normalizeRows(data, name, images), missingImages: watches.length > 0 && !images.size && !watches.some((watch) => watch.image) };
 }
 async function loadCatalog() {
-  let tabs = BRAND_TABS;
-  try { tabs = discoverTabs(await fetchText(`${SHEET_BASE}/edit`)); } catch { /* known tabs remain available */ }
+  const tabs = BRAND_TABS;
   const results = [];
   for (let i = 0; i < tabs.length; i += 6) results.push(...await Promise.allSettled(tabs.slice(i, i + 6).map(loadBrand)));
   const failedBrands = [], failedImageBrands = [], watches = [], ids = new Set(), duplicateIds = [];
@@ -133,11 +144,11 @@ async function getCatalog() {
 
 function htmlPage(request, product = null) {
   const url = new URL(request.url);
-  const title = product ? `${product.brand} ${product.model || product.id} | Graceful Gifts Manila` : "Graceful Gifts Manila | Luxury Watch Collection";
-  const description = product ? `View ${product.brand} ${product.model || product.id}, ID ${product.id}, and inquire with Graceful Gifts Manila.` : "Explore watches by brand, price, and style. Save favorites and inquire with Graceful Gifts Manila.";
+  const title = product ? `${watchName(product)} | Graceful Gifts Manila` : "Graceful Gifts Manila | Luxury Watch Collection";
+  const description = product ? `View ${watchName(product)}, ID ${product.id}, and inquire with Graceful Gifts Manila.` : "Explore watches by brand, price, and style. Save favorites and inquire with Graceful Gifts Manila.";
   const imagePath = product?.image ? `${url.origin}/image/${encodeURIComponent(product.id)}` : null;
   const imageMeta = imagePath ? `<meta property="og:image" content="${escapeHtml(imagePath)}">` : "";
-  const initial = product ? `<main class="container product-initial"><p class="eyebrow">WATCH DETAILS</p><h1>${escapeHtml(product.brand)} ${escapeHtml(product.model || product.id)}</h1><p>Watch ID ${escapeHtml(product.id)}</p>${imagePath ? `<img src="${escapeHtml(imagePath)}" alt="${escapeHtml(product.brand)} ${escapeHtml(product.model)}" width="540" height="540">` : ""}<p>${product.price === null ? "Price on request" : `₱${product.price.toLocaleString("en-PH")}`}</p></main>` : `<main class="container loading-screen"><p>Preparing the collection…</p></main>`;
+  const initial = product ? `<main class="container product-initial"><p class="eyebrow">WATCH DETAILS</p><h1>${escapeHtml(watchName(product))}</h1><p>Watch ID ${escapeHtml(product.id)}</p>${imagePath ? `<img src="${escapeHtml(imagePath)}" alt="${escapeHtml(watchName(product))}" width="540" height="540">` : ""}<p>${product.price === null ? "Price on request" : `₱${product.price.toLocaleString("en-PH")}`}</p></main>` : `<main class="container loading-screen"><p>Preparing the collection…</p></main>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f4ed"><title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(description)}"><meta property="og:type" content="${product ? "product" : "website"}"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(url.toString())}">${imageMeta}<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css"></head><body><div id="app">${initial}</div><script>window.GGM_CONFIG=${JSON.stringify({ facebook: FACEBOOK, messenger: MESSENGER })};</script><script src="/app.js" defer></script></body></html>`;
 }
 const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="13" fill="#171813"/><circle cx="32" cy="32" r="21" fill="none" stroke="#c6a56d" stroke-width="1.5"/><path d="M32 17v15l10 6" fill="none" stroke="#c6a56d" stroke-width="2" stroke-linecap="round"/><circle cx="32" cy="32" r="2" fill="#c6a56d"/></svg>`;
