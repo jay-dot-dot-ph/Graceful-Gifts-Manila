@@ -25,6 +25,8 @@ try {
     const state = await page.evaluate(() => {
       const screen = document.querySelector('#opening-screen');
       const brand = document.querySelector('.opening-brand').getBoundingClientRect();
+      const mark = document.querySelector('.opening-mark');
+      const markBounds = mark.getBoundingClientRect();
       const cards = [...document.querySelectorAll('.opening-feedback')];
       const visible = cards.filter((card) => Number(getComputedStyle(card).opacity) > 0.2);
       const overlap = visible.some((card) => {
@@ -40,6 +42,8 @@ try {
         visibleCount: visible.length,
         activeCount: cards.filter((card) => card.dataset.active === 'true').length,
         overlap,
+        logoTopmost: mark.contains(document.elementFromPoint(markBounds.left + markBounds.width / 2, markBounds.top + markBounds.height / 2)),
+        logoVisible: getComputedStyle(mark).visibility === 'visible' && Number(getComputedStyle(mark).opacity) === 1 && markBounds.width > 0,
         clipped: visible.some((card) => {
           const rect = card.getBoundingClientRect();
           return rect.left < -0.01 || rect.top < -0.01 || rect.right > innerWidth + 0.01 || rect.bottom > innerHeight + 0.01;
@@ -61,9 +65,10 @@ try {
     assert.equal(state.fadeDuration, label === 'tablet' ? '0.001s' : '0.55s', `${label}: fade should respect reduced motion`);
     assert.equal(state.inert, true, `${label}: homepage should not receive focus during opening`);
     assert.ok(state.scrollWidth <= state.viewportWidth + 1, `${label}: no horizontal overflow`);
-    const [minimum, maximum] = label === 'desktop' ? [4, 6] : label === 'tablet' ? [3, 5] : [2, 3];
+    const [minimum, maximum] = label === 'desktop' ? [12, 16] : label === 'tablet' ? [3, 5] : [2, 3];
     assert.ok(state.visibleCount >= minimum && state.visibleCount <= maximum, `${label}: expected ${minimum}–${maximum} pictures together; saw ${state.visibleCount} visible / ${state.activeCount} active`);
     assert.equal(state.overlap, false, `${label}: pictures must clear the loading logo and message`);
+    assert.equal(state.logoTopmost && state.logoVisible, true, `${label}: the centered brand mark must remain visible above the collage`);
     assert.equal(state.distorted, 0, `${label}: displayed pictures should be smaller without changing aspect ratio`);
     assert.equal(state.clipped, false, `${label}: no visible picture should leave the viewport`);
     assert.equal(state.paths.length, feedbackCount);

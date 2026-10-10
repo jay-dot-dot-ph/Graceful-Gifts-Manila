@@ -18,9 +18,9 @@
     height: 0,
   }));
   const active = new Set();
-  const duration = 1500;
-  const enter = 180;
-  const hold = 1050;
+  let duration = 1500;
+  let enter = 180;
+  let hold = 1050;
   let deck = [];
   let started = false;
   let finalGroup = false;
@@ -37,17 +37,25 @@
     return result;
   }
   function targetCount() {
-    if (opening.clientWidth >= 1100 && opening.clientHeight >= 600) return 6;
+    // Extra staggered slots keep at least twelve visible while others enter or leave.
+    if (opening.clientWidth >= 1100 && opening.clientHeight >= 600) return 16;
     if (opening.clientWidth >= 700 && opening.clientHeight >= 600) return 5;
     return 3;
+  }
+  function updateTiming() {
+    const desktop = targetCount() === 16;
+    duration = desktop ? 1800 : 1500;
+    enter = desktop ? 150 : 180;
+    hold = desktop ? 1400 : 1050;
   }
   function measure(card) {
     const width = opening.clientWidth;
     const height = opening.clientHeight;
     const compact = width < 700 || height < 520;
-    const maxWidth = width <= 340 ? width * 0.52 : compact ? Math.min(width * 0.64, 250) : width < 1100 ? 290 : 330;
-    const maxHeight = compact ? Math.min(height * 0.24, 220) : Math.min(height * 0.38, 340);
-    const ratio = Math.min(compact ? 0.78 : 0.82, maxWidth / card.naturalWidth, maxHeight / card.naturalHeight);
+    const desktop = width >= 1100 && height >= 600;
+    const maxWidth = width <= 340 ? width * 0.52 : compact ? Math.min(width * 0.64, 250) : desktop ? 215 : 290;
+    const maxHeight = compact ? Math.min(height * 0.24, 220) : desktop ? 220 : Math.min(height * 0.38, 340);
+    const ratio = Math.min(compact ? 0.78 : desktop ? 0.72 : 0.82, maxWidth / card.naturalWidth, maxHeight / card.naturalHeight);
     card.width = card.naturalWidth * ratio;
     card.height = card.naturalHeight * ratio;
     card.element.style.width = `${card.width}px`;
@@ -120,6 +128,7 @@
   }
   function start(allowPartial = false) {
     if (started) return;
+    updateTiming();
     slotCount = targetCount();
     const ready = cards.filter((card) => card.image.complete && card.image.naturalWidth).length;
     if (ready < (allowPartial ? 2 : slotCount)) return;
@@ -158,6 +167,7 @@
     }
     active.clear();
     deck = [];
+    updateTiming();
     slotCount = targetCount();
     for (let slot = 0; slot < slotCount; slot++) show(slot, slot * duration / slotCount);
   });
