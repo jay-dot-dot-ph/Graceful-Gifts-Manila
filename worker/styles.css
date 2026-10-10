@@ -13,8 +13,8 @@
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 .brand-symbol{font-size:25px;letter-spacing:0;padding-right:0}
 
-/* The homepage opening holds for ten seconds on every visit. */
-.opening-screen{position:fixed;inset:0;z-index:200;overflow:hidden;background:radial-gradient(circle at 50% 38%,#fffdf8 0%,#f4eee3 72%,#e9dfcf 100%);color:var(--ink);animation:opening-exit .55s ease-in-out 10s forwards}
+/* The homepage opening holds for seven seconds on every visit. */
+.opening-screen{position:fixed;inset:0;z-index:200;overflow:hidden;background:radial-gradient(circle at 50% 38%,#fffdf8 0%,#f4eee3 72%,#e9dfcf 100%);color:var(--ink);animation:opening-exit .55s ease-in-out 7s forwards}
 .opening-route-skip .opening-screen{display:none}
 .opening-content{height:100%;height:100dvh;min-height:0;display:grid;place-items:center;padding:clamp(16px,3vw,50px)}
 .opening-brand{position:relative;z-index:2;align-self:center;justify-self:center;text-align:center;display:flex;align-items:center;flex-direction:column;gap:0}
@@ -24,11 +24,11 @@
 .opening-rule{width:42px;height:1px;background:#b99b6b;margin:26px 0 21px}
 .opening-message{font-family:var(--serif);font-size:clamp(1.1rem,2.5vw,1.45rem);color:#756b5d;margin:0}
 .opening-collage{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-.opening-feedback{position:absolute;margin:0;opacity:0;pointer-events:none;box-shadow:0 15px 45px #352b1d24;will-change:opacity,transform}
-.opening-feedback img{display:block;width:auto;height:auto;max-width:none;max-height:none;object-fit:initial}
+.opening-feedback{position:absolute;margin:0;opacity:0;pointer-events:none;box-shadow:0 9px 28px #352b1d20;will-change:opacity,transform}
+.opening-feedback img{display:block;width:100%;height:auto;max-width:none;max-height:none;object-fit:initial}
 @keyframes opening-exit{0%{opacity:1;visibility:visible}99%{visibility:visible}100%{opacity:0;visibility:hidden;pointer-events:none}}
 @media(max-width:760px){.opening-content{padding:12px}.opening-name{letter-spacing:.16em}}
 @media(max-width:340px){.opening-brand{background:#fffdf8ed;padding:15px 12px;box-shadow:0 8px 35px #fffdf8;outline:1px solid #d9cbb651}}
 @media(max-height:500px){.opening-brand{background:#fffdf8ed;padding:10px 12px;box-shadow:0 8px 35px #fffdf8;outline:1px solid #d9cbb651}}
 @media(max-height:520px){.opening-mark{width:52px;height:52px;font-size:2rem}.opening-name{margin-top:10px}.opening-rule{margin:10px 0}}
-@media(prefers-reduced-motion:reduce){.opening-screen{animation:opening-exit 1ms linear 10s forwards!important}}
+@media(prefers-reduced-motion:reduce){.opening-screen{animation:opening-exit 1ms linear 7s forwards!important}}

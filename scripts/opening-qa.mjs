@@ -26,7 +26,7 @@ try {
       const screen = document.querySelector('#opening-screen');
       const brand = document.querySelector('.opening-brand').getBoundingClientRect();
       const cards = [...document.querySelectorAll('.opening-feedback')];
-      const visible = cards.filter((card) => Number(getComputedStyle(card).opacity) > 0.12);
+      const visible = cards.filter((card) => Number(getComputedStyle(card).opacity) > 0.2);
       const overlap = visible.some((card) => {
         const rect = card.getBoundingClientRect();
         return brand.left < rect.right && brand.right > rect.left && brand.top < rect.bottom && brand.bottom > rect.top;
@@ -46,36 +46,46 @@ try {
         }),
         loaded: cards.filter((card) => card.querySelector('img').complete && card.querySelector('img').naturalWidth > 0).length,
         paths: cards.map((card) => card.querySelector('img').getAttribute('src')),
-        mismatched: cards.filter((card) => {
+        distorted: visible.filter((card) => {
           const image = card.querySelector('img');
-          if (!image.naturalWidth) return false;
+          if (!image.naturalWidth) return true;
           const rect = image.getBoundingClientRect();
-          return image.naturalWidth !== Number(card.dataset.width) || image.naturalHeight !== Number(card.dataset.height) || Math.abs(rect.width - image.naturalWidth) > 0.01 || Math.abs(rect.height - image.naturalHeight) > 0.01;
+          const x = rect.width / image.naturalWidth;
+          const y = rect.height / image.naturalHeight;
+          return image.naturalWidth !== Number(card.dataset.width) || image.naturalHeight !== Number(card.dataset.height) || Math.abs(x - y) > 0.005 || x >= 1 || y >= 1;
         }).length,
         animationDurations: visible.map((card) => card.getAnimations()[0]?.effect.getTiming().duration),
       };
     });
-    assert.equal(state.delay, '10s', `${label}: exit should begin at ten seconds`);
+    assert.equal(state.delay, '7s', `${label}: exit should begin at seven seconds`);
     assert.equal(state.fadeDuration, label === 'tablet' ? '0.001s' : '0.55s', `${label}: fade should respect reduced motion`);
     assert.equal(state.inert, true, `${label}: homepage should not receive focus during opening`);
     assert.ok(state.scrollWidth <= state.viewportWidth + 1, `${label}: no horizontal overflow`);
-    assert.ok(state.visibleCount >= (label === 'short-mobile' ? 2 : 3), `${label}: several pictures should be visible together; saw ${state.visibleCount} visible / ${state.activeCount} active`);
-    if (width > 340 && height > 500) assert.equal(state.overlap, false, `${label}: pictures must clear the loading logo and message`);
-    else assert.ok(state.overlap || state.visibleCount >= 3, `${label}: narrow screens should show the collage around the protected logo`);
-    assert.equal(state.mismatched, 0, `${label}: every loaded picture should stay at native size`);
+    const [minimum, maximum] = label === 'desktop' ? [4, 6] : label === 'tablet' ? [3, 5] : [2, 3];
+    assert.ok(state.visibleCount >= minimum && state.visibleCount <= maximum, `${label}: expected ${minimum}–${maximum} pictures together; saw ${state.visibleCount} visible / ${state.activeCount} active`);
+    assert.equal(state.overlap, false, `${label}: pictures must clear the loading logo and message`);
+    assert.equal(state.distorted, 0, `${label}: displayed pictures should be smaller without changing aspect ratio`);
     assert.equal(state.clipped, false, `${label}: no visible picture should leave the viewport`);
     assert.equal(state.paths.length, feedbackCount);
     assert.equal(new Set(state.paths).size, feedbackCount, `${label}: use each supplied picture`);
     assert.ok(state.paths.every((path) => /^\/feedback\/[a-f0-9]{12}\.jpg$/.test(path)), `${label}: use content-versioned original images`);
-    if (label !== 'tablet') assert.ok(new Set(state.animationDurations).size > 1, `${label}: animation timing should vary`);
+    if (label !== 'tablet') assert.ok(state.animationDurations.every((duration) => duration >= 1250 && duration <= 1950), `${label}: pictures should hold for 0.8–1.5 seconds plus gentle fades`);
     if (['desktop', 'mobile', 'short-mobile', 'landscape-mobile'].includes(label)) await page.screenshot({ path: resolve(screenshots, `opening-collage-${label}.png`) });
-    for (const pause of [2200, 2600]) {
+    for (const pause of [2000, 1900]) {
       await page.waitForTimeout(pause);
-      const count = await page.locator('.opening-feedback').evaluateAll((cards) => cards.filter((card) => Number(getComputedStyle(card).opacity) > 0.12).length);
-      assert.ok(count >= 2, `${label}: multiple pictures should remain visible throughout the opening; saw ${count}`);
+      const sample = await page.locator('.opening-feedback').evaluateAll((cards) => ({ count: cards.filter((card) => Number(getComputedStyle(card).opacity) > 0.2).length, active: cards.filter((card) => card.dataset.active === 'true').map((card) => Number(getComputedStyle(card).opacity).toFixed(2)) }));
+      assert.ok(sample.count >= minimum && sample.count <= maximum, `${label}: picture count should stay within ${minimum}–${maximum}; saw ${sample.count}; active opacities ${sample.active}`);
     }
-    await page.waitForFunction(() => document.querySelector('#opening-screen')?.getAnimations()[0]?.currentTime >= 9000, null, { timeout: 11000 });
-    assert.equal(await page.locator('#opening-screen').isVisible(), true, `${label}: screen should still show before ten seconds`);
+    await page.waitForFunction(() => document.querySelector('#opening-screen')?.getAnimations()[0]?.currentTime >= 6800, null, { timeout: 8000 });
+    assert.equal(await page.locator('#opening-screen').isVisible(), true, `${label}: screen should still show before seven seconds`);
+    const finalCount = await page.locator('.opening-feedback').evaluateAll((cards) => cards.filter((card) => Number(getComputedStyle(card).opacity) > 0.8).length);
+    assert.ok(finalCount >= minimum && finalCount <= maximum, `${label}: final group should hold together; saw ${finalCount}`);
+    if (label !== 'tablet') {
+      await page.waitForFunction(() => document.querySelector('#opening-screen')?.getAnimations()[0]?.currentTime >= 7250, null, { timeout: 2000 });
+      const fading = await page.evaluate(() => ({ screen: Number(getComputedStyle(document.querySelector('#opening-screen')).opacity), pictures: [...document.querySelectorAll('.opening-feedback[data-active="true"]')].map((card) => Number(getComputedStyle(card).opacity)) }));
+      assert.ok(fading.screen < 1 && fading.screen > 0, `${label}: screen should fade after seven seconds`);
+      assert.ok(fading.pictures.length >= minimum && fading.pictures.every((opacity) => opacity < 1 && opacity > 0), `${label}: final pictures should fade with the screen`);
+    }
     await page.locator('#opening-screen').waitFor({ state: 'detached', timeout: 3000 });
     assert.equal(await page.locator('#app').evaluate((app) => app.inert), false, `${label}: homepage should be interactive`);
     assert.equal(await page.locator('.opening-feedback').count(), 0, `${label}: all feedback must be removed`);
@@ -93,7 +103,7 @@ try {
   assert.equal(await directPage.locator('#opening-screen').count(), 0, 'Direct catalog visits should skip the homepage opening');
   assert.equal(await directPage.locator('#app').evaluate((app) => app.inert), false, 'Direct catalog visits should stay interactive');
   await directContext.close();
-  console.log('Ten-second feedback collage and direct routes passed.');
+  console.log('Seven-second feedback collage and direct routes passed.');
 } finally {
   await browser.close();
 }
