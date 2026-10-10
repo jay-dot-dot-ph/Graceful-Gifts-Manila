@@ -71,12 +71,16 @@
     const reserved = { left: logo.left - 12, top: logo.top - 12, right: logo.right + 12, bottom: logo.bottom + 12 };
     const maxX = width - card.width - inset;
     const maxY = height - card.height - inset;
-    const xs = [inset, (inset + maxX) / 2, maxX];
-    const ys = [inset, (inset + maxY) / 2, maxY];
+    const columns = width >= 1300 ? 10 : 9;
+    const rows = height >= 800 ? 6 : 5;
+    const grid = shuffle(Array.from({ length: columns * rows }, (_, index) => ({
+      x: inset + (maxX - inset) * (index % columns) / (columns - 1),
+      y: inset + (maxY - inset) * Math.floor(index / columns) / (rows - 1),
+    })));
     let best = null;
-    for (let attempt = 0; attempt < 140; attempt++) {
-      const x = attempt < 9 ? xs[attempt % 3] : randomBetween(inset, maxX);
-      const y = attempt < 9 ? ys[Math.floor(attempt / 3)] : randomBetween(inset, maxY);
+    for (let attempt = 0; attempt < grid.length + 80; attempt++) {
+      const x = attempt < grid.length ? grid[attempt].x : randomBetween(inset, maxX);
+      const y = attempt < grid.length ? grid[attempt].y : randomBetween(inset, maxY);
       const rect = { left: x, top: y, right: x + card.width, bottom: y + card.height };
       if (overlapArea(rect, reserved)) continue;
       const overlap = [...active].reduce((total, entry) => total + overlapArea(rect, entry.rect) / Math.min(card.width * card.height, entry.card.width * entry.card.height), 0);
