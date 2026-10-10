@@ -37,6 +37,8 @@ The Firebase project is `graceful-gifts-manila`. Its Spark plan supports the sta
 
 The GitHub workflow in `.github/workflows/firebase-hosting.yml` refreshes and deploys the catalog every six hours. Its encrypted `FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA` secret is stored in the repository. The first successful automated run completed on 2026-10-10. Image filenames change when a source image changes, allowing refreshed photos to replace older cached versions.
 
+For full-site refreshes shortly after staff edits the Sheet, install the bound [Sheet edit trigger](automation/README.md). It dispatches the same GitHub workflow after nearby edits settle. The six-hour schedule remains a fallback for changes made by scripts or APIs. The trigger requires a one-time Google Apps Script authorization and a repository-scoped GitHub Actions token stored in Apps Script Script Properties.
+
 For a manual deployment from this folder, use the Firebase CLI after `npm.cmd run build:firebase`:
 
 ```powershell
