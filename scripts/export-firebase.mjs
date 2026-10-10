@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { feedbackAssets } from './feedback-assets.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, 'hosting-dist');
@@ -47,7 +48,7 @@ mkdirSync(join(output, 'images'), { recursive: true });
 mkdirSync(join(output, 'api'), { recursive: true });
 mkdirSync(join(output, 'watch'), { recursive: true });
 mkdirSync(join(output, 'feedback'), { recursive: true });
-copyFileSync(join(root, 'feedback/photo_2025-05-24_15-30-47 (6).jpg'), join(output, 'feedback/opening-35b1b185.jpg'));
+for (const { path, bytes } of feedbackAssets(root)) writeFileSync(join(output, path), bytes);
 
 const imageWatches = catalog.watches.filter((watch) => watch.image);
 let nextImage = 0;

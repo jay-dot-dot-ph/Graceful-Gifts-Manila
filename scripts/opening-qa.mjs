@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright-core';
 
 const browser = await chromium.launch({ executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', headless: true });
 const base = process.argv[2] || process.env.QA_BASE || 'http://127.0.0.1:4173';
-const fixture = { watches: [], brands: [] }; // Only the opening experience is under test.
+const fixture = { watches: [], brands: [] };
+const feedbackCount = readdirSync(resolve('feedback')).filter((name) => /\.jpe?g$/i.test(name)).length;
 const screenshots = resolve('.sites-runtime');
 mkdirSync(screenshots, { recursive: true });
 
@@ -19,72 +20,69 @@ try {
     await page.route('**/api/catalog', (route) => route.fulfill({ json: fixture }));
     await page.goto(base + '/', { waitUntil: 'domcontentloaded' });
     assert.equal(await page.locator('#opening-screen').isVisible(), true, `${label}: opening should be visible`);
-    await page.locator('.opening-feedback img').evaluate(async (image) => {
-      if (!image.complete) await new Promise((resolve, reject) => {
-        image.addEventListener('load', resolve, { once: true });
-        image.addEventListener('error', reject, { once: true });
-      });
-      if (!image.naturalWidth) throw new Error('Feedback image failed to load');
-    });
+    assert.equal(await page.locator('.opening-feedback').count(), feedbackCount, `${label}: include every feedback image`);
+    await page.waitForTimeout(1200);
     const state = await page.evaluate(() => {
       const screen = document.querySelector('#opening-screen');
       const brand = document.querySelector('.opening-brand').getBoundingClientRect();
-      const feedback = document.querySelector('.opening-feedback');
-      const image = document.querySelector('.opening-feedback img');
-      const imageRect = image.getBoundingClientRect();
-      const originalSpot = feedback.dataset.spot;
-      const spotOverlaps = Array.from({ length: 4 }, (_, index) => {
-        feedback.dataset.spot = String(index);
-        const rect = image.getBoundingClientRect();
+      const cards = [...document.querySelectorAll('.opening-feedback')];
+      const visible = cards.filter((card) => Number(getComputedStyle(card).opacity) > 0.12);
+      const overlap = visible.some((card) => {
+        const rect = card.getBoundingClientRect();
         return brand.left < rect.right && brand.right > rect.left && brand.top < rect.bottom && brand.bottom > rect.top;
       });
-      feedback.dataset.spot = originalSpot;
       return {
         delay: getComputedStyle(screen).animationDelay,
         fadeDuration: getComputedStyle(screen).animationDuration,
         scrollWidth: document.documentElement.scrollWidth,
         viewportWidth: innerWidth,
-        overlap: brand.left < imageRect.right && brand.right > imageRect.left && brand.top < imageRect.bottom && brand.bottom > imageRect.top,
         inert: document.querySelector('#app').inert,
-        imageUrl: image.getAttribute('src'),
-        imageSize: [image.naturalWidth, image.naturalHeight],
-        renderedSize: [imageRect.width, imageRect.height],
-        spot: feedback.dataset.spot,
-        spotOverlaps,
+        visibleCount: visible.length,
+        activeCount: cards.filter((card) => card.dataset.active === 'true').length,
+        overlap,
+        clipped: visible.some((card) => {
+          const rect = card.getBoundingClientRect();
+          return rect.left < -0.01 || rect.top < -0.01 || rect.right > innerWidth + 0.01 || rect.bottom > innerHeight + 0.01;
+        }),
+        loaded: cards.filter((card) => card.querySelector('img').complete && card.querySelector('img').naturalWidth > 0).length,
+        paths: cards.map((card) => card.querySelector('img').getAttribute('src')),
+        mismatched: cards.filter((card) => {
+          const image = card.querySelector('img');
+          if (!image.naturalWidth) return false;
+          const rect = image.getBoundingClientRect();
+          return image.naturalWidth !== Number(card.dataset.width) || image.naturalHeight !== Number(card.dataset.height) || Math.abs(rect.width - image.naturalWidth) > 0.01 || Math.abs(rect.height - image.naturalHeight) > 0.01;
+        }).length,
+        animationDurations: visible.map((card) => card.getAnimations()[0]?.effect.getTiming().duration),
       };
     });
     assert.equal(state.delay, '10s', `${label}: exit should begin at ten seconds`);
-    assert.equal(state.fadeDuration, label === 'tablet' ? '0.001s' : '0.55s', `${label}: exit duration should respect motion preference`);
-    assert.equal(state.overlap, false, `${label}: feedback should not cover branding or loading text`);
-    assert.deepEqual(state.spotOverlaps, [false, false, false, false], `${label}: no floating position should cover the branding`);
+    assert.equal(state.fadeDuration, label === 'tablet' ? '0.001s' : '0.55s', `${label}: fade should respect reduced motion`);
     assert.equal(state.inert, true, `${label}: homepage should not receive focus during opening`);
-    assert.ok(state.scrollWidth <= state.viewportWidth + 1, `${label}: layout should not overflow horizontally`);
-    assert.match(state.imageUrl, /\/feedback\/opening-35b1b185\.jpg$/);
-    assert.deepEqual(state.imageSize, [249, 263], `${label}: use the supplied image at its native dimensions`);
-    assert.ok(state.renderedSize.every((size, index) => Math.abs(size - state.imageSize[index]) < 0.01), `${label}: image must not be resized or cropped`);
-    if (label === 'desktop' || label === 'mobile') {
-      await page.waitForTimeout(600);
-      await page.screenshot({ path: resolve(screenshots, `opening-${label}.png`) });
-    }
-    if (label !== 'tablet') {
-      await page.waitForFunction((oldSpot) => document.querySelector('.opening-feedback')?.dataset.spot !== oldSpot, state.spot, { timeout: 4000 });
-      const changed = await page.evaluate(() => {
-        const brand = document.querySelector('.opening-brand').getBoundingClientRect();
-        const image = document.querySelector('.opening-feedback img').getBoundingClientRect();
-        return { spot: document.querySelector('.opening-feedback').dataset.spot, overlap: brand.left < image.right && brand.right > image.left && brand.top < image.bottom && brand.bottom > image.top };
-      });
-      assert.notEqual(changed.spot, state.spot, `${label}: feedback should reappear in another position`);
-      assert.equal(changed.overlap, false, `${label}: the next position should keep the branding clear`);
+    assert.ok(state.scrollWidth <= state.viewportWidth + 1, `${label}: no horizontal overflow`);
+    assert.ok(state.visibleCount >= (label === 'short-mobile' ? 2 : 3), `${label}: several pictures should be visible together; saw ${state.visibleCount} visible / ${state.activeCount} active`);
+    if (width > 340 && height > 500) assert.equal(state.overlap, false, `${label}: pictures must clear the loading logo and message`);
+    else assert.ok(state.overlap || state.visibleCount >= 3, `${label}: narrow screens should show the collage around the protected logo`);
+    assert.equal(state.mismatched, 0, `${label}: every loaded picture should stay at native size`);
+    assert.equal(state.clipped, false, `${label}: no visible picture should leave the viewport`);
+    assert.equal(state.paths.length, feedbackCount);
+    assert.equal(new Set(state.paths).size, feedbackCount, `${label}: use each supplied picture`);
+    assert.ok(state.paths.every((path) => /^\/feedback\/[a-f0-9]{12}\.jpg$/.test(path)), `${label}: use content-versioned original images`);
+    if (label !== 'tablet') assert.ok(new Set(state.animationDurations).size > 1, `${label}: animation timing should vary`);
+    if (['desktop', 'mobile', 'short-mobile', 'landscape-mobile'].includes(label)) await page.screenshot({ path: resolve(screenshots, `opening-collage-${label}.png`) });
+    for (const pause of [2200, 2600]) {
+      await page.waitForTimeout(pause);
+      const count = await page.locator('.opening-feedback').evaluateAll((cards) => cards.filter((card) => Number(getComputedStyle(card).opacity) > 0.12).length);
+      assert.ok(count >= 2, `${label}: multiple pictures should remain visible throughout the opening; saw ${count}`);
     }
     await page.waitForFunction(() => document.querySelector('#opening-screen')?.getAnimations()[0]?.currentTime >= 9000, null, { timeout: 11000 });
     assert.equal(await page.locator('#opening-screen').isVisible(), true, `${label}: screen should still show before ten seconds`);
     await page.locator('#opening-screen').waitFor({ state: 'detached', timeout: 3000 });
-    await page.locator('.hero h1').waitFor({ timeout: 5000 });
     assert.equal(await page.locator('#app').evaluate((app) => app.inert), false, `${label}: homepage should be interactive`);
-    assert.equal(await page.locator('#opening-screen .opening-feedback').count(), 0, `${label}: feedback should be removed`);
+    assert.equal(await page.locator('.opening-feedback').count(), 0, `${label}: all feedback must be removed`);
     await page.reload({ waitUntil: 'domcontentloaded' });
-    assert.equal(await page.locator('#opening-screen').isVisible(), true, `${label}: every homepage load should show the opening`);
+    assert.equal(await page.locator('#opening-screen').isVisible(), true, `${label}: opening should show on every homepage load`);
     assert.deepEqual(errors, [], `${label}: browser should not report JavaScript errors`);
+    console.log(`${label}: ${state.visibleCount} pictures visible together; ${state.loaded}/${feedbackCount} loaded at 1.2 s`);
     await context.close();
   }
   const directContext = await browser.newContext();
@@ -95,7 +93,7 @@ try {
   assert.equal(await directPage.locator('#opening-screen').count(), 0, 'Direct catalog visits should skip the homepage opening');
   assert.equal(await directPage.locator('#app').evaluate((app) => app.inert), false, 'Direct catalog visits should stay interactive');
   await directContext.close();
-  console.log('Ten-second opening, original-size floating feedback, responsive layout, reduced motion, repeated visits, and direct routes passed.');
+  console.log('Ten-second feedback collage and direct routes passed.');
 } finally {
   await browser.close();
 }
