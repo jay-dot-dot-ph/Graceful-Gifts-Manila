@@ -2,6 +2,8 @@
 const STYLES = "__STYLES__";
 const CLIENT = "__CLIENT__";
 const OPENING_SCRIPT = "__OPENING_SCRIPT__";
+const OPENING_BG = "__OPENING_BG__";
+const OPENING_BG_PATH = "__OPENING_BG_PATH__";
 const FEEDBACK_IMAGES = "__FEEDBACK_IMAGES__";
 const SHEET_ID = "1qowXiNelPflvWPYv1lWWCf7z9AnltCL5Tem8Sus-arI";
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}`;
@@ -164,6 +166,7 @@ export default {
     if (pathname === "/styles.css") return new Response(STYLES, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "public, max-age=3600" } });
     if (pathname === "/app.js") return new Response(CLIENT, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=3600" } });
     if (pathname === "/favicon.svg") return new Response(favicon, { headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" } });
+    if (pathname === OPENING_BG_PATH) return new Response(Uint8Array.from(atob(OPENING_BG), (character) => character.charCodeAt(0)), { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
     const feedback = FEEDBACK_IMAGES.find((image) => image.path === pathname);
     if (feedback) return new Response(Uint8Array.from(atob(feedback.base64), (character) => character.charCodeAt(0)), { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
     if (/^\/image\/[A-Z0-9-]+$/i.test(pathname)) {

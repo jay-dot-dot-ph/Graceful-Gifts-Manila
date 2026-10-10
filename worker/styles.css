@@ -14,10 +14,10 @@
 .brand-symbol{font-size:25px;letter-spacing:0;padding-right:0}
 
 /* The homepage opening holds for seven seconds on every visit. */
-.opening-screen{position:fixed;inset:0;z-index:200;overflow:hidden;background:radial-gradient(circle at 50% 38%,#fffdf8 0%,#f4eee3 72%,#e9dfcf 100%);color:var(--ink);animation:opening-exit .55s ease-in-out 7s forwards}
+.opening-screen{position:fixed;inset:0;z-index:200;overflow:hidden;background-color:#e9dfcf;background-image:linear-gradient(#f9f5ed70,#f9f5ed90),url('__OPENING_BG_PATH__');background-position:center,center 57%;background-size:cover;background-repeat:no-repeat;color:var(--ink);animation:opening-exit .55s ease-in-out 7s forwards}
 .opening-route-skip .opening-screen{display:none}
 .opening-content{height:100%;height:100dvh;min-height:0;display:grid;place-items:center;padding:clamp(16px,3vw,50px)}
-.opening-brand{position:relative;z-index:2;align-self:center;justify-self:center;text-align:center;display:flex;align-items:center;flex-direction:column;gap:0}
+.opening-brand{position:relative;z-index:2;align-self:center;justify-self:center;text-align:center;display:flex;align-items:center;flex-direction:column;gap:0;padding:20px 28px;background:#fffdf8d9;box-shadow:0 12px 45px #352b1d24;backdrop-filter:blur(5px)}
 .opening-mark{width:clamp(66px,8vw,88px);height:clamp(66px,8vw,88px);display:grid;place-items:center;border:1px solid #b99b6b;border-radius:50%;font-family:var(--serif);font-size:clamp(2.5rem,5vw,3.3rem);color:#866b42;line-height:1}
 .opening-name{font-size:clamp(.85rem,1.8vw,1.12rem);font-weight:700;letter-spacing:.23em;line-height:1.5;margin:25px 0 0}
 .opening-name span{display:block;font-size:.68em;letter-spacing:.42em;margin-top:3px}

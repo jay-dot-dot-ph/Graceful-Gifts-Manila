@@ -36,6 +36,7 @@ try {
       return {
         delay: getComputedStyle(screen).animationDelay,
         fadeDuration: getComputedStyle(screen).animationDuration,
+        backgroundImage: getComputedStyle(screen).backgroundImage,
         scrollWidth: document.documentElement.scrollWidth,
         viewportWidth: innerWidth,
         inert: document.querySelector('#app').inert,
@@ -64,8 +65,17 @@ try {
     assert.equal(state.delay, '7s', `${label}: exit should begin at seven seconds`);
     assert.equal(state.fadeDuration, label === 'tablet' ? '0.001s' : '0.55s', `${label}: fade should respect reduced motion`);
     assert.equal(state.inert, true, `${label}: homepage should not receive focus during opening`);
+    const backgroundPath = state.backgroundImage.match(/\/assets\/opening-bg-[a-f0-9]{12}\.jpg/)?.[0];
+    assert.ok(backgroundPath, `${label}: opening should use the supplied photograph`);
+    const background = await page.evaluate(async (path) => {
+      const response = await fetch(path);
+      if (!response.ok) return { status: response.status };
+      const image = await createImageBitmap(await response.blob());
+      return { status: response.status, width: image.width, height: image.height };
+    }, backgroundPath);
+    assert.deepEqual(background, { status: 200, width: 1440, height: 2560 }, `${label}: supplied photograph should load at its original dimensions`);
     assert.ok(state.scrollWidth <= state.viewportWidth + 1, `${label}: no horizontal overflow`);
-    const [minimum, maximum] = label.includes('desktop') ? [20, 28] : label === 'tablet' ? [3, 5] : [2, 3];
+    const [minimum, maximum] = label.includes('desktop') ? [30, 42] : label === 'tablet' ? [3, 5] : [2, 3];
     assert.ok(state.visibleCount >= minimum && state.visibleCount <= maximum, `${label}: expected ${minimum}–${maximum} pictures together; saw ${state.visibleCount} visible / ${state.activeCount} active`);
     assert.equal(state.overlap, false, `${label}: pictures must clear the loading logo and message`);
     assert.equal(state.logoTopmost && state.logoVisible, true, `${label}: the centered brand mark must remain visible above the collage`);
