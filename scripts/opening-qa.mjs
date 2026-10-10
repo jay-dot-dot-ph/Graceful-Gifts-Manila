@@ -59,7 +59,7 @@ try {
     assert.deepEqual(state.spotOverlaps, [false, false, false, false], `${label}: no floating position should cover the branding`);
     assert.equal(state.inert, true, `${label}: homepage should not receive focus during opening`);
     assert.ok(state.scrollWidth <= state.viewportWidth + 1, `${label}: layout should not overflow horizontally`);
-    assert.match(state.imageUrl, /\/feedback\/opening\.jpg$/);
+    assert.match(state.imageUrl, /\/feedback\/opening-35b1b185\.jpg$/);
     assert.deepEqual(state.imageSize, [249, 263], `${label}: use the supplied image at its native dimensions`);
     assert.ok(state.renderedSize.every((size, index) => Math.abs(size - state.imageSize[index]) < 0.01), `${label}: image must not be resized or cropped`);
     if (label === 'desktop' || label === 'mobile') {
