@@ -2,6 +2,8 @@
 
 Responsive watch showroom backed by the existing **2026 WATCHES** Google Sheet. The site has no accounts, cart, checkout, or payment collection. Customers browse the catalog, save favorites in their browser, copy an inquiry, then continue in Messenger.
 
+Live website: https://graceful-gifts-manila.web.app
+
 ## Local preview
 
 Use Node.js 24 or later from this directory:
@@ -25,7 +27,7 @@ The current Sheet has no usable recent `Date Added` values or featured markers, 
 
 The live Sheet currently has no watch with zero stock. Browser QA injects a temporary zero-stock test fixture to check the sold-out display and inquiry message; it does not change the Sheet or customer catalog.
 
-Several supplied watch images visibly contain `LUXX Collection` branding and a different contact number. The site shows Sheet images unchanged. Those images should be reviewed or replaced in the spreadsheet before a customer-facing launch.
+Several supplied watch images visibly contain `LUXX Collection` branding and a different contact number. The site shows Sheet images unchanged. Those images should be reviewed or replaced in the spreadsheet.
 
 The Sheet was already publicly readable when this build began. The site does not write to it or change its sharing settings. If its sharing or HTML format changes, the read adapter will need updating.
 
@@ -33,7 +35,7 @@ The Sheet was already publicly readable when this build began. The site does not
 
 The Firebase project is `graceful-gifts-manila`. Its Spark plan supports the static Hosting export in `hosting-dist/`; the Firebase Web SDK snippet is not needed for this catalog. Run `npm.cmd run build:firebase` to read the Sheet and generate 696 product HTML pages, catalog JSON, and locally hosted copies of the spreadsheet images. `firebase.json` serves these files with clean product URLs. The export fails if a brand tab or watch image cannot be fetched, so an incomplete catalog is not deployed silently.
 
-The GitHub workflow in `.github/workflows/firebase-hosting.yml` can refresh and deploy the catalog every six hours after the repository receives the source and the encrypted `FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA` secret. Until that workflow is active, Sheet changes require a new export and Firebase deployment. Image filenames change when a source image changes, allowing refreshed photos to replace older cached versions.
+The GitHub workflow in `.github/workflows/firebase-hosting.yml` refreshes and deploys the catalog every six hours. Its encrypted `FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA` secret is stored in the repository. The first successful automated run completed on 2026-10-10. Image filenames change when a source image changes, allowing refreshed photos to replace older cached versions.
 
 For a manual deployment from this folder, use the Firebase CLI after `npm.cmd run build:firebase`:
 
