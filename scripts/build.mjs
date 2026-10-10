@@ -7,7 +7,7 @@ if (!dist.startsWith(root + sep)) throw new Error("Build output escaped the site
 const source = readFileSync(join(root, "worker/index.js"), "utf8");
 const styles = readFileSync(join(root, "worker/styles.css"), "utf8");
 const client = readFileSync(join(root, "worker/client.js"), "utf8");
-const openingFeedback = readFileSync(join(root, "feedback/photo_2026-04-29_13-24-58.jpg"));
+const openingFeedback = readFileSync(join(root, "feedback/photo_2025-05-24_15-30-47 (6).jpg"));
 if (!source.includes('"__STYLES__"') || !source.includes('"__CLIENT__"') || !source.includes('"__OPENING_FEEDBACK__"')) throw new Error("Missing build placeholders.");
 const bundled = source.replace('"__STYLES__"', JSON.stringify(styles)).replace('"__CLIENT__"', JSON.stringify(client)).replace('"__OPENING_FEEDBACK__"', JSON.stringify(openingFeedback.toString("base64")));
 rmSync(dist, { recursive: true, force: true });
