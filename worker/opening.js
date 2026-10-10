@@ -74,8 +74,8 @@
     const columns = width >= 1300 ? 10 : 9;
     const rows = height >= 800 ? 6 : 5;
     const grid = shuffle(Array.from({ length: columns * rows }, (_, index) => ({
-      x: inset + (maxX - inset) * (index % columns) / (columns - 1),
-      y: inset + (maxY - inset) * Math.floor(index / columns) / (rows - 1),
+      x: Math.max(inset, Math.min(maxX, width * ((index % columns) + 0.5) / columns - card.width / 2)),
+      y: Math.max(inset, Math.min(maxY, height * (Math.floor(index / columns) + 0.5) / rows - card.height / 2)),
     })));
     let best = null;
     for (let attempt = 0; attempt < grid.length + 80; attempt++) {
@@ -87,7 +87,7 @@
       if (!best || overlap < best.overlap) best = { rect, overlap };
       if (overlap < 0.04) break;
     }
-    if (!best || best.overlap > (targetCount() === 42 ? 0.42 : 0.38)) return null;
+    if (!best || best.overlap > (targetCount() === 42 ? 0.5 : 0.38)) return null;
     card.element.style.left = `${best.rect.left}px`;
     card.element.style.top = `${best.rect.top}px`;
     return best.rect;
