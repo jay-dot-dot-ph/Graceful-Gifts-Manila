@@ -4,8 +4,8 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const base = process.env.QA_BASE || 'http://127.0.0.1:4173';
-const catalogEndpoint = process.env.QA_CATALOG_URL || '/api/catalog';
+const base = process.argv[2] || process.env.QA_BASE || 'http://127.0.0.1:4173';
+const catalogEndpoint = process.argv[3] || process.env.QA_CATALOG_URL || '/api/catalog';
 const output = resolve('.sites-runtime');
 mkdirSync(output, { recursive: true });
 const browser = await chromium.launch({ executablePath: edge, headless: true });

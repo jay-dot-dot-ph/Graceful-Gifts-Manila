@@ -46,6 +46,8 @@ rmSync(output, { recursive: true, force: true });
 mkdirSync(join(output, 'images'), { recursive: true });
 mkdirSync(join(output, 'api'), { recursive: true });
 mkdirSync(join(output, 'watch'), { recursive: true });
+mkdirSync(join(output, 'feedback'), { recursive: true });
+copyFileSync(join(root, 'feedback/photo_2026-04-29_13-24-58.jpg'), join(output, 'feedback/opening.jpg'));
 
 const imageWatches = catalog.watches.filter((watch) => watch.image);
 let nextImage = 0;
