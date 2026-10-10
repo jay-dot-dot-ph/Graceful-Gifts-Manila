@@ -12,7 +12,9 @@ const { default: worker } = await import('../dist/server/index.js');
 const catalogResponse = await worker.fetch(new Request(`${origin}/api/catalog`));
 if (!catalogResponse.ok) throw new Error(`Live catalog returned ${catalogResponse.status}`);
 const catalog = await catalogResponse.json();
-if (catalog.partial || catalog.stale || catalog.failedBrands.length || catalog.duplicateIds.length) throw new Error('Catalog is incomplete; refusing to publish a partial snapshot.');
+if (catalog.partial || catalog.stale || catalog.failedBrands.length || catalog.duplicateIds.length) {
+  throw new Error(`Catalog is incomplete; refusing to publish a partial snapshot. Failed brands: ${catalog.failedBrands.join(', ') || 'none'}; failed image brands: ${catalog.failedImageBrands.join(', ') || 'none'}; duplicate IDs: ${catalog.duplicateIds.join(', ') || 'none'}; stale: ${catalog.stale}.`);
+}
 if (catalog.watches.length < 600) throw new Error(`Unexpected catalog size: ${catalog.watches.length}`);
 
 mkdirSync(cache, { recursive: true });
