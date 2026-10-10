@@ -1,0 +1,20 @@
+{
+  "hosting": {
+    "public": "hosting-dist",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "rewrites": [
+      { "source": "/watches", "destination": "/index.html" },
+      { "source": "/watches/**", "destination": "/index.html" },
+      { "source": "/favorites", "destination": "/index.html" },
+      { "source": "/contact", "destination": "/index.html" },
+      { "source": "/watch/**", "destination": "/index.html" }
+    ],
+    "headers": [
+      { "source": "/images/**", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
+      { "source": "/api/catalog.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] },
+      { "source": "**/*.html", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] }
+    ]
+  }
+}

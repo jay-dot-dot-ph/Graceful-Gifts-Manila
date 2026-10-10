@@ -1,0 +1,9 @@
+dist/
+site.tar.gz
+node_modules/
+.sites-runtime/
+hosting-dist/
+.image-cache/
+.openai/
+.firebase/
+firebase-debug.log

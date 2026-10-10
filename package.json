@@ -1,0 +1,17 @@
+{
+  "name": "graceful-gifts-manila-catalog",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:firebase": "node scripts/build.mjs && node scripts/export-firebase.mjs",
+    "validate": "node scripts/validate-artifact.mjs",
+    "dev": "node scripts/dev.mjs",
+    "test:unit": "node scripts/unit.mjs",
+    "test:live": "node scripts/smoke.mjs",
+    "test:browser": "node scripts/browser-qa.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.64.0"
+  }
+}
