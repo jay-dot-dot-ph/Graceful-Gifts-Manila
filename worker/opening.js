@@ -45,17 +45,17 @@
   function updateTiming() {
     const desktop = targetCount() === 42;
     duration = desktop ? 1800 : 1500;
-    enter = desktop ? 150 : 180;
-    hold = desktop ? 1400 : 1050;
+    enter = desktop ? 120 : 180;
+    hold = desktop ? 1520 : 1050;
   }
   function measure(card) {
     const width = opening.clientWidth;
     const height = opening.clientHeight;
     const compact = width < 700 || height < 520;
     const desktop = width >= 1100 && height >= 600;
-    const maxWidth = width <= 340 ? width * 0.52 : compact ? Math.min(width * 0.64, 250) : desktop ? Math.min(125, width * 0.115) : 290;
-    const maxHeight = compact ? Math.min(height * 0.24, 220) : desktop ? Math.min(135, height * 0.19) : Math.min(height * 0.38, 340);
-    const ratio = Math.min(compact ? 0.78 : desktop ? 0.52 : 0.82, maxWidth / card.naturalWidth, maxHeight / card.naturalHeight);
+    const maxWidth = width <= 340 ? width * 0.56 : compact ? Math.min(width * 0.68, 265) : desktop ? Math.min(132, width * 0.122) : 305;
+    const maxHeight = compact ? Math.min(height * 0.255, 232) : desktop ? Math.min(142, height * 0.2) : Math.min(height * 0.4, 355);
+    const ratio = Math.min(compact ? 0.82 : desktop ? 0.55 : 0.86, maxWidth / card.naturalWidth, maxHeight / card.naturalHeight);
     card.width = card.naturalWidth * ratio;
     card.height = card.naturalHeight * ratio;
     card.element.style.width = `${card.width}px`;
@@ -83,7 +83,7 @@
       if (!best || overlap < best.overlap) best = { rect, overlap };
       if (overlap < 0.04) break;
     }
-    if (!best || best.overlap > 0.38) return null;
+    if (!best || best.overlap > (targetCount() === 42 ? 0.42 : 0.38)) return null;
     card.element.style.left = `${best.rect.left}px`;
     card.element.style.top = `${best.rect.top}px`;
     return best.rect;
