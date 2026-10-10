@@ -29,7 +29,7 @@ try {
         viewportWidth: innerWidth,
         overlap: brand.left < feedback.right && brand.right > feedback.left && brand.top < feedback.bottom && brand.bottom > feedback.top,
         inert: document.querySelector('#app').inert,
-        imageUrl: image.currentSrc,
+        imageUrl: image.getAttribute('src'),
       };
     });
     assert.equal(state.delay, '5s', `${label}: exit should begin at five seconds`);
