@@ -110,14 +110,20 @@ const client = await readRoute('/app.js');
 const staticClient = client.replace("fetch('/api/catalog')", "fetch('/api/catalog.json')");
 if (staticClient === client) throw new Error('Catalog URL was not replaced in the browser script.');
 writeFileSync(join(output, 'app.js'), staticClient);
+const versionedClient = `app-${createHash('sha256').update(staticClient).digest('hex').slice(0, 12)}.js`;
+writeFileSync(join(output, versionedClient), staticClient);
+const versionedPage = (html) => {
+  if (!html.includes('src="/app.js"')) throw new Error('Page is missing the catalog browser script.');
+  return html.replace('src="/app.js"', `src="/${versionedClient}"`);
+};
 writeFileSync(join(output, 'favicon.svg'), await readRoute('/favicon.svg'));
 writeFileSync(join(output, 'robots.txt'), await readRoute('/robots.txt'));
 writeFileSync(join(output, 'api', 'catalog.json'), JSON.stringify(catalog));
-writeFileSync(join(output, 'index.html'), await readRoute('/'));
+writeFileSync(join(output, 'index.html'), versionedPage(await readRoute('/')));
 writeFileSync(join(output, '404.html'), '<!doctype html><html lang="en"><meta charset="utf-8"><title>Page not found | Graceful Gifts Manila</title><meta name="viewport" content="width=device-width,initial-scale=1"><main style="font:18px system-ui;margin:12vh auto;max-width:40rem;padding:1rem"><h1>Page not found</h1><p>This address is not in the watch collection.</p><a href="/watches">Browse watches</a></main></html>');
 
 for (const watch of catalog.watches) {
-  let html = await readRoute(`/watch/${encodeURIComponent(watch.id)}`);
+  let html = versionedPage(await readRoute(`/watch/${encodeURIComponent(watch.id)}`));
   if (watch.localImage) html = html.replaceAll(`/image/${encodeURIComponent(watch.id)}`, watch.localImage);
   writeFileSync(join(output, 'watch', `${watch.id}.html`), html);
 }
