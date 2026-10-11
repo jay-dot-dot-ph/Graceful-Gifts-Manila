@@ -206,7 +206,7 @@
   }
   start();
   setTimeout(() => start(true), 500);
-  setTimeout(holdFinalGroup, 3400);
+  setTimeout(holdFinalGroup, 2400);
   window.addEventListener('resize', () => {
     if (!started || finalGroup) return;
     for (const entry of active) {

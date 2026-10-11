@@ -38,7 +38,7 @@ try {
     });
     assert.equal(first.screenVisible && first.logoTopmost && first.appHidden, true, `${label}: opening covers the main page at first paint`);
     if (label === 'desktop') assert.equal(first.stylesReady, false, 'opening appears even while the main stylesheet is delayed');
-    assert.equal(first.delay, '4s', `${label}: opening holds for four seconds`);
+    assert.equal(first.delay, '3s', `${label}: opening holds for three seconds`);
     assert.equal(first.duration, '0.001s', `${label}: exit has no half-second pause`);
     assert.equal(first.cards, feedbackCount, `${label}: all supplied feedback pictures remain in the opening`);
     assert.equal(first.inlineImages, feedbackCount, `${label}: feedback previews load with the page`);
@@ -92,7 +92,7 @@ try {
   await page.locator('#catalog-search').waitFor({ timeout: 5000 });
   assert.equal(await page.locator('#opening-screen').count(), 0, 'Direct catalog visits skip the opening');
   await context.close();
-  console.log('Opening appears before the stylesheet, shows all desktop feedback, and exits after four seconds.');
+  console.log('Opening appears before the stylesheet, shows all desktop feedback, and exits after three seconds.');
 } finally {
   await browser.close();
 }

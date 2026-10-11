@@ -1,6 +1,6 @@
 html,body{margin:0}
 html:has(.opening-screen){overflow:hidden}
-.opening-screen{position:fixed;inset:0;z-index:200;overflow:hidden;background-color:#e9dfcf;background-image:linear-gradient(#f9f5ed70,#f9f5ed90),url('__OPENING_BG_PATH__');background-position:center,center 57%;background-size:cover;background-repeat:no-repeat;color:#1b1b18;animation:opening-exit 1ms linear 4s forwards}
+.opening-screen{position:fixed;inset:0;z-index:200;overflow:hidden;background-color:#e9dfcf;background-image:linear-gradient(#f9f5ed70,#f9f5ed90),url('__OPENING_BG_PATH__');background-position:center,center 57%;background-size:cover;background-repeat:no-repeat;color:#1b1b18;animation:opening-exit 1ms linear 3s forwards}
 .opening-screen~#app{visibility:hidden}
 .opening-route-skip:not(.site-styles-ready) #app{visibility:hidden}
 .opening-route-skip .opening-screen{display:none}
@@ -20,4 +20,4 @@ html:has(.opening-screen){overflow:hidden}
 @media(max-width:340px){.opening-brand{background:#fffdf8ed;padding:15px 12px;box-shadow:0 8px 35px #fffdf8;outline:1px solid #d9cbb651}}
 @media(max-height:500px){.opening-brand{background:#fffdf8ed;padding:10px 12px;box-shadow:0 8px 35px #fffdf8;outline:1px solid #d9cbb651}}
 @media(max-height:520px){.opening-mark{width:52px;height:52px;font-size:2rem}.opening-name{margin-top:10px}.opening-rule{margin:10px 0}}
-@media(prefers-reduced-motion:reduce){.opening-screen{animation:opening-exit 1ms linear 4s forwards!important}}
+@media(prefers-reduced-motion:reduce){.opening-screen{animation:opening-exit 1ms linear 3s forwards!important}}
