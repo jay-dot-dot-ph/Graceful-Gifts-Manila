@@ -33,7 +33,9 @@ The Sheet was already publicly readable when this build began. The site does not
 
 ## Firebase Hosting
 
-The Firebase project is `graceful-gifts-manila`. Its Spark plan supports the static Hosting export in `hosting-dist/`; the Firebase Web SDK snippet is not needed for this catalog. Run `npm.cmd run build:firebase` to read the Sheet and generate 696 product HTML pages, catalog JSON, and locally hosted copies of the spreadsheet images. `firebase.json` serves these files with clean product URLs. The export fails if a brand tab or watch image cannot be fetched, so an incomplete catalog is not deployed silently.
+The Firebase project is `graceful-gifts-manila`. Its Spark plan supports the static Hosting export in `hosting-dist/`; the Firebase Web SDK snippet is not needed for this catalog. Run `npm.cmd run build:firebase` to read the Sheet and generate product HTML pages, catalog JSON, and locally hosted copies of the spreadsheet images. `firebase.json` serves these files with clean product URLs. The export fails if a brand tab or selected watch image cannot be fetched, so an incomplete catalog is not deployed silently.
+
+Google's Sheet HTML only exposes the first 99 embedded photos in a tab. When later rows have no image URL, the Firebase export reads that tab's XLSX image anchors and saves the photos against their Watch IDs. This keeps later Rolex listings from showing image placeholders.
 
 The GitHub workflow in `.github/workflows/firebase-hosting.yml` refreshes and deploys the catalog every six hours. Its encrypted `FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA` secret is stored in the repository. The first successful automated run completed on 2026-10-10. Image filenames change when a source image changes, allowing refreshed photos to replace older cached versions.
 

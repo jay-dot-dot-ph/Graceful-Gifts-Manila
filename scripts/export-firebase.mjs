@@ -3,6 +3,8 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { feedbackAssets } from './feedback-assets.mjs';
+import { extractXlsxImages } from './xlsx-images.mjs';
+import { SHEET_BASE } from '../worker/index.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, 'hosting-dist');
@@ -49,6 +51,29 @@ if ((catalog.brands.find((brand) => brand.name === 'VACHERON')?.count ?? 0) < 9 
   throw new Error('VACHERON public catalog contains unexpected brands or too few watches.');
 }
 
+const embeddedImages = new Map();
+const missingImageBrands = new Set(catalog.watches.filter((watch) => !watch.image).map((watch) => watch.brandTab));
+for (const name of missingImageBrands) {
+  const brand = catalog.brands.find((item) => item.name === name);
+  if (!brand?.gid) throw new Error(`Missing sheet ID for ${name}`);
+  const [csvResponse, xlsxResponse] = await Promise.all([
+    fetch(`${SHEET_BASE}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`, { signal: AbortSignal.timeout(30000) }),
+    fetch(`${SHEET_BASE}/export?format=xlsx&gid=${encodeURIComponent(brand.gid)}`, { signal: AbortSignal.timeout(120000) }),
+  ]);
+  if (!csvResponse.ok || !xlsxResponse.ok) throw new Error(`Could not read embedded images for ${name}: CSV ${csvResponse.status}, XLSX ${xlsxResponse.status}`);
+  const csv = await csvResponse.text();
+  const xlsx = Buffer.from(await xlsxResponse.arrayBuffer());
+  if (xlsx.length > 100_000_000) throw new Error(`XLSX export for ${name} is too large`);
+  const images = extractXlsxImages(xlsx, csv);
+  const brandWatches = catalog.watches.filter((watch) => watch.brandTab === name);
+  const ids = new Set(brandWatches.map((watch) => watch.id));
+  if ([...images.keys()].some((id) => !ids.has(id))) throw new Error(`XLSX images do not match the ${name} catalog`);
+  for (const watch of brandWatches) {
+    if (!watch.image && images.has(watch.id)) embeddedImages.set(watch.id, images.get(watch.id));
+  }
+  console.log(`Recovered ${[...embeddedImages.keys()].filter((id) => ids.has(id)).length} embedded images for ${name}.`);
+}
+
 mkdirSync(cache, { recursive: true });
 rmSync(output, { recursive: true, force: true });
 mkdirSync(join(output, 'images'), { recursive: true });
@@ -57,12 +82,21 @@ mkdirSync(join(output, 'watch'), { recursive: true });
 mkdirSync(join(output, 'feedback'), { recursive: true });
 for (const { path, bytes } of feedbackAssets(root)) writeFileSync(join(output, path), bytes);
 
-const imageWatches = catalog.watches.filter((watch) => watch.image);
+const imageWatches = catalog.watches.filter((watch) => watch.image || embeddedImages.has(watch.id));
 let nextImage = 0;
 const failures = [];
 let downloaded = 0;
 const extension = (type) => type.startsWith('image/jpeg') ? 'jpg' : type.startsWith('image/png') ? 'png' : type.startsWith('image/webp') ? 'webp' : null;
 async function downloadImage(watch) {
+  const embedded = embeddedImages.get(watch.id);
+  if (embedded) {
+    const digest = createHash('sha256').update(embedded.bytes).digest('hex').slice(0, 12);
+    const filename = `${watch.id}-${digest}.${embedded.extension}`;
+    writeFileSync(join(output, 'images', filename), embedded.bytes);
+    watch.localImage = `/images/${filename}`;
+    watch.image = watch.localImage;
+    return;
+  }
   const source = new URL(watch.image);
   if (source.protocol !== 'https:' || source.hostname !== 'docs.google.com' || !source.pathname.startsWith('/sheets-images-rt/')) throw new Error(`Unexpected image host for ${watch.id}`);
   const digest = createHash('sha256').update(watch.image).digest('hex').slice(0, 12);

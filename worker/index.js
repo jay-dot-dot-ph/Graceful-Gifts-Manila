@@ -3,7 +3,7 @@ const STYLES = "__STYLES__";
 const CLIENT = "__CLIENT__";
 const FEEDBACK_IMAGES = "__FEEDBACK_IMAGES__";
 const SHEET_ID = "1qowXiNelPflvWPYv1lWWCf7z9AnltCL5Tem8Sus-arI";
-const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}`;
+export const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}`;
 const FACEBOOK = "https://www.facebook.com/GracefulGifts.Manila";
 const MESSENGER = "https://m.me/GracefulGifts.Manila";
 const CACHE_MS = 5 * 60 * 1000;
@@ -143,7 +143,7 @@ async function loadCatalog() {
   });
   if (!watches.length) throw new Error("The watch catalog could not be loaded.");
   if (failedBrands.length && catalogCache) return { ...catalogCache, stale: true, failedBrands };
-  return { watches, brands: tabs.map(([name]) => ({ name, slug: slug(name), count: watches.filter((watch) => watch.brandTab === name).length })), sourceWatchCount: ids.size, excludedMisfiledCount, fetchedAt: new Date().toISOString(), partial: failedBrands.length > 0 || failedImageBrands.length > 0, failedBrands, failedImageBrands, duplicateIds, stale: false };
+  return { watches, brands: tabs.map(([name, gid]) => ({ name, slug: slug(name), gid, count: watches.filter((watch) => watch.brandTab === name).length })), sourceWatchCount: ids.size, excludedMisfiledCount, fetchedAt: new Date().toISOString(), partial: failedBrands.length > 0 || failedImageBrands.length > 0, failedBrands, failedImageBrands, duplicateIds, stale: false };
 }
 async function getCatalog() {
   if (catalogCache && Date.now() - Date.parse(catalogCache.fetchedAt) < CACHE_MS) return catalogCache;
