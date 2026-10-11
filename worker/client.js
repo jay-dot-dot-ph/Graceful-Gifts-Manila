@@ -34,8 +34,8 @@ function card(watch) {
 function sectionHead(eyebrow, title, link, label) {
   return `<div class="section-head"><div><p class="eyebrow">${eyebrow}</p><h2>${title}</h2></div>${link ? `<a class="text-link" href="${link}">${label || 'View all'} <span aria-hidden="true">↗</span></a>` : ''}</div>`;
 }
-function brandTiles(brands, limit) {
-  return `<div class="brand-grid">${brands.filter((brand) => brand.count).slice(0, limit).map((brand) => `<a class="brand-tile" href="/watches/${brand.slug}"><span>${esc(brand.name)}</span><small>${brand.count} ${brand.count === 1 ? 'watch' : 'watches'} <span aria-hidden="true">↗</span></small></a>`).join('')}</div>`;
+function brandTiles(brands, limit, id = '') {
+  return `<div class="brand-grid" ${id ? `id="${id}"` : ''}>${brands.filter((brand) => brand.count).slice(0, limit).map((brand) => `<a class="brand-tile" href="/watches/${brand.slug}"><span>${esc(brand.name)}</span><small>${brand.count} ${brand.count === 1 ? 'watch' : 'watches'} <span aria-hidden="true">↗</span></small></a>`).join('')}</div>`;
 }
 function isNew(watch) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(watch.dateAdded)) return false;
@@ -93,8 +93,13 @@ function updateResults() {
 }
 function catalogPage() {
   const brand = catalog.brands.find((item) => item.slug === filters.brand);
-  app.innerHTML = nav('Watches') + `<main><section class="page-heading"><div class="container"><p class="eyebrow">THE COLLECTION</p><h1>${brand ? esc(brand.name) + ' watches' : 'Explore the collection'}</h1><p>Find your next favorite by brand, detail, color, or price.</p></div></section><section class="container brand-list-section" id="brands">${brandTiles(catalog.brands)}</section><section class="container catalog-layout"><aside class="filters" id="filters-panel">${filterForm()}</aside><div class="catalog-main"><div class="catalog-toolbar"><label class="search-field"><span aria-hidden="true">⌕</span><input id="catalog-search" type="search" placeholder="Search brand, model, Watch ID…" value="${esc(filters.query)}" aria-label="Search watches"></label><button class="mobile-filter-button" type="button" data-open-filters>Filter & sort <span>☷</span></button><label class="sort-control">Sort by <select id="catalog-sort"><option value="newest">Newest</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="brand">Brand: A–Z</option></select></label></div><div class="catalog-count"><span id="result-count"></span><span>Prices in Philippine pesos</span></div><div id="catalog-results"></div></div></section></main><div class="filter-backdrop" data-close-filters></div>` + footer();
+  app.innerHTML = nav('Watches') + `<main><section class="page-heading"><div class="container"><p class="eyebrow">THE COLLECTION</p><h1>${brand ? esc(brand.name) + ' watches' : 'Explore the collection'}</h1><p>Find your next favorite by brand, detail, color, or price.</p></div></section><section class="container brand-list-section" id="brands">${brandTiles(catalog.brands, undefined, 'catalog-brand-grid')}<button class="brand-toggle" type="button" data-brand-toggle aria-controls="catalog-brand-grid" aria-expanded="false">See more brands</button></section><section class="container catalog-layout"><aside class="filters" id="filters-panel">${filterForm()}</aside><div class="catalog-main"><div class="catalog-toolbar"><label class="search-field"><span aria-hidden="true">⌕</span><input id="catalog-search" type="search" placeholder="Search brand, model, Watch ID…" value="${esc(filters.query)}" aria-label="Search watches"></label><button class="mobile-filter-button" type="button" data-open-filters>Filter & sort <span>☷</span></button><label class="sort-control">Sort by <select id="catalog-sort"><option value="newest">Newest</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="brand">Brand: A–Z</option></select></label></div><div class="catalog-count"><span id="result-count"></span><span>Prices in Philippine pesos</span></div><div id="catalog-results"></div></div></section></main><div class="filter-backdrop" data-close-filters></div>` + footer();
   document.getElementById('catalog-sort').value = filters.sort;
+  document.querySelector('[data-brand-toggle]').addEventListener('click', (event) => {
+    const expanded = document.getElementById('brands').classList.toggle('expanded');
+    event.currentTarget.setAttribute('aria-expanded', String(expanded));
+    event.currentTarget.textContent = expanded ? 'See fewer brands' : 'See more brands';
+  });
   document.getElementById('catalog-search').addEventListener('input', (event) => { filters.query = event.target.value; shown = 24; updateResults(); });
   document.getElementById('catalog-sort').addEventListener('change', (event) => { filters.sort = event.target.value; shown = 24; updateResults(); });
   document.querySelectorAll('[data-filter]').forEach((field) => field.addEventListener('input', (event) => { filters[event.target.dataset.filter] = event.target.value; shown = 24; updateResults(); }));

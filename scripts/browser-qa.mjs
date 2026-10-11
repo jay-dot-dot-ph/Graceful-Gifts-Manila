@@ -21,6 +21,24 @@ try {
   await page.screenshot({ path: resolve(output, 'qa-desktop.png') });
   await page.goto(base + '/watches');
   await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
+  const brandTiles = page.locator('#catalog-brand-grid .brand-tile');
+  const brandToggle = page.locator('[data-brand-toggle]');
+  const brandCount = await brandTiles.count();
+  assert.ok(brandCount >= 23, `All current brand tabs should have tiles: ${brandCount}`);
+  assert.equal(await brandTiles.filter({ visible: true }).count(), 7, 'Desktop should show one brand row');
+  assert.equal(await brandToggle.getAttribute('aria-expanded'), 'false');
+  await page.screenshot({ path: resolve(output, 'qa-brand-desktop.png') });
+  for (const [width, expected] of [[1000, 5], [700, 3], [390, 2]]) {
+    await page.setViewportSize({ width, height: 900 });
+    assert.equal(await brandTiles.filter({ visible: true }).count(), expected, `${width}px should show one brand row`);
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await brandToggle.click();
+  assert.equal(await brandTiles.filter({ visible: true }).count(), brandCount, 'See more should reveal every brand');
+  assert.equal(await brandToggle.getAttribute('aria-expanded'), 'true');
+  await brandToggle.click();
+  assert.equal(await brandTiles.filter({ visible: true }).count(), 7, 'See fewer should restore one row');
+  await brandToggle.click();
   const allCount = await page.locator('#result-count').innerText();
   assert.ok(Number(allCount.split(' ')[0]) >= 724, `All current brand tabs should appear in the catalog: ${allCount}`);
   assert.match(await page.locator('a[href="/watches/super-clone-rolex"]').innerText(), /Super clone Rolex\s+8 watches/);
@@ -102,6 +120,15 @@ try {
   const size = await mobilePage.evaluate(() => ({ viewport: innerWidth, content: document.documentElement.scrollWidth }));
   assert.ok(size.content <= size.viewport + 1, `Mobile overflow: ${JSON.stringify(size)}`);
   await mobilePage.screenshot({ path: resolve(output, 'qa-mobile.png') });
+  await mobilePage.goto(base + '/watches/seiko');
+  await mobilePage.locator('.watch-card').first().waitFor({ timeout: 30000 });
+  const mobileBrandTiles = mobilePage.locator('#catalog-brand-grid .brand-tile');
+  assert.equal(await mobileBrandTiles.filter({ visible: true }).count(), 2, 'Phone should show one brand row');
+  await mobilePage.screenshot({ path: resolve(output, 'qa-brand-mobile.png') });
+  await mobilePage.locator('[data-brand-toggle]').click();
+  assert.equal(await mobileBrandTiles.filter({ visible: true }).count(), brandCount);
+  assert.equal(await mobilePage.locator('[data-brand-toggle]').getAttribute('aria-expanded'), 'true');
+  await mobilePage.goto(base + '/');
   await mobilePage.locator('[data-menu]').click();
   assert.equal(await mobilePage.locator('#mobile-nav').isVisible(), true);
   await mobilePage.goto(base + '/watch/RLX-W001');
