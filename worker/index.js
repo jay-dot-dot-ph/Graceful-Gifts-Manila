@@ -9,15 +9,6 @@ const SHEET_ID = "1qowXiNelPflvWPYv1lWWCf7z9AnltCL5Tem8Sus-arI";
 const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}`;
 const FACEBOOK = "https://www.facebook.com/GracefulGifts.Manila";
 const MESSENGER = "https://m.me/GracefulGifts.Manila";
-const BRAND_TABS = [
-  ["AP", "1994018057"], ["BVLGARI", "153669170"], ["CARTIER", "327287243"],
-  ["CHARRIOL", "976443302"], ["COACH", "1611498834"], ["FOSSIL", "949872863"],
-  ["HUBLOT", "1825202400"], ["INVICTA", "1839212129"], ["MARCJACOBS", "1217338794"],
-  ["MK", "35068659"], ["MS", "535083943"], ["OMEGA", "1895499623"],
-  ["PANERAI", "867802356"], ["PATEK", "742602860"], ["PS", "914894785"],
-  ["RADO", "705980892"], ["SEIKO", "324325008"], ["TAG", "1894959040"],
-  ["TISSOT", "1920786190"], ["ROLEX", "2073039252"], ["VACHERON", "1215005135"],
-];
 const CACHE_MS = 5 * 60 * 1000;
 let catalogCache = null;
 let catalogPromise = null;
@@ -49,15 +40,15 @@ export function parseCsv(input) {
 export function discoverTabs(html) {
   const captions = [...html.matchAll(/docs-sheet-tab-caption[^>]*>([^<]+)<\/div>/g)]
     .map((match) => match[1].trim()).filter((name) => name && !["CATEGORIES", "DEFINITION"].includes(name));
-  const found = [];
-  for (const name of captions) {
-    const index = html.lastIndexOf(name);
-    if (index < 0) continue;
-    const ids = [...html.slice(Math.max(0, index - 220), index).matchAll(/\d{6,12}/g)];
-    const gid = ids.at(-1)?.[0];
-    if (gid) found.push([name, gid]);
+  // Google embeds tab names and gids in an escaped metadata block, separate from the tab buttons.
+  const metadata = html.replace(/\\+"/g, '"').replace(/\\+u003d/g, '=');
+  const gids = new Map([...metadata.matchAll(/"3":\[2,"([^"]+)"\],"6":1,"24":"#gid=(\d+)"/g)]
+    .map((match) => [match[1], match[2]]));
+  const missing = captions.filter((name) => !gids.has(name));
+  if (!captions.length || missing.length || new Set(captions.map((name) => gids.get(name))).size !== captions.length) {
+    throw new Error(`Could not discover every brand tab: ${missing.join(', ') || 'missing or duplicate sheet IDs'}`);
   }
-  return found.length ? found : BRAND_TABS;
+  return captions.map((name) => [name, gids.get(name)]);
 }
 
 export function extractImages(html) {
@@ -108,6 +99,17 @@ async function fetchText(url) {
   }
   throw lastError;
 }
+async function loadTabs() {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { return discoverTabs(await fetchText(`${SHEET_BASE}/edit`)); }
+    catch (error) {
+      lastError = error;
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
 async function loadBrand([name, gid]) {
   const csv = `${SHEET_BASE}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
   const page = `${SHEET_BASE}/edit?gid=${encodeURIComponent(gid)}`;
@@ -123,7 +125,7 @@ async function loadBrand([name, gid]) {
   return { watches: normalizeRows(data, name, images), missingImages: watches.length > 0 && !images.size && !watches.some((watch) => watch.image) };
 }
 async function loadCatalog() {
-  const tabs = BRAND_TABS;
+  const tabs = await loadTabs();
   const results = [];
   for (let i = 0; i < tabs.length; i += 6) results.push(...await Promise.allSettled(tabs.slice(i, i + 6).map(loadBrand)));
   const failedBrands = [], failedImageBrands = [], watches = [], ids = new Set(), duplicateIds = [];

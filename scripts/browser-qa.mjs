@@ -22,7 +22,17 @@ try {
   await page.goto(base + '/watches');
   await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
   const allCount = await page.locator('#result-count').innerText();
-  assert.match(allCount, /696 watches/);
+  assert.ok(Number(allCount.split(' ')[0]) >= 724, `All current brand tabs should appear in the catalog: ${allCount}`);
+  assert.match(await page.locator('a[href="/watches/super-clone-rolex"]').innerText(), /Super clone Rolex\s+8 watches/);
+  assert.match(await page.locator('a[href="/watches/rm-highgrade"]').innerText(), /RM HIGHGRADE\s+20 watches/);
+  await page.goto(base + '/watches/super-clone-rolex');
+  await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
+  assert.ok(Number((await page.locator('#result-count').innerText()).split(' ')[0]) >= 8);
+  await page.goto(base + '/watches/rm-highgrade');
+  await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
+  assert.ok(Number((await page.locator('#result-count').innerText()).split(' ')[0]) >= 20);
+  await page.goto(base + '/watches');
+  await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
   await page.locator('#catalog-search').fill('RLX-W001');
   assert.match(await page.locator('#result-count').innerText(), /1 watch/);
   await page.goto(base + '/watches/rolex');

@@ -9,7 +9,11 @@ console.log(`Source response: ${catalog.watches.length} watches; failed: ${catal
 console.log(catalog.brands.map((brand) => `${brand.name}:${brand.count}`).join(' '));
 console.log(`Duplicate IDs: ${catalog.duplicateIds.length}`);
 assert.ok(catalog.watches.length >= 600, `Expected the real catalog, got ${catalog.watches.length} watches`);
-assert.ok(catalog.brands.length >= 21, `Expected 21 brand tabs, got ${catalog.brands.length}`);
+assert.ok(catalog.brands.length >= 23, `Expected all current brand tabs, got ${catalog.brands.length}`);
+assert.ok(catalog.brands.find((brand) => brand.name === 'Super clone Rolex')?.count >= 8, 'The new Super clone Rolex tab should be included');
+assert.ok(catalog.brands.find((brand) => brand.name === 'RM HIGHGRADE')?.count >= 20, 'The new RM HIGHGRADE tab should be included');
+assert.equal(catalog.partial, false, 'The live Sheet read should include every brand and image tab');
+assert.deepEqual(catalog.duplicateIds, [], 'Watch IDs must remain unique across all tabs');
 assert.ok(catalog.watches.filter((watch) => watch.image).length >= 300, 'Embedded watch images were not loaded');
 assert.equal(catalog.watches.find((watch) => watch.id === 'RLX-W001')?.price, 5950);
 assert.equal(catalog.watches.find((watch) => watch.id === 'RLX-W001')?.stock, 10);
