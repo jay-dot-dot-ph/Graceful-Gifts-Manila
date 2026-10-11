@@ -102,7 +102,13 @@ function catalogPage() {
   });
   document.getElementById('catalog-search').addEventListener('input', (event) => { filters.query = event.target.value; shown = 24; updateResults(); });
   document.getElementById('catalog-sort').addEventListener('change', (event) => { filters.sort = event.target.value; shown = 24; updateResults(); });
-  document.querySelectorAll('[data-filter]').forEach((field) => field.addEventListener('input', (event) => { filters[event.target.dataset.filter] = event.target.value; shown = 24; updateResults(); }));
+  document.querySelectorAll('[data-filter]').forEach((field) => field.addEventListener('input', (event) => {
+    if (event.target.dataset.filter === 'brand') {
+      location.assign(event.target.value ? `/watches/${encodeURIComponent(event.target.value)}` : '/watches');
+      return;
+    }
+    filters[event.target.dataset.filter] = event.target.value; shown = 24; updateResults();
+  }));
   updateResults(); afterRender();
 }
 function detailPage(watch) {
@@ -183,7 +189,10 @@ document.addEventListener('click', async (event) => {
   if (button.matches('[data-favorite]')) { updateFavorite(button.dataset.favorite); return; }
   if (button.matches('[data-open-filters]')) { document.body.classList.add('filters-open'); return; }
   if (button.matches('[data-close-filters]')) { document.body.classList.remove('filters-open'); return; }
-  if (button.matches('[data-clear]')) { filters = { query:'', brand:'', size:'', dial:'', movement:'', category:'', availability:'', min:'', max:'', sort:'newest' }; shown = 24; catalogPage(); return; }
+  if (button.matches('[data-clear]')) {
+    if (location.pathname !== '/watches' || location.search) { location.assign('/watches'); return; }
+    filters = { query:'', brand:'', size:'', dial:'', movement:'', category:'', availability:'', min:'', max:'', sort:'newest' }; shown = 24; catalogPage(); return;
+  }
   if (button.matches('[data-load-more]')) { shown += 24; updateResults(); return; }
   if (button.matches('[data-inquire]')) { const watch = catalog.watches.find((item) => item.id === button.dataset.inquire); await handleInquiry(button, watch ? [watch] : []); return; }
   if (button.matches('[data-inquire-selected]')) { await handleInquiry(button, catalog.watches.filter((watch) => selected.has(watch.id))); return; }
