@@ -37,12 +37,12 @@ try {
     });
     assert.equal(first.screenVisible && first.logoTopmost && first.appHidden, true, `${label}: opening covers the main page at first paint`);
     if (label === 'desktop') assert.equal(first.stylesReady, false, 'opening appears even while the main stylesheet is delayed');
-    assert.equal(first.delay, '7s', `${label}: opening still holds for seven seconds`);
+    assert.equal(first.delay, '4s', `${label}: opening holds for four seconds`);
     assert.equal(first.duration, '0.001s', `${label}: exit has no half-second pause`);
     assert.equal(first.cards, feedbackCount, `${label}: all supplied feedback pictures remain in the opening`);
     await page.waitForFunction(() => [...document.querySelectorAll('.opening-feedback')].some((card) => Number(getComputedStyle(card).opacity) > 0.2), null, { timeout: 3500 });
     if (label.endsWith('desktop')) {
-      await page.waitForFunction((count) => [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95).length === count, feedbackCount, { timeout: 5000 });
+      await page.waitForFunction((count) => [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95).length === count, feedbackCount, { timeout: 3500 });
       const collage = await page.evaluate(() => {
         const logo = document.querySelector('.opening-brand').getBoundingClientRect();
         const visible = [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95);
@@ -56,7 +56,7 @@ try {
       assert.equal(collage.coveredLogo, false, 'desktop: photos leave the logo clear');
     }
     try {
-      await page.locator('#opening-screen').waitFor({ state: 'detached', timeout: 9000 });
+      await page.locator('#opening-screen').waitFor({ state: 'detached', timeout: 6000 });
     } catch (error) {
       const state = await page.evaluate(() => {
         const screen = document.getElementById('opening-screen');
@@ -80,7 +80,7 @@ try {
   await page.locator('#catalog-search').waitFor({ timeout: 5000 });
   assert.equal(await page.locator('#opening-screen').count(), 0, 'Direct catalog visits skip the opening');
   await context.close();
-  console.log('Opening appears before the stylesheet, retains feedback and seven-second hold, then shows the main page immediately.');
+  console.log('Opening appears before the stylesheet, shows all desktop feedback, and exits after four seconds.');
 } finally {
   await browser.close();
 }

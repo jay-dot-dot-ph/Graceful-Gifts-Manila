@@ -45,9 +45,9 @@
   }
   function updateTiming() {
     const desktop = isDesktop();
-    duration = desktop ? 6000 : 1500;
-    enter = desktop ? 900 : 180;
-    hold = desktop ? 4200 : 1050;
+    duration = desktop ? 3600 : 1500;
+    enter = desktop ? 750 : 180;
+    hold = desktop ? 2400 : 1050;
   }
   function measure(card) {
     const width = opening.clientWidth;
@@ -120,7 +120,7 @@
       entry.animation = entry.card.element.animate([
         { opacity: 0, transform: 'translateY(8px) scale(.96)' },
         { opacity: 1, transform: 'translateY(0) scale(1)' },
-      ], { duration: 900, delay: offset, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' });
+      ], { duration: enter, delay: offset, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' });
       return;
     }
     const direction = Math.random() < 0.5 ? -1 : 1;
@@ -145,7 +145,7 @@
     const ready = cards.filter((card) => card.image.complete && card.image.naturalWidth).length;
     if (ready < (allowPartial ? 2 : slotCount)) return;
     started = true;
-    for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 35 : slot * duration / slotCount);
+    for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 25 : slot * duration / slotCount);
   }
   function holdFinalGroup() {
     finalGroup = true;
@@ -162,8 +162,8 @@
     card.image.src = card.image.dataset.src;
   }
   start();
-  setTimeout(() => start(true), 800);
-  setTimeout(holdFinalGroup, 5800);
+  setTimeout(() => start(true), 500);
+  setTimeout(holdFinalGroup, 3400);
   window.addEventListener('resize', () => {
     if (!started || finalGroup) return;
     for (const entry of active) {
@@ -175,7 +175,7 @@
     deck = [];
     updateTiming();
     slotCount = targetCount();
-    for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 35 : slot * duration / slotCount);
+    for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 25 : slot * duration / slotCount);
   });
   opening.addEventListener('animationend', (event) => {
     if (event.target !== opening) return;
