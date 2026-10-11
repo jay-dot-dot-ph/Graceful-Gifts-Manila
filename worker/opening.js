@@ -63,6 +63,10 @@
     card.element.style.height = `${card.height}px`;
   }
   function position(card) {
+    if (isDesktop()) {
+      const tile = card.element.getBoundingClientRect();
+      return { left: tile.left, top: tile.top, right: tile.right, bottom: tile.bottom };
+    }
     measure(card);
     const width = opening.clientWidth;
     const height = opening.clientHeight;
@@ -72,8 +76,8 @@
     const reserved = { left: logo.left - 40, top: logo.top - 40, right: logo.right + 40, bottom: logo.bottom + 40 };
     const maxX = width - card.width - inset;
     const maxY = height - card.height - inset;
-    const columns = isDesktop() ? (width >= 1300 ? 13 : 11) : (width >= 1300 ? 12 : 10);
-    const rows = isDesktop() ? (height >= 800 ? 8 : 7) : (height >= 800 ? 7 : 6);
+    const columns = width >= 1300 ? 12 : 10;
+    const rows = height >= 800 ? 7 : 6;
     const grid = shuffle(Array.from({ length: columns * rows }, (_, index) => ({
       x: Math.max(inset, Math.min(maxX, width * ((index % columns) + 0.5) / columns - card.width / 2)),
       y: Math.max(inset, Math.min(maxY, height * (Math.floor(index / columns) + 0.5) / rows - card.height / 2)),
@@ -88,13 +92,13 @@
       if (!best || overlap < best.overlap) best = { rect, overlap };
       if (overlap < 0.04) break;
     }
-    if (!best || best.overlap > (isDesktop() ? 0.62 : 0.38)) return null;
+    if (!best || best.overlap > 0.38) return null;
     card.element.style.left = `${best.rect.left}px`;
     card.element.style.top = `${best.rect.top}px`;
     return best.rect;
   }
   function nextCard() {
-    if (!deck.length) deck = shuffle(cards.filter((card) => card.image.complete && card.image.naturalWidth));
+    if (!deck.length) deck = shuffle(cards.filter((card) => (isDesktop() || card.element.dataset.repeat !== 'true') && card.image.complete && card.image.naturalWidth));
     const attempts = deck.length;
     for (let index = 0; index < attempts; index++) {
       const card = deck.shift();
@@ -118,7 +122,7 @@
     }
     if (isDesktop()) {
       entry.animation = entry.card.element.animate([
-        { opacity: 0, transform: 'translateY(8px) scale(.96)' },
+        { opacity: .35, transform: 'translateY(8px) scale(.96)' },
         { opacity: 1, transform: 'translateY(0) scale(1)' },
       ], { duration: enter, delay: offset, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' });
       return;
