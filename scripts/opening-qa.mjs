@@ -60,6 +60,7 @@ try {
           return image.naturalWidth !== Number(card.dataset.width) || image.naturalHeight !== Number(card.dataset.height) || Math.abs(x - y) > 0.005 || x >= 1 || y >= 1;
         }).length,
         animationDurations: visible.map((card) => card.getAnimations()[0]?.effect.getTiming().duration),
+        desktopFadeOffsets: visible.map((card) => card.getAnimations()[0]?.effect.getKeyframes().slice(1, 3).map((frame) => frame.offset)),
       };
     });
     assert.equal(state.delay, '7s', `${label}: exit should begin at seven seconds`);
@@ -84,7 +85,10 @@ try {
     assert.equal(state.paths.length, feedbackCount);
     assert.equal(new Set(state.paths).size, feedbackCount, `${label}: use each supplied picture`);
     assert.ok(state.paths.every((path) => /^\/feedback\/[a-f0-9]{12}\.jpg$/.test(path)), `${label}: use content-versioned original images`);
-    if (label !== 'tablet') assert.ok(state.animationDurations.every((duration) => duration >= 1250 && duration <= 1950), `${label}: pictures should hold for 0.8–1.5 seconds plus gentle fades`);
+    if (label.includes('desktop')) {
+      assert.ok(state.animationDurations.every((duration) => duration === 6000), `${label}: pictures should cycle at the slower desktop pace`);
+      assert.ok(state.desktopFadeOffsets.every((offsets) => offsets?.[0] === 0.15 && offsets?.[1] === 0.85), `${label}: each picture should fade in and out over 900 ms with a 4.2-second hold`);
+    } else if (label !== 'tablet') assert.ok(state.animationDurations.every((duration) => duration >= 1250 && duration <= 1950), `${label}: pictures should hold for 0.8–1.5 seconds plus gentle fades`);
     if (['desktop', 'mobile', 'short-mobile', 'landscape-mobile'].includes(label)) await page.screenshot({ path: resolve(screenshots, `opening-collage-${label}.png`) });
     for (const pause of [2000, 1900]) {
       await page.waitForTimeout(pause);

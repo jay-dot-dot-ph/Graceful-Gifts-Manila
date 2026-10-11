@@ -44,9 +44,9 @@
   }
   function updateTiming() {
     const desktop = targetCount() === 42;
-    duration = desktop ? 1800 : 1500;
-    enter = desktop ? 120 : 180;
-    hold = desktop ? 1520 : 1050;
+    duration = desktop ? 6000 : 1500;
+    enter = desktop ? 900 : 180;
+    hold = desktop ? 4200 : 1050;
   }
   function measure(card) {
     const width = opening.clientWidth;
