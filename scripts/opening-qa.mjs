@@ -42,7 +42,7 @@ try {
     assert.equal(first.cards, feedbackCount, `${label}: all supplied feedback pictures remain in the opening`);
     await page.waitForFunction(() => [...document.querySelectorAll('.opening-feedback')].some((card) => Number(getComputedStyle(card).opacity) > 0.2), null, { timeout: 3500 });
     if (label.endsWith('desktop')) {
-      await page.waitForFunction(() => [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95).length >= 40, null, { timeout: 5000 });
+      await page.waitForFunction((count) => [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95).length === count, feedbackCount, { timeout: 5000 });
       const collage = await page.evaluate(() => {
         const logo = document.querySelector('.opening-brand').getBoundingClientRect();
         const visible = [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95);
@@ -52,7 +52,7 @@ try {
         });
         return { visible: visible.length, coveredLogo };
       });
-      assert.ok(collage.visible >= 40, `desktop: at least forty photos visible together (${collage.visible})`);
+      assert.equal(collage.visible, feedbackCount, `${label}: every photo visible together`);
       assert.equal(collage.coveredLogo, false, 'desktop: photos leave the logo clear');
     }
     try {
