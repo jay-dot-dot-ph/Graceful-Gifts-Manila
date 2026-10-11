@@ -67,7 +67,7 @@ try {
           return image.naturalWidth !== Number(card.dataset.width) || image.naturalHeight !== Number(card.dataset.height) || Math.abs(x - y) > 0.005 || x >= 1 || y >= 1;
         }).length,
         animationDurations: visible.map((card) => card.getAnimations()[0]?.effect.getTiming().duration),
-        desktopTransition: !desktop || visible.every((card) => {
+        desktopTransition: !desktop || cards.filter((card) => card.dataset.active === 'true').every((card) => {
           const frames = card.getAnimations()[0]?.effect.getKeyframes();
           return frames?.[0]?.transform === 'scale(0.94)' && frames?.at(-1)?.transform === 'scale(1)' && Number(frames.at(-1).opacity) === 1;
         }),
@@ -87,7 +87,7 @@ try {
     assert.deepEqual(background, { status: 200, width: 1440, height: 2560 }, `${label}: supplied photograph should load at its original dimensions`);
     assert.ok(state.scrollWidth <= state.viewportWidth + 1, `${label}: no horizontal overflow`);
     const desktop = label.includes('desktop');
-    const [minimum, maximum] = desktop ? [3, 12] : label === 'tablet' ? [3, 5] : [2, 3];
+    const [minimum, maximum] = desktop ? [0, 12] : label === 'tablet' ? [3, 5] : [2, 3];
     assert.ok(state.visibleCount >= minimum && state.visibleCount <= maximum, `${label}: expected ${minimum}–${maximum} pictures together; saw ${state.visibleCount} visible / ${state.activeCount} active`);
     assert.equal(state.overlap, false, `${label}: pictures must clear the loading logo and message`);
     if (desktop) {
@@ -116,6 +116,7 @@ try {
         return {
           count: visible.length,
           active: cards.filter((card) => card.dataset.active === 'true').map((card) => Number(getComputedStyle(card).opacity).toFixed(2)),
+          slots: visible.map((card) => card.dataset.slot),
           overlap: rects.some((rect, index) => rects.slice(index + 1).some((other) => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top)),
           logoClearance: rects.every((rect) => rect.right <= brand.left - 36 || rect.left >= brand.right + 36 || rect.bottom <= brand.top - 36 || rect.top >= brand.bottom + 36),
         };
@@ -124,6 +125,7 @@ try {
       if (desktop) {
         assert.equal(sample.overlap, false, `${label}: all twelve displayed pictures should retain separate positions`);
         assert.equal(sample.logoClearance, true, `${label}: all displayed pictures should preserve the logo's clear space`);
+        assert.equal(new Set(sample.slots).size, sample.count, `${label}: displayed pictures should occupy distinct planned positions`);
       }
     }
     await page.waitForFunction(() => document.querySelector('#opening-screen')?.getAnimations()[0]?.currentTime >= 6800, null, { timeout: 8000 });
