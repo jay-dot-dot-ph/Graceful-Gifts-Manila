@@ -40,7 +40,14 @@ if (catalog.failedImageBrands.length && !catalog.failedBrands.length) {
 if (catalog.partial || catalog.stale || catalog.failedBrands.length || catalog.duplicateIds.length) {
   throw new Error(`Catalog is incomplete; refusing to publish a partial snapshot. Failed brands: ${catalog.failedBrands.join(', ') || 'none'}; failed image brands: ${catalog.failedImageBrands.join(', ') || 'none'}; duplicate IDs: ${catalog.duplicateIds.join(', ') || 'none'}; stale: ${catalog.stale}.`);
 }
-if (catalog.watches.length < 600) throw new Error(`Unexpected catalog size: ${catalog.watches.length}`);
+if (catalog.sourceWatchCount < 560 || catalog.watches.length < 560 ||
+    catalog.sourceWatchCount - catalog.watches.length !== catalog.excludedMisfiledCount) {
+  throw new Error(`Unexpected source/public catalog size: ${catalog.sourceWatchCount}/${catalog.watches.length}`);
+}
+if ((catalog.brands.find((brand) => brand.name === 'VACHERON')?.count ?? 0) < 9 ||
+    catalog.watches.some((watch) => watch.brandTab === 'VACHERON' && !/^vacheron(?:\s|$)/i.test(watch.brand))) {
+  throw new Error('VACHERON public catalog contains unexpected brands or too few watches.');
+}
 
 mkdirSync(cache, { recursive: true });
 rmSync(output, { recursive: true, force: true });

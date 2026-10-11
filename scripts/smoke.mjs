@@ -5,10 +5,15 @@ const worker = (await import(pathToFileURL(resolve('dist/server/index.js')).href
 const catalogResponse = await worker.fetch(new Request('https://local.example/api/catalog'));
 assert.equal(catalogResponse.status, 200, 'Catalog endpoint should load the public spreadsheet');
 const catalog = await catalogResponse.json();
-console.log(`Source response: ${catalog.watches.length} watches; failed: ${catalog.failedBrands.join(', ') || 'none'}; brands: ${catalog.brands.length}; images: ${catalog.watches.filter((watch) => watch.image).length}`);
+console.log(`Source response: ${catalog.sourceWatchCount} rows, ${catalog.watches.length} public watches, ${catalog.excludedMisfiledCount} excluded; failed: ${catalog.failedBrands.join(', ') || 'none'}; brands: ${catalog.brands.length}; images: ${catalog.watches.filter((watch) => watch.image).length}`);
 console.log(catalog.brands.map((brand) => `${brand.name}:${brand.count}`).join(' '));
 console.log(`Duplicate IDs: ${catalog.duplicateIds.length}`);
-assert.ok(catalog.watches.length >= 600, `Expected the real catalog, got ${catalog.watches.length} watches`);
+assert.ok(catalog.sourceWatchCount >= 560, `Expected the complete source catalog, got ${catalog.sourceWatchCount} rows`);
+assert.ok(catalog.watches.length >= 560, `Expected the curated public catalog, got ${catalog.watches.length} watches`);
+assert.equal(catalog.sourceWatchCount - catalog.watches.length, catalog.excludedMisfiledCount);
+assert.ok(catalog.brands.find((brand) => brand.name === 'VACHERON')?.count >= 9);
+assert.ok(catalog.watches.filter((watch) => watch.brandTab === 'VACHERON').every((watch) => /^vacheron(?:\s|$)/i.test(watch.brand)));
+assert.ok(catalog.watches.filter((watch) => watch.brandTab === 'VACHERON' && watch.image).length >= 9);
 assert.ok(catalog.brands.length >= 23, `Expected all current brand tabs, got ${catalog.brands.length}`);
 assert.ok(catalog.brands.find((brand) => brand.name === 'Super clone Rolex')?.count >= 8, 'The new Super clone Rolex tab should be included');
 assert.ok(catalog.brands.find((brand) => brand.name === 'RM HIGHGRADE')?.count >= 20, 'The new RM HIGHGRADE tab should be included');

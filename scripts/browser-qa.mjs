@@ -40,7 +40,7 @@ try {
   assert.equal(await brandTiles.filter({ visible: true }).count(), 7, 'See fewer should restore one row');
   await brandToggle.click();
   const allCount = await page.locator('#result-count').innerText();
-  assert.ok(Number(allCount.split(' ')[0]) >= 724, `All current brand tabs should appear in the catalog: ${allCount}`);
+  assert.ok(Number(allCount.split(' ')[0]) >= 560, `The public catalog should retain the correctly filed watches: ${allCount}`);
   assert.match(await page.locator('a[href="/watches/super-clone-rolex"]').innerText(), /Super clone Rolex\s+8 watches/);
   assert.match(await page.locator('a[href="/watches/rm-highgrade"]').innerText(), /RM HIGHGRADE\s+20 watches/);
   await page.goto(base + '/watches/super-clone-rolex');
@@ -49,6 +49,11 @@ try {
   await page.goto(base + '/watches/rm-highgrade');
   await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
   assert.ok(Number((await page.locator('#result-count').innerText()).split(' ')[0]) >= 20);
+  await page.goto(base + '/watches/vacheron');
+  await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
+  assert.ok(Number((await page.locator('#result-count').innerText()).split(' ')[0]) >= 9);
+  assert.ok(await page.locator('.watch-card img').count() >= 9);
+  assert.ok((await page.locator('.watch-card .eyebrow').allInnerTexts()).every((name) => name.toLowerCase() === 'vacheron'));
   await page.goto(base + '/watches/bvlgari');
   await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
   assert.match(await page.locator('.page-heading h1').innerText(), /^BVLGARI watches$/);
@@ -74,6 +79,8 @@ try {
   await page.goto(base + '/watches');
   await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
   const liveCatalog = await page.evaluate(async (endpoint) => (await fetch(endpoint)).json(), catalogEndpoint);
+  assert.ok(liveCatalog.sourceWatchCount >= 560, 'The source read should retain the watch catalog');
+  assert.equal(liveCatalog.sourceWatchCount - liveCatalog.watches.length, liveCatalog.excludedMisfiledCount);
   const realSoldOut = liveCatalog.watches.find((watch) => watch.stock === 0);
   const soldOut = realSoldOut || liveCatalog.watches.find((watch) => watch.id !== 'RLX-W001');
   assert.ok(soldOut, 'Catalog should include a watch for the sold-out journey');

@@ -126,17 +126,24 @@ async function loadCatalog() {
   const results = [];
   for (let i = 0; i < tabs.length; i += 6) results.push(...await Promise.allSettled(tabs.slice(i, i + 6).map(loadBrand)));
   const failedBrands = [], failedImageBrands = [], watches = [], ids = new Set(), duplicateIds = [];
+  let excludedMisfiledCount = 0;
   results.forEach((result, index) => {
     if (result.status === "rejected") { failedBrands.push(tabs[index][0]); return; }
     if (result.value.missingImages) failedImageBrands.push(tabs[index][0]);
     for (const watch of result.value.watches) {
       if (ids.has(watch.id)) { duplicateIds.push(watch.id); continue; }
-      ids.add(watch.id); watches.push(watch);
+      ids.add(watch.id);
+      // The VACHERON tab currently has unrelated legacy rows after its nine Vacheron watches.
+      if (watch.brandTab === "VACHERON" && !/^vacheron(?:\s|$)/i.test(watch.brand)) {
+        excludedMisfiledCount++;
+        continue;
+      }
+      watches.push(watch);
     }
   });
   if (!watches.length) throw new Error("The watch catalog could not be loaded.");
   if (failedBrands.length && catalogCache) return { ...catalogCache, stale: true, failedBrands };
-  return { watches, brands: tabs.map(([name]) => ({ name, slug: slug(name), count: watches.filter((watch) => watch.brandTab === name).length })), fetchedAt: new Date().toISOString(), partial: failedBrands.length > 0 || failedImageBrands.length > 0, failedBrands, failedImageBrands, duplicateIds, stale: false };
+  return { watches, brands: tabs.map(([name]) => ({ name, slug: slug(name), count: watches.filter((watch) => watch.brandTab === name).length })), sourceWatchCount: ids.size, excludedMisfiledCount, fetchedAt: new Date().toISOString(), partial: failedBrands.length > 0 || failedImageBrands.length > 0, failedBrands, failedImageBrands, duplicateIds, stale: false };
 }
 async function getCatalog() {
   if (catalogCache && Date.now() - Date.parse(catalogCache.fetchedAt) < CACHE_MS) return catalogCache;
