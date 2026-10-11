@@ -9,7 +9,7 @@ const feedbackCount = readdirSync(resolve('feedback')).filter((name) => /\.jpe?g
 const browser = await chromium.launch({ executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', headless: true });
 
 try {
-  for (const [label, width, height] of [['desktop', 1440, 900], ['tablet', 820, 1180], ['mobile', 390, 844]]) {
+  for (const [label, width, height] of [['desktop', 1440, 900], ['small-desktop', 1100, 600], ['tablet', 820, 1180], ['mobile', 390, 844]]) {
     const context = await browser.newContext({ viewport: { width, height }, reducedMotion: label === 'tablet' ? 'reduce' : 'no-preference' });
     const page = await context.newPage();
     const errors = [];
@@ -41,6 +41,20 @@ try {
     assert.equal(first.duration, '0.001s', `${label}: exit has no half-second pause`);
     assert.equal(first.cards, feedbackCount, `${label}: all supplied feedback pictures remain in the opening`);
     await page.waitForFunction(() => [...document.querySelectorAll('.opening-feedback')].some((card) => Number(getComputedStyle(card).opacity) > 0.2), null, { timeout: 3500 });
+    if (label.endsWith('desktop')) {
+      await page.waitForFunction(() => [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95).length >= 40, null, { timeout: 5000 });
+      const collage = await page.evaluate(() => {
+        const logo = document.querySelector('.opening-brand').getBoundingClientRect();
+        const visible = [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95);
+        const coveredLogo = visible.some((card) => {
+          const photo = card.getBoundingClientRect();
+          return photo.left < logo.right && photo.right > logo.left && photo.top < logo.bottom && photo.bottom > logo.top;
+        });
+        return { visible: visible.length, coveredLogo };
+      });
+      assert.ok(collage.visible >= 40, `desktop: at least forty photos visible together (${collage.visible})`);
+      assert.equal(collage.coveredLogo, false, 'desktop: photos leave the logo clear');
+    }
     try {
       await page.locator('#opening-screen').waitFor({ state: 'detached', timeout: 9000 });
     } catch (error) {

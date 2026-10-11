@@ -37,13 +37,13 @@
     return result;
   }
   function targetCount() {
-    // Extra staggered slots keep at least thirty visible while others enter or leave.
-    if (opening.clientWidth >= 1100 && opening.clientHeight >= 600) return 42;
+    // The desktop opening keeps more than forty distinct feedback photos visible together.
+    if (window.innerWidth >= 1100 && window.innerHeight >= 600) return 44;
     if (opening.clientWidth >= 700 && opening.clientHeight >= 600) return 5;
     return 3;
   }
   function updateTiming() {
-    const desktop = targetCount() === 42;
+    const desktop = targetCount() === 44;
     duration = desktop ? 6000 : 1500;
     enter = desktop ? 900 : 180;
     hold = desktop ? 4200 : 1050;
@@ -52,7 +52,7 @@
     const width = opening.clientWidth;
     const height = opening.clientHeight;
     const compact = width < 700 || height < 520;
-    const desktop = width >= 1100 && height >= 600;
+    const desktop = window.innerWidth >= 1100 && window.innerHeight >= 600;
     const maxWidth = width <= 340 ? width * 0.56 : compact ? Math.min(width * 0.68, 265) : desktop ? Math.min(132, width * 0.122) : 305;
     const maxHeight = compact ? Math.min(height * 0.255, 232) : desktop ? Math.min(142, height * 0.2) : Math.min(height * 0.4, 355);
     const ratio = Math.min(compact ? 0.82 : desktop ? 0.55 : 0.86, maxWidth / card.naturalWidth, maxHeight / card.naturalHeight);
@@ -71,8 +71,8 @@
     const reserved = { left: logo.left - 12, top: logo.top - 12, right: logo.right + 12, bottom: logo.bottom + 12 };
     const maxX = width - card.width - inset;
     const maxY = height - card.height - inset;
-    const columns = width >= 1300 ? 10 : 9;
-    const rows = height >= 800 ? 6 : 5;
+    const columns = width >= 1300 ? 12 : 10;
+    const rows = height >= 800 ? 7 : 6;
     const grid = shuffle(Array.from({ length: columns * rows }, (_, index) => ({
       x: Math.max(inset, Math.min(maxX, width * ((index % columns) + 0.5) / columns - card.width / 2)),
       y: Math.max(inset, Math.min(maxY, height * (Math.floor(index / columns) + 0.5) / rows - card.height / 2)),
@@ -87,7 +87,7 @@
       if (!best || overlap < best.overlap) best = { rect, overlap };
       if (overlap < 0.04) break;
     }
-    if (!best || best.overlap > (targetCount() === 42 ? 0.5 : 0.38)) return null;
+    if (!best || best.overlap > (targetCount() === 44 ? 0.62 : 0.38)) return null;
     card.element.style.left = `${best.rect.left}px`;
     card.element.style.top = `${best.rect.top}px`;
     return best.rect;
@@ -115,6 +115,13 @@
       entry.card.element.style.opacity = '1';
       return;
     }
+    if (targetCount() === 44) {
+      entry.animation = entry.card.element.animate([
+        { opacity: 0, transform: 'translateY(8px) scale(.96)' },
+        { opacity: 1, transform: 'translateY(0) scale(1)' },
+      ], { duration: 900, delay: offset, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' });
+      return;
+    }
     const direction = Math.random() < 0.5 ? -1 : 1;
     const animation = entry.card.element.animate([
       { opacity: 0, transform: `translateY(${7 * direction}px)`, offset: 0 },
@@ -137,7 +144,7 @@
     const ready = cards.filter((card) => card.image.complete && card.image.naturalWidth).length;
     if (ready < (allowPartial ? 2 : slotCount)) return;
     started = true;
-    for (let slot = 0; slot < slotCount; slot++) show(slot, slot * duration / slotCount);
+    for (let slot = 0; slot < slotCount; slot++) show(slot, slotCount === 44 ? slot * 35 : slot * duration / slotCount);
   }
   function holdFinalGroup() {
     finalGroup = true;
@@ -167,7 +174,7 @@
     deck = [];
     updateTiming();
     slotCount = targetCount();
-    for (let slot = 0; slot < slotCount; slot++) show(slot, slot * duration / slotCount);
+    for (let slot = 0; slot < slotCount; slot++) show(slot, slotCount === 44 ? slot * 35 : slot * duration / slotCount);
   });
   opening.addEventListener('animationend', (event) => {
     if (event.target !== opening) return;
