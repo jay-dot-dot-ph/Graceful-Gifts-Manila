@@ -57,7 +57,7 @@ try {
           return rect.left < -0.01 || rect.top < -0.01 || rect.right > innerWidth + 0.01 || rect.bottom > innerHeight + 0.01;
         }),
         loaded: cards.filter((card) => card.querySelector('img').complete && card.querySelector('img').naturalWidth > 0).length,
-        paths: cards.map((card) => card.querySelector('img').getAttribute('src')),
+        paths: cards.map((card) => card.querySelector('img').getAttribute('src')).filter(Boolean),
         distorted: visible.filter((card) => {
           const image = card.querySelector('img');
           if (!image.naturalWidth) return true;
@@ -100,8 +100,9 @@ try {
     assert.equal(state.logoTopmost && state.logoVisible, true, `${label}: the centered brand mark must remain visible above the collage`);
     assert.equal(state.distorted, 0, `${label}: displayed pictures should be smaller without changing aspect ratio`);
     assert.equal(state.clipped, false, `${label}: no visible picture should leave the viewport`);
-    assert.equal(state.paths.length, feedbackCount);
-    assert.equal(new Set(state.paths).size, feedbackCount, `${label}: use each supplied picture`);
+    const requestedImages = desktop ? 16 : feedbackCount;
+    assert.equal(state.paths.length, requestedImages, `${label}: request only the images needed for the opening`);
+    assert.equal(new Set(state.paths).size, requestedImages, `${label}: use distinct supplied pictures`);
     assert.ok(state.paths.every((path) => /^\/feedback\/[a-f0-9]{12}\.jpg$/.test(path)), `${label}: use content-versioned original images`);
     if (desktop) assert.ok(state.animationDurations.every((duration) => duration === 7000), `${label}: desktop pictures should fade in slowly and remain until the opening ends`);
     else if (label !== 'tablet') assert.ok(state.animationDurations.every((duration) => duration >= 1250 && duration <= 1950), `${label}: pictures should hold for 0.8–1.5 seconds plus gentle fades`);
@@ -141,7 +142,7 @@ try {
     await page.reload({ waitUntil: 'domcontentloaded' });
     assert.equal(await page.locator('#opening-screen').isVisible(), true, `${label}: opening should show on every homepage load`);
     assert.deepEqual(errors, [], `${label}: browser should not report JavaScript errors`);
-    console.log(`${label}: ${state.visibleCount} pictures visible together; ${state.loaded}/${feedbackCount} loaded at 1.2 s`);
+    console.log(`${label}: ${state.visibleCount} pictures visible together; ${state.loaded}/${requestedImages} requested pictures loaded at 1.2 s`);
     await context.close();
   }
   const directContext = await browser.newContext();

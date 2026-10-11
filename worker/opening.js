@@ -25,6 +25,7 @@
   let started = false;
   let finalGroup = false;
   let slotCount = 0;
+  let partialStartAllowed = false;
   const desktopSlots = [
     [.12, .13], [.88, .87], [.38, .13], [.62, .87],
     [.88, .13], [.12, .87], [.62, .13], [.38, .87],
@@ -157,12 +158,12 @@
       show(slot);
     }).catch(() => {});
   }
-  function start(allowPartial = false) {
+  function start() {
     if (started) return;
     updateTiming();
     slotCount = targetCount();
     const ready = cards.filter((card) => card.image.complete && card.image.naturalWidth).length;
-    if (ready < (allowPartial ? 2 : slotCount)) return;
+    if (ready < (partialStartAllowed ? 2 : slotCount)) return;
     started = true;
     for (let slot = 0; slot < slotCount; slot++) show(slot, slot * (slotCount === desktopSlots.length ? 135 : duration / slotCount));
   }
@@ -181,12 +182,15 @@
     for (const entry of active) entry.card.element.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 550, easing: 'ease-in-out', fill: 'forwards' });
   }
 
+  const initialCards = targetCount() === desktopSlots.length ? shuffle(cards).slice(0, 16) : cards;
   for (const card of cards) {
     card.image.addEventListener('load', () => { if (!finalGroup) start(); }, { once: true });
+  }
+  for (const card of initialCards) {
     card.image.src = card.image.dataset.src;
   }
   start();
-  setTimeout(() => start(true), 800);
+  setTimeout(() => { partialStartAllowed = true; start(); }, 800);
   setTimeout(holdFinalGroup, 5800);
   setTimeout(fadeFinalGroup, 7000);
   window.addEventListener('resize', () => {
@@ -200,6 +204,7 @@
     deck = [];
     updateTiming();
     slotCount = targetCount();
+    if (slotCount !== desktopSlots.length) for (const card of cards) if (!card.image.src) card.image.src = card.image.dataset.src;
     for (let slot = 0; slot < slotCount; slot++) show(slot, slot * (slotCount === desktopSlots.length ? 135 : duration / slotCount));
   });
   opening.addEventListener('animationend', (event) => {
