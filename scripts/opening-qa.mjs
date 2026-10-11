@@ -33,6 +33,7 @@ try {
         delay: getComputedStyle(screen).animationDelay,
         duration: getComputedStyle(screen).animationDuration,
         cards: screen.querySelectorAll('.opening-feedback').length,
+        inlineImages: screen.querySelectorAll('.opening-feedback img[src^="data:image/jpeg;base64,"]').length,
       };
     });
     assert.equal(first.screenVisible && first.logoTopmost && first.appHidden, true, `${label}: opening covers the main page at first paint`);
@@ -40,6 +41,7 @@ try {
     assert.equal(first.delay, '4s', `${label}: opening holds for four seconds`);
     assert.equal(first.duration, '0.001s', `${label}: exit has no half-second pause`);
     assert.equal(first.cards, feedbackCount, `${label}: all supplied feedback pictures remain in the opening`);
+    assert.equal(first.inlineImages, feedbackCount, `${label}: feedback previews load with the page`);
     await page.waitForFunction(() => [...document.querySelectorAll('.opening-feedback')].some((card) => Number(getComputedStyle(card).opacity) > 0.2), null, { timeout: 3500 });
     if (label.endsWith('desktop')) {
       await page.waitForFunction((count) => [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95).length === count, feedbackCount, { timeout: 3500 });

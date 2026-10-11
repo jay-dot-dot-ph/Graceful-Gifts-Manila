@@ -69,7 +69,7 @@
     const inset = 12;
     if (card.width + inset * 2 > width || card.height + inset * 2 > height) return null;
     const logo = brand.getBoundingClientRect();
-    const reserved = { left: logo.left - 12, top: logo.top - 12, right: logo.right + 12, bottom: logo.bottom + 12 };
+    const reserved = { left: logo.left - 40, top: logo.top - 40, right: logo.right + 40, bottom: logo.bottom + 40 };
     const maxX = width - card.width - inset;
     const maxY = height - card.height - inset;
     const columns = isDesktop() ? (width >= 1300 ? 13 : 11) : (width >= 1300 ? 12 : 10);
@@ -159,7 +159,7 @@
   }
   for (const card of cards) {
     card.image.addEventListener('load', () => { if (!finalGroup) start(); }, { once: true });
-    card.image.src = card.image.dataset.src;
+    if (card.image.dataset.src) card.image.src = card.image.dataset.src;
   }
   start();
   setTimeout(() => start(true), 500);

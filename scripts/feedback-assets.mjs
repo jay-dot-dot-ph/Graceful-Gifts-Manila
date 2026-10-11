@@ -21,7 +21,7 @@ function dimensions(bytes) {
 
 export function feedbackAssets(root) {
   return readdirSync(join(root, 'feedback')).filter((name) => /\.jpe?g$/i.test(name)).sort().map((name) => {
-    const bytes = readFileSync(join(root, 'feedback', name));
+    const bytes = readFileSync(join(root, 'feedback-preview', name));
     const digest = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
     return { name, ...dimensions(bytes), path: `/feedback/${digest}.jpg`, bytes };
   });
