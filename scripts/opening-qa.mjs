@@ -6,7 +6,6 @@ import { chromium } from 'playwright-core';
 const base = process.argv[2] || process.env.QA_BASE || 'http://127.0.0.1:4173';
 const fixture = { watches: [], brands: [] };
 const feedbackCount = readdirSync(resolve('feedback')).filter((name) => /\.jpe?g$/i.test(name)).length;
-const tileCount = Math.ceil((feedbackCount + 6) / 10) * 10;
 const browser = await chromium.launch({ executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', headless: true });
 
 try {
@@ -34,7 +33,6 @@ try {
         delay: getComputedStyle(screen).animationDelay,
         duration: getComputedStyle(screen).animationDuration,
         cards: screen.querySelectorAll('.opening-feedback').length,
-        uniqueCards: screen.querySelectorAll('.opening-feedback[data-repeat="false"]').length,
         inlineImages: screen.querySelectorAll('.opening-feedback img[src^="data:image/jpeg;base64,"]').length,
       };
     });
@@ -42,28 +40,32 @@ try {
     if (label === 'desktop') assert.equal(first.stylesReady, false, 'opening appears even while the main stylesheet is delayed');
     assert.equal(first.delay, '4s', `${label}: opening holds for four seconds`);
     assert.equal(first.duration, '0.001s', `${label}: exit has no half-second pause`);
-    assert.equal(first.cards, tileCount, `${label}: feedback tiles fill the desktop grid`);
-    assert.equal(first.uniqueCards, feedbackCount, `${label}: every supplied feedback picture has a tile`);
-    assert.equal(first.inlineImages, tileCount, `${label}: feedback previews load with the page`);
+    assert.equal(first.cards, feedbackCount, `${label}: all supplied feedback pictures remain in the opening`);
+    assert.equal(first.inlineImages, feedbackCount, `${label}: feedback previews load with the page`);
     await page.waitForFunction(() => [...document.querySelectorAll('.opening-feedback')].some((card) => Number(getComputedStyle(card).opacity) > 0.2), null, { timeout: 3500 });
     if (label.endsWith('desktop')) {
-      await page.waitForFunction((count) => [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95).length === count, tileCount, { timeout: 3500 });
+      await page.waitForFunction((count) => [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95).length === count, feedbackCount, { timeout: 3500 });
       const collage = await page.evaluate(() => {
         const logo = document.querySelector('.opening-brand').getBoundingClientRect();
+        const screen = document.querySelector('#opening-screen').getBoundingClientRect();
         const visible = [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95);
-        const originals = visible.filter((card) => card.dataset.repeat === 'false');
-        const coveredLogo = originals.some((card) => {
+        const quadrants = [0, 0, 0, 0];
+        const cropped = visible.some((card) => {
+          const photo = card.getBoundingClientRect();
+          const image = card.querySelector('img');
+          quadrants[Number(photo.top + photo.height / 2 >= screen.height / 2) * 2 + Number(photo.left + photo.width / 2 >= screen.width / 2)]++;
+          return Math.abs(photo.width / photo.height - image.naturalWidth / image.naturalHeight) > .01 || getComputedStyle(image).objectFit === 'cover';
+        });
+        const coveredLogo = visible.some((card) => {
           const photo = card.getBoundingClientRect();
           return photo.left < logo.right && photo.right > logo.left && photo.top < logo.bottom && photo.bottom > logo.top;
         });
-        const screen = document.querySelector('#opening-screen').getBoundingClientRect();
-        const filledArea = visible.reduce((area, card) => { const tile = card.getBoundingClientRect(); return area + tile.width * tile.height; }, 0);
-        return { visible: visible.length, originals: originals.length, coveredLogo, filledArea, screenArea: screen.width * screen.height };
+        return { visible: visible.length, coveredLogo, quadrants, cropped };
       });
-      assert.equal(collage.visible, tileCount, `${label}: every tile visible together`);
-      assert.equal(collage.originals, feedbackCount, `${label}: every photo visible together`);
-      assert.equal(collage.coveredLogo, false, `${label}: original photos leave the logo clear`);
-      assert.ok(Math.abs(collage.filledArea - collage.screenArea) < collage.screenArea * .01, `${label}: the photo grid fills the screen`);
+      assert.equal(collage.visible, feedbackCount, `${label}: every photo visible together`);
+      assert.equal(collage.coveredLogo, false, 'desktop: photos leave the logo clear');
+      assert.equal(collage.cropped, false, `${label}: photos keep their original proportions`);
+      assert.ok(collage.quadrants.every((count) => count >= 8), `${label}: photos fill all sides evenly`);
     }
     try {
       await page.locator('#opening-screen').waitFor({ state: 'detached', timeout: 6000 });

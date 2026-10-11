@@ -19,6 +19,8 @@
   }));
   const active = new Set();
   const isDesktop = () => window.innerWidth >= 1100 && window.innerHeight >= 600;
+  const desktopSlot = new Map(shuffleCards(cards).map((card, index) => [card, index]));
+  let desktopCenters = null;
   let duration = 1500;
   let enter = 180;
   let hold = 1050;
@@ -36,6 +38,38 @@
       [result[index], result[other]] = [result[other], result[index]];
     }
     return result;
+  }
+  function shuffleCards(items) {
+    return [...items].sort((a, b) => {
+      const first = cards.indexOf(a) * 17 % cards.length;
+      const second = cards.indexOf(b) * 17 % cards.length;
+      return first - second;
+    });
+  }
+  function makeDesktopCenters() {
+    const screen = opening.getBoundingClientRect();
+    const logo = brand.getBoundingClientRect();
+    const inset = 28;
+    const left = Math.max(0, logo.left - screen.left - inset);
+    const right = Math.min(screen.width, logo.right - screen.left + inset);
+    const top = Math.max(0, logo.top - screen.top - inset);
+    const bottom = Math.min(screen.height, logo.bottom - screen.top + inset);
+    const centers = [];
+    const addRegion = (x0, x1, y0, y1, columns, rows) => {
+      for (let row = 0; row < rows; row++) {
+        for (let column = 0; column < columns; column++) {
+          centers.push({
+            x: x0 + (column + .5) * (x1 - x0) / columns,
+            y: y0 + (row + .5) * (y1 - y0) / rows,
+          });
+        }
+      }
+    };
+    addRegion(0, screen.width, 0, top, 10, 2);
+    addRegion(0, left, top, bottom, 4, 2);
+    addRegion(right, screen.width, top, bottom, 4, 2);
+    addRegion(0, screen.width, bottom, screen.height, 9, 2);
+    return centers;
   }
   function targetCount() {
     // Show every supplied feedback photo together on desktop.
@@ -63,15 +97,20 @@
     card.element.style.height = `${card.height}px`;
   }
   function position(card) {
-    if (isDesktop()) {
-      const tile = card.element.getBoundingClientRect();
-      return { left: tile.left, top: tile.top, right: tile.right, bottom: tile.bottom };
-    }
     measure(card);
     const width = opening.clientWidth;
     const height = opening.clientHeight;
     const inset = 12;
     if (card.width + inset * 2 > width || card.height + inset * 2 > height) return null;
+    if (isDesktop()) {
+      desktopCenters ||= makeDesktopCenters();
+      const center = desktopCenters[desktopSlot.get(card)];
+      const x = Math.max(inset, Math.min(width - card.width - inset, center.x - card.width / 2));
+      const y = Math.max(inset, Math.min(height - card.height - inset, center.y - card.height / 2));
+      card.element.style.left = `${x}px`;
+      card.element.style.top = `${y}px`;
+      return { left: x, top: y, right: x + card.width, bottom: y + card.height };
+    }
     const logo = brand.getBoundingClientRect();
     const reserved = { left: logo.left - 40, top: logo.top - 40, right: logo.right + 40, bottom: logo.bottom + 40 };
     const maxX = width - card.width - inset;
@@ -98,7 +137,7 @@
     return best.rect;
   }
   function nextCard() {
-    if (!deck.length) deck = shuffle(cards.filter((card) => (isDesktop() || card.element.dataset.repeat !== 'true') && card.image.complete && card.image.naturalWidth));
+    if (!deck.length) deck = shuffle(cards.filter((card) => card.image.complete && card.image.naturalWidth));
     const attempts = deck.length;
     for (let index = 0; index < attempts; index++) {
       const card = deck.shift();
@@ -122,7 +161,7 @@
     }
     if (isDesktop()) {
       entry.animation = entry.card.element.animate([
-        { opacity: .35, transform: 'translateY(8px) scale(.96)' },
+        { opacity: 0, transform: 'translateY(8px) scale(.96)' },
         { opacity: 1, transform: 'translateY(0) scale(1)' },
       ], { duration: enter, delay: offset, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'forwards' });
       return;
@@ -177,6 +216,7 @@
     }
     active.clear();
     deck = [];
+    desktopCenters = null;
     updateTiming();
     slotCount = targetCount();
     for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 25 : slot * duration / slotCount);
