@@ -80,8 +80,9 @@ try {
     assert.equal(await page.locator('#app').evaluate((app) => app.inert), false, `${label}: main page is interactive after opening`);
     assert.equal(await page.locator('.hero h1').isVisible(), true, `${label}: main page is visible after opening`);
     await page.reload({ waitUntil: 'commit' });
-    await page.locator('.hero h1').waitFor({ timeout: 5000 });
-    assert.equal(await page.locator('#opening-screen').count(), 0, `${label}: refresh skips the opening`);
+    await page.locator('#opening-screen').waitFor({ state: 'attached', timeout: 5000 });
+    assert.equal(await page.locator('#opening-screen').isVisible(), true, `${label}: refresh replays the opening`);
+    await page.locator('#opening-screen').waitFor({ state: 'detached', timeout: 6000 });
     assert.deepEqual(errors, [], `${label}: no browser script errors`);
     await context.close();
   }
@@ -91,11 +92,15 @@ try {
   await page.goto(base + '/watches', { waitUntil: 'domcontentloaded' });
   await page.locator('#catalog-search').waitFor({ timeout: 5000 });
   assert.equal(await page.locator('#opening-screen').count(), 0, 'Direct catalog visits skip the opening');
+  await page.goto(base + '/', { waitUntil: 'commit' });
+  await page.locator('.hero h1').waitFor({ timeout: 5000 });
+  assert.equal(await page.locator('#opening-screen').count(), 0, 'Home navigation skips the opening');
+  await page.goto(base + '/watches', { waitUntil: 'domcontentloaded' });
   await page.goto(base + '/#physical-store', { waitUntil: 'commit' });
   await page.locator('#physical-store').waitFor({ timeout: 5000 });
   assert.equal(await page.locator('#opening-screen').count(), 0, 'Physical Store link skips the opening');
   await context.close();
-  console.log('Opening shows once per visit, skips Home refresh and Physical Store, and exits after three seconds.');
+  console.log('Opening replays on refresh, skips Home and Physical Store navigation, and exits after three seconds.');
 } finally {
   await browser.close();
 }
