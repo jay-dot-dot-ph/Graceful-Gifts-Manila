@@ -12,27 +12,6 @@
 @media(max-width:430px){.hero-actions .button{width:100%}.intro-strip span{font-size:.48rem}.section-head{display:block}.section-head .text-link{margin-top:18px}.brand-list-section .brand-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sort-control select{max-width:138px}.card-image{aspect-ratio:.86}.detail-copy h1{font-size:3rem}.favorite-row{grid-template-columns:20px 62px minmax(0,1fr) 18px}.favorite-photo{height:62px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 .brand-symbol{font-size:25px;letter-spacing:0;padding-right:0}
-
-/* The homepage opening holds for seven seconds on every visit. */
-.opening-screen{position:fixed;inset:0;z-index:200;overflow:hidden;background-color:#e9dfcf;background-image:linear-gradient(#f9f5ed70,#f9f5ed90),url('__OPENING_BG_PATH__');background-position:center,center 57%;background-size:cover;background-repeat:no-repeat;color:var(--ink);animation:opening-exit .55s ease-in-out 7s forwards}
-.opening-route-skip .opening-screen{display:none}
-.opening-content{height:100%;height:100dvh;min-height:0;display:grid;place-items:center;padding:clamp(16px,3vw,50px)}
-.opening-brand{position:relative;z-index:2;align-self:center;justify-self:center;text-align:center;display:flex;align-items:center;flex-direction:column;gap:0;padding:20px 28px;background:#fffdf8d9;box-shadow:0 12px 45px #352b1d24;backdrop-filter:blur(5px)}
-.opening-mark{width:clamp(66px,8vw,88px);height:clamp(66px,8vw,88px);display:grid;place-items:center;border:1px solid #b99b6b;border-radius:50%;font-family:var(--serif);font-size:clamp(2.5rem,5vw,3.3rem);color:#866b42;line-height:1}
-.opening-name{font-size:clamp(.85rem,1.8vw,1.12rem);font-weight:700;letter-spacing:.23em;line-height:1.5;margin:25px 0 0}
-.opening-name span{display:block;font-size:.68em;letter-spacing:.42em;margin-top:3px}
-.opening-rule{width:42px;height:1px;background:#b99b6b;margin:26px 0 21px}
-.opening-message{font-family:var(--serif);font-size:clamp(1.1rem,2.5vw,1.45rem);color:#756b5d;margin:0}
-.opening-collage{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-.opening-feedback{position:absolute;margin:0;opacity:0;pointer-events:none;box-shadow:0 9px 28px #352b1d20;will-change:opacity,transform}
-.opening-feedback img{display:block;width:100%;height:auto;max-width:none;max-height:none;object-fit:initial}
-@keyframes opening-exit{0%{opacity:1;visibility:visible}99%{visibility:visible}100%{opacity:0;visibility:hidden;pointer-events:none}}
-@media(max-width:760px){.opening-content{padding:12px}.opening-name{letter-spacing:.16em}}
-@media(max-width:340px){.opening-brand{background:#fffdf8ed;padding:15px 12px;box-shadow:0 8px 35px #fffdf8;outline:1px solid #d9cbb651}}
-@media(max-height:500px){.opening-brand{background:#fffdf8ed;padding:10px 12px;box-shadow:0 8px 35px #fffdf8;outline:1px solid #d9cbb651}}
-@media(max-height:520px){.opening-mark{width:52px;height:52px;font-size:2rem}.opening-name{margin-top:10px}.opening-rule{margin:10px 0}}
-@media(prefers-reduced-motion:reduce){.opening-screen{animation:opening-exit 1ms linear 7s forwards!important}}
-
 .brand-list-section:not(.expanded) .brand-tile:nth-child(n+8){display:none}
 .brand-toggle{display:block;margin:18px auto 0;padding:8px 4px;border:0;border-bottom:1px solid var(--gold);background:transparent;color:#735a37;font-family:var(--sans);font-size:.75rem;font-weight:700;letter-spacing:.04em;cursor:pointer}
 .brand-toggle:hover{color:#33271a}.brand-toggle:focus-visible{outline:2px solid var(--gold);outline-offset:4px}
