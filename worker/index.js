@@ -1,6 +1,10 @@
 // The build embeds styles.css and client.js into this single Worker module.
 const STYLES = "__STYLES__";
+const OPENING_STYLES = "__OPENING_STYLES__";
 const CLIENT = "__CLIENT__";
+const OPENING_SCRIPT = "__OPENING_SCRIPT__";
+const OPENING_BG = "__OPENING_BG__";
+const OPENING_BG_PATH = "__OPENING_BG_PATH__";
 const FEEDBACK_IMAGES = "__FEEDBACK_IMAGES__";
 const SHEET_ID = "1qowXiNelPflvWPYv1lWWCf7z9AnltCL5Tem8Sus-arI";
 export const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}`;
@@ -154,12 +158,16 @@ async function getCatalog() {
 
 function htmlPage(request, product = null) {
   const url = new URL(request.url);
+  const showOpening = url.pathname === "/";
   const title = product ? `${watchName(product)} | Graceful Gifts Manila` : "Graceful Gifts Manila | Luxury Watch Collection";
   const description = product ? `View ${watchName(product)}, ID ${product.id}, and inquire with Graceful Gifts Manila.` : "Explore watches by brand, price, and style. Save favorites and inquire with Graceful Gifts Manila.";
   const imagePath = product?.image ? `${url.origin}/image/${encodeURIComponent(product.id)}` : null;
   const imageMeta = imagePath ? `<meta property="og:image" content="${escapeHtml(imagePath)}">` : "";
   const initial = product ? `<main class="container product-initial"><p class="eyebrow">WATCH DETAILS</p><h1>${escapeHtml(watchName(product))}</h1><p>Watch ID ${escapeHtml(product.id)}</p>${imagePath ? `<img src="${escapeHtml(imagePath)}" alt="${escapeHtml(watchName(product))}" width="540" height="540">` : ""}<p>${product.price === null ? "Price on request" : `₱${product.price.toLocaleString("en-PH")}`}</p></main>` : `<main class="container loading-screen"><p>Preparing the collection…</p></main>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f4ed"><title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(description)}"><meta property="og:type" content="${product ? "product" : "website"}"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(url.toString())}">${imageMeta}<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css"></head><body><div id="app">${initial}</div><script>window.GGM_CONFIG=${JSON.stringify({ facebook: FACEBOOK, messenger: MESSENGER })};</script><script src="/app.js" defer></script></body></html>`;
+  const opening = showOpening ? `<div id="opening-screen" class="opening-screen" role="status" aria-label="Preparing the Graceful Gifts Manila collection"><div class="opening-content"><div class="opening-brand"><span class="opening-mark" aria-hidden="true">G</span><p class="opening-name">GRACEFUL GIFTS <span>MANILA</span></p><span class="opening-rule" aria-hidden="true"></span><p class="opening-message">Preparing your collection</p></div><div class="opening-collage" aria-hidden="true">${FEEDBACK_IMAGES.map((image) => `<figure class="opening-feedback" data-width="${image.width}" data-height="${image.height}"><img data-src="${image.path}" alt="" width="${image.width}" height="${image.height}" loading="eager" decoding="async"></figure>`).join("")}</div></div></div>` : "";
+  const openingScript = showOpening ? `<script>${OPENING_SCRIPT}</script>` : "";
+  const styles = showOpening ? `<style>${OPENING_STYLES}</style><link rel="preload" as="image" href="${OPENING_BG_PATH}"><link rel="preload" as="style" href="/styles.css" onload="this.onload=null;this.rel='stylesheet';document.documentElement.classList.add('site-styles-ready')"><noscript><link rel="stylesheet" href="/styles.css"></noscript>` : `<link rel="stylesheet" href="/styles.css">`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f4ed"><title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(description)}"><meta property="og:type" content="${product ? "product" : "website"}"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(url.toString())}">${imageMeta}<link rel="icon" href="/favicon.svg" type="image/svg+xml">${showOpening ? `<script>if(location.pathname!=='/')document.documentElement.classList.add('opening-route-skip')</script>` : ""}${styles}</head><body>${opening}<div id="app">${initial}</div>${openingScript}<script>window.GGM_CONFIG=${JSON.stringify({ facebook: FACEBOOK, messenger: MESSENGER })};</script><script src="/app.js" defer></script></body></html>`;
 }
 const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="13" fill="#171813"/><circle cx="32" cy="32" r="21" fill="none" stroke="#c6a56d" stroke-width="1.5"/><path d="M32 17v15l10 6" fill="none" stroke="#c6a56d" stroke-width="2" stroke-linecap="round"/><circle cx="32" cy="32" r="2" fill="#c6a56d"/></svg>`;
 export default {
@@ -169,6 +177,7 @@ export default {
     if (pathname === "/styles.css") return new Response(STYLES, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "public, max-age=3600" } });
     if (pathname === "/app.js") return new Response(CLIENT, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=3600" } });
     if (pathname === "/favicon.svg") return new Response(favicon, { headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" } });
+    if (pathname === OPENING_BG_PATH) return new Response(Uint8Array.from(atob(OPENING_BG), (character) => character.charCodeAt(0)), { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
     const feedback = FEEDBACK_IMAGES.find((image) => image.path === pathname);
     if (feedback) return new Response(Uint8Array.from(atob(feedback.base64), (character) => character.charCodeAt(0)), { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
     if (/^\/image\/[A-Z0-9-]+$/i.test(pathname)) {
