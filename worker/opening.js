@@ -188,7 +188,7 @@
     const ready = cards.filter((card) => card.image.complete && card.image.naturalWidth).length;
     if (ready < (allowPartial ? 2 : slotCount)) return;
     started = true;
-    for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 25 : slot * duration / slotCount);
+    for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 20 : slot * duration / slotCount);
   }
   function holdFinalGroup() {
     finalGroup = true;
@@ -206,7 +206,7 @@
   }
   start();
   setTimeout(() => start(true), 500);
-  setTimeout(holdFinalGroup, 2400);
+  setTimeout(holdFinalGroup, 2200);
   window.addEventListener('resize', () => {
     if (!started || finalGroup) return;
     for (const entry of active) {
@@ -219,7 +219,7 @@
     desktopCenters = null;
     updateTiming();
     slotCount = targetCount();
-    for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 25 : slot * duration / slotCount);
+    for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 20 : slot * duration / slotCount);
   });
   opening.addEventListener('animationend', (event) => {
     if (event.target !== opening) return;
