@@ -9,7 +9,7 @@ const feedbackCount = readdirSync(resolve('feedback')).filter((name) => /\.jpe?g
 const browser = await chromium.launch({ executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', headless: true });
 
 try {
-  for (const [label, width, height] of [['desktop', 1440, 900], ['small-desktop', 1100, 600], ['tablet', 820, 1180], ['mobile', 390, 844]]) {
+  for (const [label, width, height] of [['desktop', 1440, 900], ['small-desktop', 1100, 600], ['tablet', 820, 1180], ['mobile', 390, 844], ['small-mobile', 320, 568]]) {
     const context = await browser.newContext({ viewport: { width, height }, reducedMotion: label === 'tablet' ? 'reduce' : 'no-preference' });
     const page = await context.newPage();
     const errors = [];
@@ -66,6 +66,22 @@ try {
       assert.equal(collage.coveredLogo, false, 'desktop: photos leave the logo clear');
       assert.equal(collage.cropped, false, `${label}: photos keep their original proportions`);
       assert.ok(collage.quadrants.every((count) => count >= 8), `${label}: photos fill all sides evenly`);
+    } else if (width <= 760) {
+      await page.waitForFunction((count) => [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95).length === count, feedbackCount, { timeout: 2500 });
+      const collage = await page.evaluate(() => {
+        const screen = document.querySelector('#opening-screen').getBoundingClientRect();
+        const logo = document.querySelector('.opening-brand').getBoundingClientRect();
+        const photos = [...document.querySelectorAll('.opening-feedback')].map((card) => card.getBoundingClientRect());
+        return {
+          visible: photos.length,
+          largestWidth: Math.max(...photos.map((photo) => photo.width)),
+          insideScreen: photos.every((photo) => photo.left >= screen.left && photo.right <= screen.right && photo.top >= screen.top && photo.bottom <= screen.bottom),
+          logoClear: photos.every((photo) => photo.right <= logo.left || photo.left >= logo.right || photo.bottom <= logo.top || photo.top >= logo.bottom),
+        };
+      });
+      assert.equal(collage.visible, feedbackCount, `${label}: all feedback photos are in the collage`);
+      assert.ok(collage.largestWidth <= 70, `${label}: feedback thumbnails stay compact`);
+      assert.equal(collage.insideScreen && collage.logoClear, true, `${label}: photos fit around the logo`);
     }
     try {
       await page.locator('#opening-screen').waitFor({ state: 'detached', timeout: 6000 });

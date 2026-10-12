@@ -19,6 +19,7 @@
   }));
   const active = new Set();
   const isDesktop = () => window.innerWidth >= 1100 && window.innerHeight >= 600;
+  const isMobile = () => window.innerWidth <= 760;
   const desktopSlot = new Map(shuffleCards(cards).map((card, index) => [card, index]));
   let desktopCenters = null;
   let duration = 1500;
@@ -73,17 +74,25 @@
   }
   function targetCount() {
     // Show every supplied feedback photo together on desktop.
-    if (isDesktop()) return cards.length;
+    if (isDesktop() || isMobile()) return cards.length;
     if (opening.clientWidth >= 700 && opening.clientHeight >= 600) return 5;
     return 3;
   }
   function updateTiming() {
-    const desktop = isDesktop();
-    duration = desktop ? 3600 : 1500;
-    enter = desktop ? 750 : 180;
-    hold = desktop ? 2400 : 1050;
+    const collage = isDesktop() || isMobile();
+    duration = collage ? 3600 : 1500;
+    enter = collage ? 750 : 180;
+    hold = collage ? 2400 : 1050;
   }
-  function measure(card) {
+  function measure(card, limits = null) {
+    if (limits) {
+      const ratio = Math.min(0.82, limits.width / card.naturalWidth, limits.height / card.naturalHeight);
+      card.width = card.naturalWidth * ratio;
+      card.height = card.naturalHeight * ratio;
+      card.element.style.width = `${card.width}px`;
+      card.element.style.height = `${card.height}px`;
+      return;
+    }
     const width = opening.clientWidth;
     const height = opening.clientHeight;
     const compact = width < 700 || height < 520;
@@ -97,6 +106,28 @@
     card.element.style.height = `${card.height}px`;
   }
   function position(card) {
+    if (isMobile()) {
+      const screen = opening.getBoundingClientRect();
+      const logo = brand.getBoundingClientRect();
+      const inset = 8;
+      const gap = 12;
+      const columns = screen.width <= 360 ? 5 : screen.width <= 560 ? 6 : 8;
+      const rows = Math.ceil(Math.ceil(cards.length / 2) / columns);
+      const band = desktopSlot.get(card) % 2;
+      const index = Math.floor(desktopSlot.get(card) / 2);
+      const availableWidth = screen.width - inset * 2;
+      const topHeight = Math.max(0, logo.top - screen.top - gap - inset);
+      const bottomStart = logo.bottom - screen.top + gap;
+      const bottomHeight = Math.max(0, screen.height - bottomStart - inset);
+      const cellWidth = availableWidth / columns;
+      const cellHeight = (band ? bottomHeight : topHeight) / rows;
+      measure(card, { width: cellWidth * 0.86, height: cellHeight * 0.86 });
+      const x = inset + (index % columns + 0.5) * cellWidth - card.width / 2;
+      const y = (band ? bottomStart : inset) + (Math.floor(index / columns) + 0.5) * cellHeight - card.height / 2;
+      card.element.style.left = `${x}px`;
+      card.element.style.top = `${y}px`;
+      return { left: x, top: y, right: x + card.width, bottom: y + card.height };
+    }
     measure(card);
     const width = opening.clientWidth;
     const height = opening.clientHeight;
@@ -137,7 +168,7 @@
     return best.rect;
   }
   function nextCard() {
-    if (!deck.length) deck = shuffle(cards.filter((card) => card.image.complete && card.image.naturalWidth));
+    if (!deck.length) deck = shuffle(isMobile() ? cards : cards.filter((card) => card.image.complete && card.image.naturalWidth));
     const attempts = deck.length;
     for (let index = 0; index < attempts; index++) {
       const card = deck.shift();
@@ -159,7 +190,7 @@
       entry.card.element.style.opacity = '1';
       return;
     }
-    if (isDesktop()) {
+    if (isDesktop() || isMobile()) {
       entry.animation = entry.card.element.animate([
         { opacity: 0, transform: 'translateY(8px) scale(.96)' },
         { opacity: 1, transform: 'translateY(0) scale(1)' },
@@ -186,9 +217,9 @@
     updateTiming();
     slotCount = targetCount();
     const ready = cards.filter((card) => card.image.complete && card.image.naturalWidth).length;
-    if (ready < (allowPartial ? 2 : slotCount)) return;
+    if (!isMobile() && ready < (allowPartial ? 2 : slotCount)) return;
     started = true;
-    for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 20 : slot * duration / slotCount);
+    for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 20 : isMobile() ? slot * 12 : slot * duration / slotCount);
   }
   function holdFinalGroup() {
     finalGroup = true;
@@ -219,7 +250,7 @@
     desktopCenters = null;
     updateTiming();
     slotCount = targetCount();
-    for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 20 : slot * duration / slotCount);
+    for (let slot = 0; slot < slotCount; slot++) show(slot, isDesktop() ? slot * 20 : isMobile() ? slot * 12 : slot * duration / slotCount);
   });
   opening.addEventListener('animationend', (event) => {
     if (event.target !== opening) return;
