@@ -16,7 +16,7 @@ let catalog = null;
 let shown = 24;
 let feedbackTimer = null;
 // Store-selected best sellers, in display order.
-const bestSellerIds = ['CT-W011', 'TG-W004', 'TG-W054', 'RLX-W025', 'RLX-W031'];
+const bestSellerIds = ['CT-W011', 'TG-W004', 'TG-W054', 'RLX-W025'];
 let filters = { query: new URLSearchParams(location.search).get('q') || '', brand: '', size: '', dial: '', movement: '', category: '', availability: '', min: '', max: '', sort: 'newest' };
 const path = decodeURIComponent(location.pathname);
 if (path.startsWith('/watches/')) filters.brand = path.split('/')[2];
