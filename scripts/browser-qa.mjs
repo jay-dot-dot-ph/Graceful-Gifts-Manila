@@ -139,8 +139,8 @@ try {
   assert.match(await page.evaluate(() => navigator.clipboard.readText()), /currently sold out/);
   await page.goto(base + '/contact');
   await page.locator('.contact-method').first().waitFor({ timeout: 30000 });
-  assert.equal(await page.locator('a[href="tel:+639773847543"]').count() > 0, true);
-  assert.equal(await page.locator('a[href="viber://chat?number=%2B639773847543"]').count() > 0, true);
+  assert.equal(await page.locator('a[href="tel:+639755996605"]').count() > 0, true);
+  assert.equal(await page.locator('a[href="viber://chat?number=%2B639755996605"]').count() > 0, true);
   await desktop.close();
 
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
