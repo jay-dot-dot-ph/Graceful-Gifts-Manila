@@ -20,25 +20,7 @@ try {
   assert.equal(await page.locator('.hero-visual img').evaluate((img) => img.complete && img.naturalWidth > 0), true, 'Hero watch image should load');
   assert.match(await page.locator('.trust-banner').innerText(), /Cash on Delivery Nationwide[\s\S]*Inspect Before Paying[\s\S]*Forbes Commercial/);
   assert.equal(await page.locator('.floating-chat').getAttribute('href'), 'https://m.me/GracefulGifts.Manila');
-  const previewCard = page.locator('.watch-card').first();
-  await previewCard.locator('.card-image a').click();
-  const modal = page.locator('.watch-modal');
-  await modal.waitFor();
-  assert.equal(await modal.getAttribute('aria-labelledby'), 'watch-modal-title');
-  for (const label of ['Movement type', 'Case diameter', 'Strap material', 'Water resistance', 'Box inclusions']) {
-    assert.ok((await modal.innerText()).includes(label), `Modal should show ${label}`);
-  }
-  await modal.screenshot({ path: resolve(output, 'qa-watch-modal.png') });
-  assert.equal(await modal.locator('.watch-modal-inquire').getAttribute('href'), 'https://m.me/GracefulGifts.Manila');
-  await page.evaluate(() => document.addEventListener('click', (event) => {
-    if (event.target.closest('.watch-modal-inquire')) event.preventDefault();
-  }, true));
-  const previewWatchId = await previewCard.getAttribute('data-watch-card');
-  await modal.locator('.watch-modal-inquire').click();
-  await page.waitForFunction(async (id) => (await navigator.clipboard.readText()).includes(id), previewWatchId);
-  assert.match(await page.evaluate(() => navigator.clipboard.readText()), new RegExp(previewWatchId));
-  await page.keyboard.press('Escape');
-  await modal.waitFor({ state: 'detached', timeout: 5000 });
+  assert.equal(await page.locator('.card-inquire, .watch-modal').count(), 0, 'Card inquiry and specs modal are removed');
   await page.screenshot({ path: resolve(output, 'qa-desktop.png') });
   await page.locator('.desktop-nav a[href="/brands"]').click();
   await page.locator('.brands-page-content .brand-tile').first().waitFor({ timeout: 30000 });

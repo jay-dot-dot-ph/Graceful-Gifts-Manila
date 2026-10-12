@@ -31,27 +31,7 @@ function footer() {
 function card(watch) {
   const saved = favorites.has(watch.id);
   const img = watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" loading="lazy" decoding="async" width="500" height="500">` : `<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>`;
-  return `<article class="watch-card" data-watch-card="${esc(watch.id)}"><div class="card-image"><a href="/watch/${encodeURIComponent(watch.id)}" aria-label="View ${esc(watchName(watch))}">${img}</a><button class="heart ${saved ? 'saved' : ''}" data-favorite="${esc(watch.id)}" type="button" aria-label="${saved ? 'Remove' : 'Save'} ${esc(watchName(watch))} ${saved ? 'from' : 'to'} favorites" aria-pressed="${saved}">${saved ? '♥' : '♡'}</button>${watch.stock === 0 ? '<span class="image-badge">SOLD OUT</span>' : ''}</div><div class="card-info"><p class="eyebrow">${esc(watch.brand)}</p><h3><a href="/watch/${encodeURIComponent(watch.id)}">${esc(watch.model || 'Watch details on request')}</a></h3><p class="card-meta">${esc([watch.movement, watch.size].filter(Boolean).join(' · ') || watch.id)}</p><div class="card-bottom"><strong>${money(watch.price)}</strong><span class="${watch.stock === 0 ? 'soldout' : ''}">${stockText(watch)}</span></div><a class="card-inquire" href="${config.messenger}" target="_blank" rel="noopener" data-quick-inquire="${esc(watch.id)}">Inquire Item <span aria-hidden="true">↗</span></a></div></article>`;
-}
-function openWatchModal(watch) {
-  document.querySelector('.watch-modal')?.close();
-  const specs = [
-    ['Movement type', watch.movement],
-    ['Case diameter', watch.size],
-    ['Case material', watch.caseMaterial],
-    ['Strap material', watch.strapMaterial],
-    ['Water resistance', watch.waterResistance],
-    ['Box inclusions', watch.boxInclusions],
-  ];
-  const dialog = document.createElement('dialog');
-  dialog.className = 'watch-modal';
-  dialog.setAttribute('aria-labelledby', 'watch-modal-title');
-  dialog.innerHTML = `<div class="watch-modal-inner"><button class="watch-modal-close" type="button" aria-label="Close watch details">×</button><div class="watch-modal-image">${watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" width="560" height="560">` : '<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>'}</div><div class="watch-modal-copy"><p class="eyebrow">${esc(watch.brand)} · ${esc(watch.id)}</p><h2 id="watch-modal-title">${esc(watchName(watch))}</h2><p class="watch-modal-price">${money(watch.price)}</p><p class="watch-modal-stock">${stockText(watch)}</p><dl class="watch-modal-specs">${specs.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value || 'Please confirm with our team')}</dd></div>`).join('')}</dl><a class="button button-dark watch-modal-inquire" href="${config.messenger}" target="_blank" rel="noopener" data-quick-inquire="${esc(watch.id)}">Inquire This Watch on Messenger ↗</a><p class="watch-modal-note">Your watch details are copied for you to paste in Messenger.</p><a class="watch-modal-details" href="/watch/${encodeURIComponent(watch.id)}">View full watch page ↗</a></div></div>`;
-  document.body.appendChild(dialog);
-  dialog.querySelector('.watch-modal-close').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
-  dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  dialog.showModal();
+  return `<article class="watch-card"><div class="card-image"><a href="/watch/${encodeURIComponent(watch.id)}" aria-label="View ${esc(watchName(watch))}">${img}</a><button class="heart ${saved ? 'saved' : ''}" data-favorite="${esc(watch.id)}" type="button" aria-label="${saved ? 'Remove' : 'Save'} ${esc(watchName(watch))} ${saved ? 'from' : 'to'} favorites" aria-pressed="${saved}">${saved ? '♥' : '♡'}</button>${watch.stock === 0 ? '<span class="image-badge">SOLD OUT</span>' : ''}</div><div class="card-info"><p class="eyebrow">${esc(watch.brand)}</p><h3><a href="/watch/${encodeURIComponent(watch.id)}">${esc(watch.model || 'Watch details on request')}</a></h3><p class="card-meta">${esc([watch.movement, watch.size].filter(Boolean).join(' · ') || watch.id)}</p><div class="card-bottom"><strong>${money(watch.price)}</strong><span class="${watch.stock === 0 ? 'soldout' : ''}">${stockText(watch)}</span></div></div></article>`;
 }
 function sectionHead(eyebrow, title, link, label) {
   return `<div class="section-head"><div><p class="eyebrow">${eyebrow}</p><h2>${title}</h2></div>${link ? `<a class="text-link" href="${link}">${label || 'View all'} <span aria-hidden="true">↗</span></a>` : ''}</div>`;
@@ -248,24 +228,6 @@ function startFeedback() {
   feedbackTimer = setTimeout(show, 6500);
 }
 document.addEventListener('click', async (event) => {
-  const quickInquiry = event.target.closest('[data-quick-inquire]');
-  if (quickInquiry) {
-    const watch = catalog?.watches.find((item) => item.id === quickInquiry.dataset.quickInquire);
-    if (watch) {
-      // m.me opens the conversation; its ?text= query does not reliably prefill Messenger.
-      // Copy the exact item message during the click so the customer can paste it there.
-      void copyText(inquiryMessage([watch])).then((copied) => {
-        notice(copied ? 'Watch details copied. Paste them in Messenger.' : 'Messenger opened. Please mention the watch name or ID.');
-      }).catch(() => notice('Messenger opened. Please mention the watch name or ID.'));
-    }
-    return;
-  }
-  const watchCard = event.target.closest('[data-watch-card]');
-  if (watchCard && !event.target.closest('button')) {
-    const watch = catalog?.watches.find((item) => item.id === watchCard.dataset.watchCard);
-    if (watch) { event.preventDefault(); openWatchModal(watch); }
-    return;
-  }
   const button = event.target.closest('button'); if (!button) return;
   if (button.matches('[data-menu]')) { const menu = document.getElementById('mobile-nav'); const open = menu.classList.toggle('open'); button.setAttribute('aria-expanded', String(open)); return; }
   if (button.matches('[data-favorite]')) { updateFavorite(button.dataset.favorite); return; }
