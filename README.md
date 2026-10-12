@@ -23,7 +23,7 @@ Open `http://127.0.0.1:4173`. The preview requires an internet connection to rea
 - Product URLs use `/watch/{watchId}`. Watch ID, price, stock, and specifications come from the Sheet. Blank stock is shown as availability on request; zero stock is shown as sold out.
 - `worker/client.js` renders the interface. Favorites are saved in browser local storage. Inquiry messages include each selected watch's ID, price, and exact page URL.
 
-The current Sheet has no usable recent `Date Added` values or featured markers, so New Arrivals and Featured Watches have honest placeholder states. Customer feedback images were not supplied; the gallery and timed floating feedback activate when verified image URLs are added to `feedbackImages` in `window.GGM_CONFIG` in `worker/index.js`. Do not use unverified testimonials.
+The current Sheet has no usable recent `Date Added` values, so New arrivals is hidden for now. Featured Watches still has a placeholder because the Sheet has no featured markers. Customer feedback images were not supplied; the gallery and timed floating feedback activate when verified image URLs are added to `feedbackImages` in `window.GGM_CONFIG` in `worker/index.js`. Do not use unverified testimonials.
 
 The live Sheet currently has no watch with zero stock. Browser QA injects a temporary zero-stock test fixture to check the sold-out display and inquiry message; it does not change the Sheet or customer catalog.
 
