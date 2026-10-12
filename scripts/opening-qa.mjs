@@ -77,11 +77,14 @@ try {
           largestWidth: Math.max(...photos.map((photo) => photo.width)),
           insideScreen: photos.every((photo) => photo.left >= screen.left && photo.right <= screen.right && photo.top >= screen.top && photo.bottom <= screen.bottom),
           logoClear: photos.every((photo) => photo.right <= logo.left || photo.left >= logo.right || photo.bottom <= logo.top || photo.top >= logo.bottom),
+          leftSide: photos.filter((photo) => photo.top >= logo.top && photo.bottom <= logo.bottom && photo.right <= logo.left).length,
+          rightSide: photos.filter((photo) => photo.top >= logo.top && photo.bottom <= logo.bottom && photo.left >= logo.right).length,
         };
       });
       assert.equal(collage.visible, feedbackCount, `${label}: all feedback photos are in the collage`);
       assert.ok(collage.largestWidth <= 70, `${label}: feedback thumbnails stay compact`);
       assert.equal(collage.insideScreen && collage.logoClear, true, `${label}: photos fit around the logo`);
+      assert.ok(collage.leftSide >= 2 && collage.rightSide >= 2, `${label}: photos fill both sides of the logo`);
     }
     try {
       await page.locator('#opening-screen').waitFor({ state: 'detached', timeout: 6000 });
