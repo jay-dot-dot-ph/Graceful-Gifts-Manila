@@ -9,6 +9,7 @@ const FEEDBACK_IMAGES = "__FEEDBACK_IMAGES__";
 const SHEET_ID = "1qowXiNelPflvWPYv1lWWCf7z9AnltCL5Tem8Sus-arI";
 export const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}`;
 const FACEBOOK = "https://www.facebook.com/GracefulGifts.Manila";
+// Replace this with your real Facebook Page username or Messenger link.
 const MESSENGER = "https://m.me/GracefulGifts.Manila";
 const CACHE_MS = 5 * 60 * 1000;
 let catalogCache = null;
@@ -66,6 +67,8 @@ export function extractImages(html) {
 export function normalizeRows(csv, tabName, images = new Map()) {
   const rows = parseCsv(csv);
   if (rows.length < 2) return [];
+  const waterResistanceColumn = rows[0].findIndex((header) => /water\s*resistance/i.test(header));
+  const boxInclusionsColumn = rows[0].findIndex((header) => /box\s*inclusions|included\s*accessories/i.test(header));
   const watches = [];
   for (const cells of rows.slice(1)) {
     const id = String(cells[1] || "").trim().toUpperCase();
@@ -79,6 +82,8 @@ export function normalizeRows(csv, tabName, images = new Map()) {
       category: String(cells[5] || "").trim(), dialColor: String(cells[6] || "").trim(),
       caseMaterial: String(cells[7] || "").trim(), strapMaterial: String(cells[8] || "").trim(),
       movement: String(cells[9] || "").trim(),
+      waterResistance: waterResistanceColumn < 0 ? "" : String(cells[waterResistanceColumn] || "").trim(),
+      boxInclusions: boxInclusionsColumn < 0 ? "" : String(cells[boxInclusionsColumn] || "").trim(),
       price: rawPrice && Number.isFinite(Number(rawPrice)) ? Number(rawPrice) : null,
       stock: /^\d+$/.test(rawStock) ? Number(rawStock) : null,
       description: String(cells[12] || "").trim(),

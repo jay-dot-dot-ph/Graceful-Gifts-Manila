@@ -18,6 +18,27 @@ try {
   await page.locator('.hero h1').waitFor({ timeout: 30000 });
   await page.waitForFunction(() => { const img = document.querySelector('.hero-visual img'); return img && img.complete && img.naturalWidth > 0; }, null, { timeout: 20000 });
   assert.equal(await page.locator('.hero-visual img').evaluate((img) => img.complete && img.naturalWidth > 0), true, 'Hero watch image should load');
+  assert.match(await page.locator('.trust-banner').innerText(), /Cash on Delivery Nationwide[\s\S]*Inspect Before Paying[\s\S]*Forbes Commercial/);
+  assert.equal(await page.locator('.floating-chat').getAttribute('href'), 'https://m.me/GracefulGifts.Manila');
+  const previewCard = page.locator('.watch-card').first();
+  await previewCard.locator('.card-image a').click();
+  const modal = page.locator('.watch-modal');
+  await modal.waitFor();
+  assert.equal(await modal.getAttribute('aria-labelledby'), 'watch-modal-title');
+  for (const label of ['Movement type', 'Case diameter', 'Strap material', 'Water resistance', 'Box inclusions']) {
+    assert.ok((await modal.innerText()).includes(label), `Modal should show ${label}`);
+  }
+  await modal.screenshot({ path: resolve(output, 'qa-watch-modal.png') });
+  assert.equal(await modal.locator('.watch-modal-inquire').getAttribute('href'), 'https://m.me/GracefulGifts.Manila');
+  await page.evaluate(() => document.addEventListener('click', (event) => {
+    if (event.target.closest('.watch-modal-inquire')) event.preventDefault();
+  }, true));
+  const previewWatchId = await previewCard.getAttribute('data-watch-card');
+  await modal.locator('.watch-modal-inquire').click();
+  await page.waitForFunction(async (id) => (await navigator.clipboard.readText()).includes(id), previewWatchId);
+  assert.match(await page.evaluate(() => navigator.clipboard.readText()), new RegExp(previewWatchId));
+  await page.keyboard.press('Escape');
+  await modal.waitFor({ state: 'detached', timeout: 5000 });
   await page.screenshot({ path: resolve(output, 'qa-desktop.png') });
   await page.locator('.desktop-nav a[href="/brands"]').click();
   await page.locator('.brands-page-content .brand-tile').first().waitFor({ timeout: 30000 });
@@ -148,6 +169,8 @@ try {
   mobilePage.on('pageerror', (error) => errors.push(error.message));
   await mobilePage.goto(base + '/', { waitUntil: 'domcontentloaded' });
   await mobilePage.locator('.hero h1').waitFor({ timeout: 30000 });
+  assert.equal(await mobilePage.locator('.floating-chat').isVisible(), true);
+  assert.equal(await mobilePage.locator('.trust-banner span').count(), 3);
   const size = await mobilePage.evaluate(() => ({ viewport: innerWidth, content: document.documentElement.scrollWidth }));
   assert.ok(size.content <= size.viewport + 1, `Mobile overflow: ${JSON.stringify(size)}`);
   await mobilePage.screenshot({ path: resolve(output, 'qa-mobile.png') });

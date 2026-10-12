@@ -23,15 +23,35 @@ if (path.startsWith('/watches/')) filters.brand = path.split('/')[2];
 
 function nav(active) {
   const links = [['/', 'Home'], ['/watches', 'Watches'], ['/brands', 'Brands'], ['/favorites', 'Favorites'], ['/contact', 'Contact'], ['/#physical-store', 'Physical Store']];
-  return `<header class="site-header"><div class="nav-wrap container"><a class="brand-mark" href="/" aria-label="Graceful Gifts Manila, home"><span class="brand-symbol">G</span><span class="brand-words">GRACEFUL GIFTS<small>MANILA</small></span></a><nav class="desktop-nav" aria-label="Main navigation">${links.map(([href, label]) => `<a href="${href}" ${active === label ? 'aria-current="page"' : ''}>${label}${label === 'Favorites' ? `<span class="fav-count">${favorites.size || ''}</span>` : ''}</a>`).join('')}</nav><div class="nav-actions"><a class="search-shortcut" href="/watches" aria-label="Search watches">⌕</a><button class="menu-button" data-menu type="button" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button></div></div><nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">${links.map(([href, label]) => `<a href="${href}">${label}</a>`).join('')}</nav></header>`;
+  return `<div class="trust-banner" aria-label="Shopping benefits"><div class="container trust-banner-inner"><span>🚚 Cash on Delivery Nationwide</span><span>🔍 Inspect Before Paying</span><span>📍 Physical Store: Forbes Commercial, Sampaloc, Manila</span></div></div><header class="site-header"><div class="nav-wrap container"><a class="brand-mark" href="/" aria-label="Graceful Gifts Manila, home"><span class="brand-symbol">G</span><span class="brand-words">GRACEFUL GIFTS<small>MANILA</small></span></a><nav class="desktop-nav" aria-label="Main navigation">${links.map(([href, label]) => `<a href="${href}" ${active === label ? 'aria-current="page"' : ''}>${label}${label === 'Favorites' ? `<span class="fav-count">${favorites.size || ''}</span>` : ''}</a>`).join('')}</nav><div class="nav-actions"><a class="search-shortcut" href="/watches" aria-label="Search watches">⌕</a><button class="menu-button" data-menu type="button" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button></div></div><nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">${links.map(([href, label]) => `<a href="${href}">${label}</a>`).join('')}</nav></header>`;
 }
 function footer() {
-  return `<footer class="site-footer"><div class="container footer-grid"><div><a class="footer-logo" href="/">GRACEFUL GIFTS <span>MANILA</span></a></div><div><h3>Explore</h3><a href="/watches">All watches</a><a href="/brands">Shop by brand</a><a href="/favorites">My favorites</a></div><div><h3>Connect</h3><a href="${config.facebook}" target="_blank" rel="noopener">Facebook</a><a href="${config.messenger}" target="_blank" rel="noopener">Messenger</a><a href="tel:+639755996605">0975 599 6605</a></div></div><div class="container footer-bottom"><span>© ${new Date().getFullYear()} Graceful Gifts Manila</span><span>Prices and availability are subject to confirmation.</span></div></footer>`;
+  return `<footer class="site-footer"><div class="container footer-grid"><div><a class="footer-logo" href="/">GRACEFUL GIFTS <span>MANILA</span></a></div><div><h3>Explore</h3><a href="/watches">All watches</a><a href="/brands">Shop by brand</a><a href="/favorites">My favorites</a></div><div><h3>Connect</h3><a href="${config.facebook}" target="_blank" rel="noopener">Facebook</a><a href="${config.messenger}" target="_blank" rel="noopener">Messenger</a><a href="tel:+639755996605">0975 599 6605</a></div></div><div class="container footer-bottom"><span>© ${new Date().getFullYear()} Graceful Gifts Manila</span><span>Prices and availability are subject to confirmation.</span></div></footer><a class="floating-chat" href="${config.messenger}" target="_blank" rel="noopener" aria-label="Chat with us on Messenger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.4a8 8 0 0 1-8 8 8.8 8.8 0 0 1-3.4-.7L4 20l1.3-4A8 8 0 1 1 20 11.4Z"/><path d="m8 13 3-3 2.2 2 2.8-2"/></svg><span>Chat with us</span></a>`;
 }
 function card(watch) {
   const saved = favorites.has(watch.id);
   const img = watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" loading="lazy" decoding="async" width="500" height="500">` : `<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>`;
-  return `<article class="watch-card"><div class="card-image"><a href="/watch/${encodeURIComponent(watch.id)}" aria-label="View ${esc(watchName(watch))}">${img}</a><button class="heart ${saved ? 'saved' : ''}" data-favorite="${esc(watch.id)}" type="button" aria-label="${saved ? 'Remove' : 'Save'} ${esc(watchName(watch))} ${saved ? 'from' : 'to'} favorites" aria-pressed="${saved}">${saved ? '♥' : '♡'}</button>${watch.stock === 0 ? '<span class="image-badge">SOLD OUT</span>' : ''}</div><div class="card-info"><p class="eyebrow">${esc(watch.brand)}</p><h3><a href="/watch/${encodeURIComponent(watch.id)}">${esc(watch.model || 'Watch details on request')}</a></h3><p class="card-meta">${esc([watch.movement, watch.size].filter(Boolean).join(' · ') || watch.id)}</p><div class="card-bottom"><strong>${money(watch.price)}</strong><span class="${watch.stock === 0 ? 'soldout' : ''}">${stockText(watch)}</span></div></div></article>`;
+  return `<article class="watch-card" data-watch-card="${esc(watch.id)}"><div class="card-image"><a href="/watch/${encodeURIComponent(watch.id)}" aria-label="View ${esc(watchName(watch))}">${img}</a><button class="heart ${saved ? 'saved' : ''}" data-favorite="${esc(watch.id)}" type="button" aria-label="${saved ? 'Remove' : 'Save'} ${esc(watchName(watch))} ${saved ? 'from' : 'to'} favorites" aria-pressed="${saved}">${saved ? '♥' : '♡'}</button>${watch.stock === 0 ? '<span class="image-badge">SOLD OUT</span>' : ''}</div><div class="card-info"><p class="eyebrow">${esc(watch.brand)}</p><h3><a href="/watch/${encodeURIComponent(watch.id)}">${esc(watch.model || 'Watch details on request')}</a></h3><p class="card-meta">${esc([watch.movement, watch.size].filter(Boolean).join(' · ') || watch.id)}</p><div class="card-bottom"><strong>${money(watch.price)}</strong><span class="${watch.stock === 0 ? 'soldout' : ''}">${stockText(watch)}</span></div><a class="card-inquire" href="${config.messenger}" target="_blank" rel="noopener" data-quick-inquire="${esc(watch.id)}">Inquire Item <span aria-hidden="true">↗</span></a></div></article>`;
+}
+function openWatchModal(watch) {
+  document.querySelector('.watch-modal')?.close();
+  const specs = [
+    ['Movement type', watch.movement],
+    ['Case diameter', watch.size],
+    ['Case material', watch.caseMaterial],
+    ['Strap material', watch.strapMaterial],
+    ['Water resistance', watch.waterResistance],
+    ['Box inclusions', watch.boxInclusions],
+  ];
+  const dialog = document.createElement('dialog');
+  dialog.className = 'watch-modal';
+  dialog.setAttribute('aria-labelledby', 'watch-modal-title');
+  dialog.innerHTML = `<div class="watch-modal-inner"><button class="watch-modal-close" type="button" aria-label="Close watch details">×</button><div class="watch-modal-image">${watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" width="560" height="560">` : '<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>'}</div><div class="watch-modal-copy"><p class="eyebrow">${esc(watch.brand)} · ${esc(watch.id)}</p><h2 id="watch-modal-title">${esc(watchName(watch))}</h2><p class="watch-modal-price">${money(watch.price)}</p><p class="watch-modal-stock">${stockText(watch)}</p><dl class="watch-modal-specs">${specs.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value || 'Please confirm with our team')}</dd></div>`).join('')}</dl><a class="button button-dark watch-modal-inquire" href="${config.messenger}" target="_blank" rel="noopener" data-quick-inquire="${esc(watch.id)}">Inquire This Watch on Messenger ↗</a><p class="watch-modal-note">Your watch details are copied for you to paste in Messenger.</p><a class="watch-modal-details" href="/watch/${encodeURIComponent(watch.id)}">View full watch page ↗</a></div></div>`;
+  document.body.appendChild(dialog);
+  dialog.querySelector('.watch-modal-close').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  dialog.showModal();
 }
 function sectionHead(eyebrow, title, link, label) {
   return `<div class="section-head"><div><p class="eyebrow">${eyebrow}</p><h2>${title}</h2></div>${link ? `<a class="text-link" href="${link}">${label || 'View all'} <span aria-hidden="true">↗</span></a>` : ''}</div>`;
@@ -228,6 +248,24 @@ function startFeedback() {
   feedbackTimer = setTimeout(show, 6500);
 }
 document.addEventListener('click', async (event) => {
+  const quickInquiry = event.target.closest('[data-quick-inquire]');
+  if (quickInquiry) {
+    const watch = catalog?.watches.find((item) => item.id === quickInquiry.dataset.quickInquire);
+    if (watch) {
+      // m.me opens the conversation; its ?text= query does not reliably prefill Messenger.
+      // Copy the exact item message during the click so the customer can paste it there.
+      void copyText(inquiryMessage([watch])).then((copied) => {
+        notice(copied ? 'Watch details copied. Paste them in Messenger.' : 'Messenger opened. Please mention the watch name or ID.');
+      }).catch(() => notice('Messenger opened. Please mention the watch name or ID.'));
+    }
+    return;
+  }
+  const watchCard = event.target.closest('[data-watch-card]');
+  if (watchCard && !event.target.closest('button')) {
+    const watch = catalog?.watches.find((item) => item.id === watchCard.dataset.watchCard);
+    if (watch) { event.preventDefault(); openWatchModal(watch); }
+    return;
+  }
   const button = event.target.closest('button'); if (!button) return;
   if (button.matches('[data-menu]')) { const menu = document.getElementById('mobile-nav'); const open = menu.classList.toggle('open'); button.setAttribute('aria-expanded', String(open)); return; }
   if (button.matches('[data-favorite]')) { updateFavorite(button.dataset.favorite); return; }

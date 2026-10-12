@@ -31,3 +31,51 @@
 @media(max-width:760px){.best-sellers-section{padding-bottom:28px}.best-sellers-section+.arrivals-section{padding-top:28px}}
 .brands-page-heading{padding:80px 0 70px}.brands-page-content{padding-top:65px}.brands-page-topline{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:25px}.brands-page-topline .eyebrow{margin:0}.brands-page-topline span{font-size:.75rem;color:var(--muted)}
 @media(max-width:760px){.brands-page-heading{padding:55px 0 48px}.brands-page-content{padding-top:45px}}
+
+/* Storefront inquiry and trust details */
+.trust-banner{background:#e9e0cf;border-bottom:1px solid #d5c8b3;color:#4b4438}
+.trust-banner-inner{min-height:39px;display:flex;justify-content:center;align-items:center;gap:clamp(16px,3vw,45px);flex-wrap:wrap;padding-top:7px;padding-bottom:7px}
+.trust-banner span{font-size:.68rem;font-weight:700;letter-spacing:.035em;white-space:nowrap}
+.floating-chat{position:fixed;right:22px;bottom:22px;z-index:70;display:inline-flex;align-items:center;gap:10px;min-height:52px;padding:11px 18px;border:1px solid #c6a978;border-radius:999px;background:#252720;color:#fff;box-shadow:0 8px 26px #1618114d;font-size:.78rem;font-weight:700;transition:transform .2s,background .2s}
+.floating-chat:hover{transform:translateY(-2px);background:#3b3e33}
+.floating-chat svg{width:22px;height:22px;flex:none}
+.card-inquire{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:14px;padding:11px 13px;border:1px solid #cdbfaa;background:#f1eadf;color:#5b4226;font-size:.75rem;font-weight:700;letter-spacing:.02em}
+.card-inquire:hover{text-decoration:underline;text-underline-offset:3px}
+.watch-card{cursor:pointer}
+.watch-card button,.watch-card .card-inquire{cursor:pointer}
+.watch-modal{width:min(920px,calc(100vw - 30px));max-height:min(90vh,900px);padding:0;border:1px solid #d2c6b3;background:var(--cream);color:var(--ink);box-shadow:0 28px 80px #0006}
+.watch-modal::backdrop{background:#161914b8;backdrop-filter:blur(3px)}
+.watch-modal-inner{display:grid;grid-template-columns:minmax(0,.88fr) minmax(0,1.12fr)}
+.watch-modal-image{min-height:500px;background:#eae5dc;display:grid;place-items:center}
+.watch-modal-image img{width:90%;height:90%;max-height:560px;object-fit:contain;mix-blend-mode:multiply}
+.watch-modal-copy{padding:38px 45px 35px;overflow:auto;max-height:min(90vh,900px)}
+.watch-modal-copy h2{font-size:clamp(2.2rem,4vw,3.3rem);margin:10px 0 14px}
+.watch-modal-price{font-family:var(--serif);font-size:2rem;margin:0 0 3px}
+.watch-modal-stock{color:#54715d;font-size:.76rem;margin:0 0 24px}
+.watch-modal-specs{margin:0 0 24px;border-top:1px solid var(--line)}
+.watch-modal-specs div{display:flex;justify-content:space-between;gap:15px;padding:10px 0;border-bottom:1px solid var(--line)}
+.watch-modal-specs dt{color:#777168;font-size:.74rem}
+.watch-modal-specs dd{margin:0;text-align:right;font-size:.75rem;font-weight:600}
+.watch-modal-inquire{width:100%;text-align:center}
+.watch-modal-note{margin:10px 0 17px;color:#777168;font-size:.72rem;line-height:1.5}
+.watch-modal-details{display:inline-block;border-bottom:1px solid var(--gold);padding-bottom:5px;color:#74542e;font-size:.76rem;font-weight:700}
+.watch-modal-close{position:absolute;top:12px;right:12px;z-index:1;width:38px;height:38px;border:1px solid var(--line);border-radius:50%;background:#fffdf9;color:var(--ink);font-size:1.6rem;line-height:1}
+.feedback-float{bottom:90px}
+@media(max-width:760px){
+  .trust-banner-inner{gap:5px 15px;justify-content:center}
+  .trust-banner span{font-size:.58rem;white-space:normal;text-align:center}
+  .trust-banner span:last-child{flex-basis:100%}
+  .floating-chat{right:13px;bottom:14px;min-height:48px;padding:11px 13px}
+  .floating-chat span{display:none}
+  body:has(.mobile-inquiry-bar) .floating-chat{bottom:calc(82px + env(safe-area-inset-bottom))}
+  .feedback-float{right:13px;bottom:75px}
+  body:has(.mobile-inquiry-bar) .feedback-float{bottom:145px}
+  .watch-modal{width:calc(100vw - 20px);max-height:92vh}
+  .watch-modal-inner{display:block}
+  .watch-modal-image{min-height:0;height:220px}
+  .watch-modal-image img{max-height:215px}
+  .watch-modal-copy{padding:20px 22px 24px;max-height:calc(92vh - 220px)}
+  .watch-modal-copy h2{font-size:2.15rem}
+  .watch-modal-specs div{padding:8px 0}
+  .watch-modal-inquire{min-height:48px;padding:11px;font-size:.69rem}
+}
