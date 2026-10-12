@@ -114,6 +114,17 @@ try {
   await page.goto(base + '/watch/RLX-W001');
   await page.locator('.detail-copy h1').waitFor({ timeout: 30000 });
   assert.match(await page.locator('.detail-copy h1').innerText(), /Datejust/i);
+  for (const width of [1440, 1000]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const columnGap = await page.locator('.specs-grid').evaluate((grid) => {
+      const firstValue = grid.children[0].querySelector('dd').getBoundingClientRect();
+      const nextLabel = grid.children[1].querySelector('dt').getBoundingClientRect();
+      return nextLabel.left - firstValue.right;
+    });
+    assert.ok(columnGap >= 20, `Specification columns must not collide at ${width}px: ${columnGap}px`);
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator('.specs-section').screenshot({ path: resolve(output, 'qa-watch-specs.png') });
   await page.locator('.inquiry-button').click();
   await page.locator('.inquiry-button.copied').waitFor({ timeout: 5000 });
   assert.match(await page.locator('.inquiry-button').innerText(), /MESSAGE COPIED/i);
@@ -174,6 +185,7 @@ try {
   await mobilePage.goto(base + '/watch/RLX-W001');
   await mobilePage.locator('.mobile-inquiry-bar').waitFor({ timeout: 30000 });
   assert.equal(await mobilePage.locator('.mobile-inquiry-bar').isVisible(), true);
+  assert.equal(await mobilePage.locator('.specs-grid').evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(' ').length), 1, 'Phone specifications should use one column');
   await mobile.close();
   assert.deepEqual(errors, [], 'No browser JavaScript errors expected');
   console.log(`Browser QA passed: desktop catalog/search/filter/sort/favorites/inquiry, mobile layout/navigation/detail action; sold-out journey used ${realSoldOut ? 'live stock' : 'a clearly labeled test fixture'}.`);
