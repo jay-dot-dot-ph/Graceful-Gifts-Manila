@@ -206,7 +206,7 @@ export default {
         return new Response(htmlPage(request, product), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=60" } });
       } catch { return new Response(htmlPage(request), { headers: { "content-type": "text/html; charset=utf-8" } }); }
     }
-    if (["/", "/watches", "/favorites", "/contact"].includes(pathname) || /^\/watches\/[a-z0-9-]+$/.test(pathname)) return new Response(htmlPage(request), { headers: { "content-type": "text/html; charset=utf-8" } });
+    if (["/", "/watches", "/brands", "/favorites", "/contact"].includes(pathname) || /^\/watches\/[a-z0-9-]+$/.test(pathname)) return new Response(htmlPage(request), { headers: { "content-type": "text/html; charset=utf-8" } });
     return new Response("Page not found", { status: 404 });
   },
 };

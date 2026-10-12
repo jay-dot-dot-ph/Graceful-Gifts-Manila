@@ -7,6 +7,7 @@
     "rewrites": [
       { "source": "/watches", "destination": "/index.html" },
       { "source": "/watches/**", "destination": "/index.html" },
+      { "source": "/brands", "destination": "/index.html" },
       { "source": "/favorites", "destination": "/index.html" },
       { "source": "/contact", "destination": "/index.html" },
       { "source": "/watch/**", "destination": "/index.html" }
@@ -19,6 +20,7 @@
       { "source": "/", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/watches", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/watches/**", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
+      { "source": "/brands", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/favorites", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/contact", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/watch/**", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },

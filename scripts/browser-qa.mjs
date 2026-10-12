@@ -19,6 +19,15 @@ try {
   await page.waitForFunction(() => { const img = document.querySelector('.hero-visual img'); return img && img.complete && img.naturalWidth > 0; }, null, { timeout: 20000 });
   assert.equal(await page.locator('.hero-visual img').evaluate((img) => img.complete && img.naturalWidth > 0), true, 'Hero watch image should load');
   await page.screenshot({ path: resolve(output, 'qa-desktop.png') });
+  await page.locator('.desktop-nav a[href="/brands"]').click();
+  await page.locator('.brands-page-content .brand-tile').first().waitFor({ timeout: 30000 });
+  assert.equal(new URL(page.url()).pathname, '/brands', 'Brands has its own URL');
+  assert.equal(await page.locator('.desktop-nav a[href="/brands"]').getAttribute('aria-current'), 'page');
+  assert.ok(await page.locator('.brands-page-content .brand-tile').count() >= 23, 'Brands page lists every available brand');
+  assert.equal(await page.locator('#catalog-search').count(), 0, 'Brands page is distinct from the watch catalog');
+  await page.locator('.brands-page-content a[href="/watches/vacheron"]').click();
+  await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
+  assert.equal(new URL(page.url()).pathname, '/watches/vacheron', 'Brand tile opens its watches');
   await page.goto(base + '/watches');
   await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
   const brandTiles = page.locator('#catalog-brand-grid .brand-tile');
@@ -153,6 +162,10 @@ try {
   await mobilePage.goto(base + '/');
   await mobilePage.locator('[data-menu]').click();
   assert.equal(await mobilePage.locator('#mobile-nav').isVisible(), true);
+  await mobilePage.locator('#mobile-nav a[href="/brands"]').click();
+  await mobilePage.locator('.brands-page-content .brand-tile').first().waitFor({ timeout: 30000 });
+  assert.equal(new URL(mobilePage.url()).pathname, '/brands', 'Mobile Brands menu opens its own page');
+  assert.ok((await mobilePage.evaluate(() => document.documentElement.scrollWidth)) <= 390, 'Brands page fits a phone');
   await mobilePage.goto(base + '/watch/RLX-W001');
   await mobilePage.locator('.mobile-inquiry-bar').waitFor({ timeout: 30000 });
   assert.equal(await mobilePage.locator('.mobile-inquiry-bar').isVisible(), true);
