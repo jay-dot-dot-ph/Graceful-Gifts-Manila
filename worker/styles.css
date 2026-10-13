@@ -95,3 +95,19 @@
   .specs-section{margin-top:42px;padding-top:34px}
   .related-section{padding-top:62px}
 }
+
+/* Open search where the header icon is, including on narrow screens. */
+.search-shortcut{width:38px;height:38px;display:grid;place-items:center;border:0;background:transparent;padding:5px;color:var(--ink)}
+.search-shortcut svg{width:27px;height:27px}
+.header-search-panel{position:absolute;top:100%;left:0;right:0;z-index:31;background:#f7f4ed;border-bottom:1px solid var(--line);box-shadow:0 14px 30px #211f1b24}
+.header-search-panel[hidden]{display:none}
+.header-search-form{max-width:950px;display:flex;align-items:center;gap:12px;padding-top:18px;padding-bottom:18px}
+.header-search-form input{flex:1;min-width:0;height:48px;border:1px solid #cfc6b8;background:#fffdfa;padding:0 16px;color:var(--ink);outline:none}
+.header-search-form input:focus{border-color:var(--gold)}
+.header-search-submit{height:48px;border:1px solid var(--dark);background:var(--dark);color:white;padding:0 24px;font-size:.78rem;font-weight:700}
+.header-search-close{width:36px;height:36px;border:0;background:transparent;color:var(--ink);font-size:1.65rem;line-height:1}
+@media(max-width:760px){
+  .header-search-form{gap:8px;padding-top:12px;padding-bottom:12px}
+  .header-search-submit{padding:0 13px}
+  .header-search-close{width:28px}
+}

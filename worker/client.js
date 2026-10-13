@@ -23,7 +23,7 @@ if (path.startsWith('/watches/')) filters.brand = path.split('/')[2];
 
 function nav(active) {
   const links = [['/', 'Home'], ['/watches', 'Watches'], ['/brands', 'Brands'], ['/favorites', 'Favorites'], ['/contact', 'Contact'], ['/#physical-store', 'Physical Store']];
-  return `<div class="trust-banner" aria-label="Shopping benefits"><div class="container trust-banner-inner"><span>🚚 Cash on Delivery Nationwide</span><span>🔍 Inspect Before Paying</span><span>📍 Physical Store: Forbes Commercial, Sampaloc, Manila</span></div></div><header class="site-header"><div class="nav-wrap container"><a class="brand-mark" href="/" aria-label="Graceful Gifts Manila, home"><span class="brand-symbol">G</span><span class="brand-words">GRACEFUL GIFTS<small>MANILA</small></span></a><nav class="desktop-nav" aria-label="Main navigation">${links.map(([href, label]) => `<a href="${href}" ${active === label ? 'aria-current="page"' : ''}>${label}${label === 'Favorites' ? `<span class="fav-count">${favorites.size || ''}</span>` : ''}</a>`).join('')}</nav><div class="nav-actions"><a class="search-shortcut" href="/watches" aria-label="Search watches">⌕</a><button class="menu-button" data-menu type="button" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button></div></div><nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">${links.map(([href, label]) => `<a href="${href}">${label}</a>`).join('')}</nav></header>`;
+  return `<div class="trust-banner" aria-label="Shopping benefits"><div class="container trust-banner-inner"><span>🚚 Cash on Delivery Nationwide</span><span>🔍 Inspect Before Paying</span><span>📍 Physical Store: Forbes Commercial, Sampaloc, Manila</span></div></div><header class="site-header"><div class="nav-wrap container"><a class="brand-mark" href="/" aria-label="Graceful Gifts Manila, home"><span class="brand-symbol">G</span><span class="brand-words">GRACEFUL GIFTS<small>MANILA</small></span></a><nav class="desktop-nav" aria-label="Main navigation">${links.map(([href, label]) => `<a href="${href}" ${active === label ? 'aria-current="page"' : ''}>${label}${label === 'Favorites' ? `<span class="fav-count">${favorites.size || ''}</span>` : ''}</a>`).join('')}</nav><div class="nav-actions"><button class="search-shortcut" data-search-toggle type="button" aria-label="Search watches" aria-controls="header-search-panel" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></button><button class="menu-button" data-menu type="button" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button></div></div><nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">${links.map(([href, label]) => `<a href="${href}">${label}</a>`).join('')}</nav><div class="header-search-panel" id="header-search-panel" hidden><form class="container header-search-form" action="/watches" method="get" role="search"><label class="visually-hidden" for="header-search-input">Search watches</label><input id="header-search-input" name="q" type="search" placeholder="Search brand, model, or Watch ID" value="${esc(filters.query)}" required><button class="header-search-submit" type="submit">Search</button><button class="header-search-close" data-search-close type="button" aria-label="Close search">×</button></form></div></header>`;
 }
 function footer() {
   return `<footer class="site-footer"><div class="container footer-grid"><div class="footer-about"><a class="footer-logo" href="/">GRACEFUL GIFTS <span>MANILA</span></a><p>Explore the collection online, then visit us to find the watch that feels right for you.</p><a class="footer-visit" href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=14.6084144%2C120.9940068&heading=231.21&pitch=-2.39&fov=75" target="_blank" rel="noopener">Visit our Manila store <span aria-hidden="true">↗</span></a></div><nav class="footer-links" aria-label="Footer navigation"><h3>Explore</h3><a href="/watches">All watches</a><a href="/brands">Shop by brand</a><a href="/favorites">My favorites</a></nav><div class="footer-links"><h3>Connect</h3><a href="${config.facebook}" target="_blank" rel="noopener">Facebook</a><a href="${config.messenger}" target="_blank" rel="noopener">Messenger</a><a href="tel:+639755996605">0975 599 6605</a></div></div><div class="container footer-bottom"><span>© ${new Date().getFullYear()} Graceful Gifts Manila</span><span>Prices and availability are subject to confirmation.</span></div></footer><a class="floating-chat" href="${config.messenger}" target="_blank" rel="noopener" aria-label="Chat with us on Messenger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.4a8 8 0 0 1-8 8 8.8 8.8 0 0 1-3.4-.7L4 20l1.3-4A8 8 0 1 1 20 11.4Z"/><path d="m8 13 3-3 2.2 2 2.8-2"/></svg><span>Chat with us</span></a>`;
@@ -277,6 +277,20 @@ function watchPhotoPosition() {
   if (!photo) return 0;
   return Math.max(0, Math.round(window.scrollY + photo.getBoundingClientRect().top - (header?.getBoundingClientRect().height || 0) - 12));
 }
+function setHeaderSearch(open) {
+  const panel = document.getElementById('header-search-panel');
+  const toggle = document.querySelector('[data-search-toggle]');
+  if (!panel || !toggle) return;
+  panel.hidden = !open;
+  toggle.setAttribute('aria-expanded', String(open));
+  if (open) {
+    document.getElementById('mobile-nav')?.classList.remove('open');
+    document.querySelector('[data-menu]')?.setAttribute('aria-expanded', 'false');
+    const input = document.getElementById('header-search-input');
+    input?.focus();
+    input?.select();
+  } else if (panel.contains(document.activeElement)) toggle.focus();
+}
 document.addEventListener('click', (event) => {
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !catalog) return;
   const link = event.target.closest('a[href^="/watch/"]');
@@ -306,8 +320,10 @@ window.addEventListener('popstate', (event) => {
 });
 document.addEventListener('click', async (event) => {
   const button = event.target.closest('button'); if (!button) return;
+  if (button.matches('[data-search-toggle]')) { setHeaderSearch(document.getElementById('header-search-panel')?.hidden); return; }
+  if (button.matches('[data-search-close]')) { setHeaderSearch(false); return; }
   if (button.matches('[data-detail-back]')) { if (history.state?.ggm && history.length > 1) history.back(); else location.assign(`/watches/${encodeURIComponent(button.dataset.detailBack)}`); return; }
-  if (button.matches('[data-menu]')) { const menu = document.getElementById('mobile-nav'); const open = menu.classList.toggle('open'); button.setAttribute('aria-expanded', String(open)); return; }
+  if (button.matches('[data-menu]')) { setHeaderSearch(false); const menu = document.getElementById('mobile-nav'); const open = menu.classList.toggle('open'); button.setAttribute('aria-expanded', String(open)); return; }
   if (button.matches('[data-favorite]')) { updateFavorite(button.dataset.favorite); return; }
   if (button.matches('[data-open-filters]')) { document.body.classList.add('filters-open'); return; }
   if (button.matches('[data-close-filters]')) { document.body.classList.remove('filters-open'); return; }
@@ -322,6 +338,7 @@ document.addEventListener('click', async (event) => {
   if (button.matches('[data-share]')) { const watch = catalog.watches.find((item) => item.id === button.dataset.share); if (watch && await copyText(watchUrl(watch))) notice('Watch link copied.'); return; }
   if (button.matches('[data-dismiss-feedback]')) { document.getElementById('feedback-float')?.remove(); return; }
 });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !document.getElementById('header-search-panel')?.hidden) setHeaderSearch(false); });
 document.addEventListener('change', (event) => { if (event.target.matches('[data-select]')) { if (event.target.checked) selected.add(event.target.dataset.select); else selected.delete(event.target.dataset.select); favoritesPage(); } });
 async function init() {
   try {
