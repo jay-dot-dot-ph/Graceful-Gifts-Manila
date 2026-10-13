@@ -34,7 +34,7 @@ function card(watch) {
   return `<article class="watch-card"><div class="card-image"><a href="/watch/${encodeURIComponent(watch.id)}" aria-label="View ${esc(watchName(watch))}">${img}</a><button class="heart ${saved ? 'saved' : ''}" data-favorite="${esc(watch.id)}" type="button" aria-label="${saved ? 'Remove' : 'Save'} ${esc(watchName(watch))} ${saved ? 'from' : 'to'} favorites" aria-pressed="${saved}">${saved ? '♥' : '♡'}</button>${watch.stock === 0 ? '<span class="image-badge">SOLD OUT</span>' : ''}</div><div class="card-info"><p class="eyebrow">${esc(watch.brand)}</p><h3><a href="/watch/${encodeURIComponent(watch.id)}">${esc(watch.model || 'Watch details on request')}</a></h3><p class="card-meta">${esc([watch.movement, watch.size].filter(Boolean).join(' · ') || watch.id)}</p><div class="card-bottom"><strong>${money(watch.price)}</strong><span class="${watch.stock === 0 ? 'soldout' : ''}">${stockText(watch)}</span></div></div></article>`;
 }
 function sectionHead(eyebrow, title, link, label) {
-  return `<div class="section-head"><div><p class="eyebrow">${eyebrow}</p><h2>${title}</h2></div>${link ? `<a class="text-link" href="${link}">${label || 'View all'} <span aria-hidden="true">↗</span></a>` : ''}</div>`;
+  return `<div class="section-head"><div>${eyebrow ? `<p class="eyebrow">${eyebrow}</p>` : ''}<h2>${title}</h2></div>${link ? `<a class="text-link" href="${link}">${label || 'View all'} <span aria-hidden="true">↗</span></a>` : ''}</div>`;
 }
 function brandTiles(brands, limit, id = '') {
   return `<div class="brand-grid" ${id ? `id="${id}"` : ''}>${brands.filter((brand) => brand.count).slice(0, limit).map((brand) => `<a class="brand-tile" href="/watches/${brand.slug}"><span>${esc(brand.name)}</span><small>${brand.count} ${brand.count === 1 ? 'watch' : 'watches'} <span aria-hidden="true">↗</span></small></a>`).join('')}</div>`;
@@ -154,8 +154,28 @@ function catalogPage() {
 function detailPage(watch) {
   document.title = `${watch ? watchName(watch) : 'Watch not found'} | Graceful Gifts Manila`;
   if (!watch) { app.innerHTML = nav('Watches') + `<main class="container empty-state"><h1>Watch not found</h1><p>This watch may no longer be listed.</p><a class="button button-dark" href="/watches">Browse watches</a></main>` + footer(); afterRender(); return; }
-  const specs = [['Brand', watch.brand], ['Model', watch.model], ['Watch ID', watch.id], ['Size', watch.size], ['Category', watch.category], ['Dial color', watch.dialColor], ['Case material', watch.caseMaterial], ['Strap material', watch.strapMaterial], ['Movement', watch.movement]];
-  app.innerHTML = nav('Watches') + `<main class="container detail-page"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><a href="/watches">Watches</a><span>/</span><a href="/watches/${watch.brandSlug}">${esc(watch.brand)}</a><span>/</span><span>${esc(watch.model || watch.id)}</span></nav><div class="detail-grid"><div class="detail-image">${watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" width="800" height="800">` : `<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>`}</div><div class="detail-copy"><p class="eyebrow">${esc(watch.brand)}</p><h1>${esc(watch.model || 'Watch details on request')}</h1><p class="watch-id">Watch ID: ${esc(watch.id)}</p><div class="detail-rule"></div><div class="detail-price">${money(watch.price)}</div><div class="detail-stock ${watch.stock === 0 ? 'soldout' : ''}"><span class="stock-dot"></span>${stockText(watch)}</div><p class="detail-description">${esc(watch.description || 'Please message us for full details about this watch.')}</p><div class="detail-actions"><button class="button button-dark inquiry-button" type="button" data-inquire="${esc(watch.id)}">${watch.stock === 0 ? 'Ask about this watch' : 'Message to inquire'} <span>↗</span></button><button class="button button-outline favorite-detail ${favorites.has(watch.id) ? 'saved' : ''}" type="button" data-favorite="${esc(watch.id)}">${favorites.has(watch.id) ? '♥ Saved' : '♡ Favorite'}</button></div><p class="inquiry-note">Your message will be copied first, then you can open Messenger and paste it.</p><button class="share-link" type="button" data-share="${esc(watch.id)}">Copy watch page link ↗</button></div></div><section class="specs-section"><div><p class="eyebrow">THE DETAILS</p><h2>Watch specifications</h2></div><dl class="specs-grid">${specs.filter(([,value]) => value).map(([label,value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl></section><section class="related-section">${sectionHead('KEEP EXPLORING', 'More from ' + esc(watch.brand), '/watches/' + watch.brandSlug, 'View brand')}<div class="watch-grid">${catalog.watches.filter((item) => item.id !== watch.id && item.brandSlug === watch.brandSlug).slice(0, 4).map(card).join('')}</div></section></main><div class="mobile-inquiry-bar"><span>${watch.stock === 0 ? 'SOLD OUT' : money(watch.price)}</span><button type="button" data-inquire="${esc(watch.id)}">${watch.stock === 0 ? 'Ask about this watch' : 'Message to inquire'} ↗</button></div>` + footer();
+  const specs = [['Size', watch.size], ['Category', watch.category], ['Dial color', watch.dialColor], ['Case material', watch.caseMaterial], ['Strap material', watch.strapMaterial], ['Movement', watch.movement]].filter(([, value]) => value);
+  const related = catalog.watches.filter((item) => item.id !== watch.id && item.brandSlug === watch.brandSlug).slice(0, 4);
+  const inquiryLabel = watch.stock === 0 ? 'Ask about this watch' : 'Message to inquire';
+  app.innerHTML = nav('Watches') + `
+    <main class="container detail-page">
+      <div class="detail-topline"><button class="detail-back" type="button" data-detail-back="${esc(watch.brandSlug)}"><span aria-hidden="true">←</span> Back to watches</button></div>
+      <div class="detail-grid">
+        <div class="detail-image">${watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" width="800" height="800">` : `<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>`}</div>
+        <div class="detail-copy">
+          <p class="eyebrow">${esc(watch.brand)}</p>
+          <h1>${esc(watch.model || 'Watch details on request')}</h1>
+          <p class="watch-id">Watch ID: ${esc(watch.id)}</p>
+          <div class="detail-price-row"><div class="detail-price">${money(watch.price)}</div><div class="detail-stock ${watch.stock === 0 ? 'soldout' : ''}"><span class="stock-dot"></span>${stockText(watch)}</div></div>
+          <div class="detail-actions"><button class="button button-dark inquiry-button" type="button" data-inquire="${esc(watch.id)}">${inquiryLabel} <span>↗</span></button><button class="button button-outline favorite-detail ${favorites.has(watch.id) ? 'saved' : ''}" type="button" data-favorite="${esc(watch.id)}">${favorites.has(watch.id) ? '♥ Saved' : '♡ Favorite'}</button></div>
+          <p class="inquiry-note">Copy details, then open Messenger.</p>
+          <button class="share-link" type="button" data-share="${esc(watch.id)}">Copy link ↗</button>
+        </div>
+      </div>
+      ${specs.length ? `<section class="specs-section"><h2>Specifications</h2><dl class="specs-grid">${specs.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl></section>` : ''}
+      ${related.length ? `<section class="related-section">${sectionHead('', 'More from ' + esc(watch.brand), '/watches/' + watch.brandSlug, 'View all')}<div class="watch-grid">${related.map(card).join('')}</div></section>` : ''}
+    </main>
+    <div class="mobile-inquiry-bar"><span>${watch.stock === 0 ? 'SOLD OUT' : money(watch.price)}</span><button type="button" data-inquire="${esc(watch.id)}">${inquiryLabel} ↗</button></div>` + footer();
   afterRender();
 }
 function favoritesPage() {
@@ -236,6 +256,7 @@ function saveRouteState() {
   history.replaceState({ ...(history.state || {}), ggm: routeState() }, '', location.href);
 }
 function renderRoute() {
+  document.body.classList.toggle('is-watch-detail', path.startsWith('/watch/'));
   if (path === '/') home();
   else if (path === '/brands') brandsPage();
   else if (path === '/favorites') favoritesPage();
@@ -285,6 +306,7 @@ window.addEventListener('popstate', (event) => {
 });
 document.addEventListener('click', async (event) => {
   const button = event.target.closest('button'); if (!button) return;
+  if (button.matches('[data-detail-back]')) { if (history.state?.ggm && history.length > 1) history.back(); else location.assign(`/watches/${encodeURIComponent(button.dataset.detailBack)}`); return; }
   if (button.matches('[data-menu]')) { const menu = document.getElementById('mobile-nav'); const open = menu.classList.toggle('open'); button.setAttribute('aria-expanded', String(open)); return; }
   if (button.matches('[data-favorite]')) { updateFavorite(button.dataset.favorite); return; }
   if (button.matches('[data-open-filters]')) { document.body.classList.add('filters-open'); return; }

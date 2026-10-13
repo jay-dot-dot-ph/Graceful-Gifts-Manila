@@ -71,3 +71,27 @@
 .visit-intro .button-light{background:var(--dark);border-color:var(--dark);color:#fff}
 .visit-intro .button-light:hover{background:#414438;border-color:#414438;color:#fff}
 .site-footer{background:#1f211c}
+
+/* Keep the watch page focused on the product and one inquiry action. */
+.is-watch-detail .trust-banner,.is-watch-detail .floating-chat,.is-watch-detail .feedback-float{display:none}
+.detail-topline{padding:18px 0 20px}
+.detail-back{display:inline-flex;align-items:center;gap:10px;padding:8px 0;border:0;background:none;color:#706a60;font-size:.78rem;font-weight:600;cursor:pointer}
+.detail-back:hover{color:var(--ink)}
+.detail-back span{font-size:1.35rem;font-weight:400;line-height:1}
+.detail-grid{align-items:start}
+.detail-copy{padding:36px 0}
+.detail-price-row{border-top:1px solid var(--line);margin-top:28px;padding-top:25px}
+.detail-price-row .detail-stock{margin:10px 0 0}
+.detail-actions{margin-top:30px}
+.inquiry-note{margin:12px 0 0}
+.share-link{margin-top:22px}
+.specs-section{margin-top:62px;padding-top:43px}
+.specs-section h2{font-size:clamp(2.2rem,3.2vw,2.8rem)}
+.related-section{padding-top:82px}
+@media(max-width:760px){
+  .detail-topline{padding:9px 0 10px}
+  .detail-copy{padding:24px 0 0}
+  .detail-price-row{margin-top:24px;padding-top:22px}
+  .specs-section{margin-top:42px;padding-top:34px}
+  .related-section{padding-top:62px}
+}
