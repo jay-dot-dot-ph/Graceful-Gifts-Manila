@@ -18,7 +18,7 @@ let feedbackTimer = null;
 // Store-selected best sellers, in display order.
 const bestSellerIds = ['CT-W011', 'TG-W004', 'TG-W054', 'RLX-W025'];
 let filters = { query: new URLSearchParams(location.search).get('q') || '', brand: '', size: '', dial: '', movement: '', category: '', availability: '', min: '', max: '', sort: 'newest' };
-const path = decodeURIComponent(location.pathname);
+let path = decodeURIComponent(location.pathname);
 if (path.startsWith('/watches/')) filters.brand = path.split('/')[2];
 
 function nav(active) {
@@ -132,6 +132,7 @@ function brandsPage() {
 }
 function catalogPage() {
   const brand = catalog.brands.find((item) => item.slug === filters.brand);
+  document.title = `${brand ? brand.name + ' watches' : 'Watches'} | Graceful Gifts Manila`;
   app.innerHTML = nav('Watches') + `<main><section class="page-heading catalog-heading"><div class="container catalog-container"><p class="eyebrow">THE COLLECTION</p><h1>${brand ? esc(brand.name) + ' watches' : 'Explore the collection'}</h1></div></section><section class="container catalog-container brand-list-section" id="brands">${brandTiles(catalog.brands, undefined, 'catalog-brand-grid')}<button class="brand-toggle" type="button" data-brand-toggle aria-controls="catalog-brand-grid" aria-expanded="false">See more brands</button></section><section class="container catalog-container catalog-layout"><aside class="filters" id="filters-panel">${filterForm()}</aside><div class="catalog-main"><div class="catalog-toolbar"><label class="search-field"><span aria-hidden="true">⌕</span><input id="catalog-search" type="search" placeholder="Search brand, model, Watch ID…" value="${esc(filters.query)}" aria-label="Search watches"></label><button class="mobile-filter-button" type="button" data-open-filters>Filter & sort <span>☷</span></button><label class="sort-control">Sort by <select id="catalog-sort"><option value="newest">Newest</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="brand">Brand: A–Z</option></select></label></div><div class="catalog-count"><span id="result-count"></span><span>Prices in Philippine pesos</span></div><div id="catalog-results"></div></div></section></main><div class="filter-backdrop" data-close-filters></div>` + footer();
   document.getElementById('catalog-sort').value = filters.sort;
   document.querySelector('[data-brand-toggle]').addEventListener('click', (event) => {
@@ -151,6 +152,7 @@ function catalogPage() {
   updateResults(); afterRender();
 }
 function detailPage(watch) {
+  document.title = `${watch ? watchName(watch) : 'Watch not found'} | Graceful Gifts Manila`;
   if (!watch) { app.innerHTML = nav('Watches') + `<main class="container empty-state"><h1>Watch not found</h1><p>This watch may no longer be listed.</p><a class="button button-dark" href="/watches">Browse watches</a></main>` + footer(); afterRender(); return; }
   const specs = [['Brand', watch.brand], ['Model', watch.model], ['Watch ID', watch.id], ['Size', watch.size], ['Category', watch.category], ['Dial color', watch.dialColor], ['Case material', watch.caseMaterial], ['Strap material', watch.strapMaterial], ['Movement', watch.movement]];
   app.innerHTML = nav('Watches') + `<main class="container detail-page"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><a href="/watches">Watches</a><span>/</span><a href="/watches/${watch.brandSlug}">${esc(watch.brand)}</a><span>/</span><span>${esc(watch.model || watch.id)}</span></nav><div class="detail-grid"><div class="detail-image">${watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" width="800" height="800">` : `<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>`}</div><div class="detail-copy"><p class="eyebrow">${esc(watch.brand)}</p><h1>${esc(watch.model || 'Watch details on request')}</h1><p class="watch-id">Watch ID: ${esc(watch.id)}</p><div class="detail-rule"></div><div class="detail-price">${money(watch.price)}</div><div class="detail-stock ${watch.stock === 0 ? 'soldout' : ''}"><span class="stock-dot"></span>${stockText(watch)}</div><p class="detail-description">${esc(watch.description || 'Please message us for full details about this watch.')}</p><div class="detail-actions"><button class="button button-dark inquiry-button" type="button" data-inquire="${esc(watch.id)}">${watch.stock === 0 ? 'Ask about this watch' : 'Message to inquire'} <span>↗</span></button><button class="button button-outline favorite-detail ${favorites.has(watch.id) ? 'saved' : ''}" type="button" data-favorite="${esc(watch.id)}">${favorites.has(watch.id) ? '♥ Saved' : '♡ Favorite'}</button></div><p class="inquiry-note">Your message will be copied first, then you can open Messenger and paste it.</p><button class="share-link" type="button" data-share="${esc(watch.id)}">Copy watch page link ↗</button></div></div><section class="specs-section"><div><p class="eyebrow">THE DETAILS</p><h2>Watch specifications</h2></div><dl class="specs-grid">${specs.filter(([,value]) => value).map(([label,value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl></section><section class="related-section">${sectionHead('KEEP EXPLORING', 'More from ' + esc(watch.brand), '/watches/' + watch.brandSlug, 'View brand')}<div class="watch-grid">${catalog.watches.filter((item) => item.id !== watch.id && item.brandSlug === watch.brandSlug).slice(0, 4).map(card).join('')}</div></section></main><div class="mobile-inquiry-bar"><span>${watch.stock === 0 ? 'SOLD OUT' : money(watch.price)}</span><button type="button" data-inquire="${esc(watch.id)}">${watch.stock === 0 ? 'Ask about this watch' : 'Message to inquire'} ↗</button></div>` + footer();
@@ -222,6 +224,55 @@ function startFeedback() {
   };
   feedbackTimer = setTimeout(show, 6500);
 }
+function routeState() {
+  return {
+    scrollY: window.scrollY,
+    filters: { ...filters },
+    shown,
+    brandsExpanded: document.getElementById('brands')?.classList.contains('expanded') || false
+  };
+}
+function saveRouteState() {
+  history.replaceState({ ...(history.state || {}), ggm: routeState() }, '', location.href);
+}
+function renderRoute() {
+  if (path === '/') home();
+  else if (path === '/brands') brandsPage();
+  else if (path === '/favorites') favoritesPage();
+  else if (path === '/contact') contactPage();
+  else if (path.startsWith('/watch/')) detailPage(catalog.watches.find((watch) => watch.id === path.split('/')[2].toUpperCase()));
+  else catalogPage();
+}
+function jumpTo(y) {
+  const root = document.documentElement;
+  const previous = root.style.scrollBehavior;
+  root.style.scrollBehavior = 'auto';
+  window.scrollTo(0, y);
+  root.style.scrollBehavior = previous;
+}
+document.addEventListener('click', (event) => {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !catalog) return;
+  const link = event.target.closest('a[href^="/watch/"]');
+  if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+  const url = new URL(link.href);
+  if (url.origin !== location.origin || !catalog.watches.some((watch) => watch.id === decodeURIComponent(url.pathname.split('/')[2]).toUpperCase())) return;
+  event.preventDefault();
+  saveRouteState();
+  history.pushState({ ggm: { scrollY: 0 } }, '', url.pathname);
+  path = decodeURIComponent(url.pathname);
+  renderRoute();
+  jumpTo(0);
+});
+window.addEventListener('popstate', (event) => {
+  if (!catalog) return;
+  path = decodeURIComponent(location.pathname);
+  const state = event.state?.ggm;
+  if (state?.filters) filters = { ...state.filters };
+  if (Number.isInteger(state?.shown)) shown = state.shown;
+  renderRoute();
+  if (state?.brandsExpanded && path.startsWith('/watches')) document.querySelector('[data-brand-toggle]')?.click();
+  requestAnimationFrame(() => requestAnimationFrame(() => jumpTo(state?.scrollY || 0)));
+});
 document.addEventListener('click', async (event) => {
   const button = event.target.closest('button'); if (!button) return;
   if (button.matches('[data-menu]')) { const menu = document.getElementById('mobile-nav'); const open = menu.classList.toggle('open'); button.setAttribute('aria-expanded', String(open)); return; }
@@ -244,9 +295,8 @@ async function init() {
   try {
     const response = await fetch('/api/catalog'); if (!response.ok) throw new Error('Catalog request failed');
     catalog = await response.json(); if (!Array.isArray(catalog.watches)) throw new Error('Invalid catalog');
-    if (path === '/') home(); else if (path === '/brands') brandsPage(); else if (path === '/favorites') favoritesPage(); else if (path === '/contact') contactPage();
-    else if (path.startsWith('/watch/')) detailPage(catalog.watches.find((watch) => watch.id === path.split('/')[2].toUpperCase()));
-    else catalogPage();
+    path = decodeURIComponent(location.pathname);
+    renderRoute();
     if (location.hash === '#physical-store') requestAnimationFrame(() => document.getElementById('physical-store')?.scrollIntoView());
     startFeedback();
   } catch {

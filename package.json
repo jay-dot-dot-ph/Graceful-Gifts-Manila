@@ -10,6 +10,7 @@
     "test:unit": "node scripts/unit.mjs",
     "test:live": "node scripts/smoke.mjs",
     "test:browser": "node scripts/browser-qa.mjs",
+    "test:history": "node scripts/history-qa.mjs",
     "test:opening": "node scripts/opening-qa.mjs"
   },
   "devDependencies": {
