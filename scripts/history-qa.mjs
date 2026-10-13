@@ -23,7 +23,10 @@ try {
   assert.ok(photoPosition.scroll > 100, `Photo tap should land at the watch photo, not the page top: ${JSON.stringify(photoPosition)}`);
   assert.ok(photoPosition.photoTop >= photoPosition.headerBottom - 2 && photoPosition.photoTop <= photoPosition.headerBottom + 30, `Watch photo should sit directly below the sticky header: ${JSON.stringify(photoPosition)}`);
   assert.equal(await page.evaluate(() => window.__historyMarker), 'same document', 'Watch opens without a page reload');
+  await page.evaluate(() => { window.__firstBackFrame = new Promise((resolve) => addEventListener('popstate', () => requestAnimationFrame(() => resolve(scrollY)), { once: true })); });
   await page.goBack();
+  const firstBackFrame = await page.evaluate(() => window.__firstBackFrame);
+  assert.ok(Math.abs(firstBackFrame - listingScroll) < 40, `Back should show the saved catalog position in its first frame: ${firstBackFrame} versus ${listingScroll}`);
   await page.locator('.watch-card').first().waitFor();
   await page.waitForFunction((previousY) => Math.abs(scrollY - previousY) < 40, listingScroll);
   assert.equal(new URL(page.url()).pathname, '/watches/ms');
@@ -34,8 +37,25 @@ try {
   await page.locator('.detail-page h1').waitFor();
   assert.match(new URL(page.url()).pathname, /^\/watch\//);
   await page.waitForFunction((previousY) => Math.abs(scrollY - previousY) < 40, photoPosition.scroll);
+  const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const desktopPage = await desktop.newPage();
+  desktopPage.on('pageerror', (error) => errors.push(error.message));
+  await desktopPage.goto(base + '/watches/ms');
+  await desktopPage.locator('.watch-card').first().waitFor();
+  await desktopPage.locator('.watch-card').first().evaluate((card) => card.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  const desktopListingScroll = await desktopPage.evaluate(() => scrollY);
+  assert.ok(desktopListingScroll > 100);
+  await desktopPage.locator('.watch-card .card-image a').first().click();
+  await desktopPage.locator('.detail-page h1').waitFor();
+  const desktopPhotoPosition = await desktopPage.evaluate(() => ({ scroll: scrollY, photoTop: document.querySelector('.detail-image').getBoundingClientRect().top, headerBottom: document.querySelector('.site-header').getBoundingClientRect().bottom }));
+  assert.ok(desktopPhotoPosition.scroll >= 80, `Desktop photo tap should land at the watch image: ${JSON.stringify(desktopPhotoPosition)}`);
+  assert.ok(desktopPhotoPosition.photoTop >= desktopPhotoPosition.headerBottom - 2 && desktopPhotoPosition.photoTop <= desktopPhotoPosition.headerBottom + 30, `Desktop watch photo should sit below the header: ${JSON.stringify(desktopPhotoPosition)}`);
+  await desktopPage.evaluate(() => { window.__firstBackFrame = new Promise((resolve) => addEventListener('popstate', () => requestAnimationFrame(() => resolve(scrollY)), { once: true })); });
+  await desktopPage.goBack();
+  const desktopFirstBackFrame = await desktopPage.evaluate(() => window.__firstBackFrame);
+  assert.ok(Math.abs(desktopFirstBackFrame - desktopListingScroll) < 40, `Desktop Back should restore its first frame: ${desktopFirstBackFrame} versus ${desktopListingScroll}`);
   assert.deepEqual(errors, []);
-  console.log(`Mobile history QA passed: photo tap landed at the watch image, Back restored listing at ${listingScroll}px, and Forward reopened the watch without reloading.`);
+  console.log('Photo navigation QA passed: mobile and desktop land at the watch image; Back restores the listing in its first frame.');
 } finally {
   await browser.close();
 }

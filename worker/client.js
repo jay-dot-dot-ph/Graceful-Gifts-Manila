@@ -262,8 +262,9 @@ document.addEventListener('click', (event) => {
   if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
   const url = new URL(link.href);
   if (url.origin !== location.origin || !catalog.watches.some((watch) => watch.id === decodeURIComponent(url.pathname.split('/')[2]).toUpperCase())) return;
-  const photoTap = matchMedia('(max-width: 760px)').matches && (link.closest('.card-image') || link.matches('.favorite-photo, .hero-visual'));
+  const photoTap = link.closest('.card-image') || link.matches('.favorite-photo, .hero-visual');
   event.preventDefault();
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   saveRouteState();
   history.pushState({ ggm: { scrollY: 0 } }, '', url.pathname);
   path = decodeURIComponent(url.pathname);
@@ -280,7 +281,7 @@ window.addEventListener('popstate', (event) => {
   if (Number.isInteger(state?.shown)) shown = state.shown;
   renderRoute();
   if (state?.brandsExpanded && path.startsWith('/watches')) document.querySelector('[data-brand-toggle]')?.click();
-  requestAnimationFrame(() => requestAnimationFrame(() => jumpTo(state?.scrollY || 0)));
+  jumpTo(state?.scrollY || 0);
 });
 document.addEventListener('click', async (event) => {
   const button = event.target.closest('button'); if (!button) return;
