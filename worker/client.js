@@ -250,18 +250,27 @@ function jumpTo(y) {
   window.scrollTo(0, y);
   root.style.scrollBehavior = previous;
 }
+function watchPhotoPosition() {
+  const photo = document.querySelector('.detail-image');
+  const header = document.querySelector('.site-header');
+  if (!photo) return 0;
+  return Math.max(0, Math.round(window.scrollY + photo.getBoundingClientRect().top - (header?.getBoundingClientRect().height || 0) - 12));
+}
 document.addEventListener('click', (event) => {
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !catalog) return;
   const link = event.target.closest('a[href^="/watch/"]');
   if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
   const url = new URL(link.href);
   if (url.origin !== location.origin || !catalog.watches.some((watch) => watch.id === decodeURIComponent(url.pathname.split('/')[2]).toUpperCase())) return;
+  const photoTap = matchMedia('(max-width: 760px)').matches && (link.closest('.card-image') || link.matches('.favorite-photo, .hero-visual'));
   event.preventDefault();
   saveRouteState();
   history.pushState({ ggm: { scrollY: 0 } }, '', url.pathname);
   path = decodeURIComponent(url.pathname);
   renderRoute();
-  jumpTo(0);
+  const targetY = photoTap ? watchPhotoPosition() : 0;
+  history.replaceState({ ggm: { scrollY: targetY } }, '', location.href);
+  jumpTo(targetY);
 });
 window.addEventListener('popstate', (event) => {
   if (!catalog) return;
