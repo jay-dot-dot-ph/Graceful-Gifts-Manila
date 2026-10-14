@@ -15,31 +15,7 @@ const { default: worker } = await import('../dist/server/index.js');
 const catalogResponse = await worker.fetch(new Request(`${origin}/api/catalog`));
 if (!catalogResponse.ok) throw new Error(`Live catalog returned ${catalogResponse.status}`);
 const catalog = await catalogResponse.json();
-const publishedImagePaths = new Map();
-if (catalog.failedImageBrands.length && !catalog.failedBrands.length) {
-  const previousResponse = await fetch(`${origin}/api/catalog.json`, { signal: AbortSignal.timeout(20000) });
-  if (!previousResponse.ok) throw new Error(`Published image catalog returned ${previousResponse.status}`);
-  const previous = await previousResponse.json();
-  const previousById = new Map(previous.watches.map((watch) => [watch.id, watch]));
-  const missingTabs = new Set(catalog.failedImageBrands);
-  let preserved = 0;
-  for (const watch of catalog.watches) {
-    if (!missingTabs.has(watch.brandTab) || watch.image) continue;
-    const old = previousById.get(watch.id);
-    if (old?.brandTab === watch.brandTab && old.image) {
-      watch.image = old.image;
-      if (/^\/images\/[A-Za-z0-9-]+\.(jpg|png|webp)$/.test(old.localImage || '')) publishedImagePaths.set(watch.id, old.localImage);
-      preserved++;
-    }
-  }
-  const lost = catalog.watches.filter((watch) => missingTabs.has(watch.brandTab) && previousById.get(watch.id)?.image && !watch.image);
-  if (lost.length) throw new Error(`Could not preserve ${lost.length} published images: ${lost.slice(0, 10).map((watch) => watch.id).join(', ')}`);
-  catalog.imageFallbackBrands = [...missingTabs];
-  catalog.failedImageBrands = [];
-  catalog.partial = false;
-  console.log(`Google's embedded image pages were unavailable for ${missingTabs.size} brands; preserved ${preserved} published image sources.`);
-}
-if (catalog.partial || catalog.stale || catalog.failedBrands.length || catalog.duplicateIds.length) {
+if (catalog.stale || catalog.failedBrands.length || catalog.duplicateIds.length) {
   throw new Error(`Catalog is incomplete; refusing to publish a partial snapshot. Failed brands: ${catalog.failedBrands.join(', ') || 'none'}; failed image brands: ${catalog.failedImageBrands.join(', ') || 'none'}; duplicate IDs: ${catalog.duplicateIds.join(', ') || 'none'}; stale: ${catalog.stale}.`);
 }
 if (catalog.sourceWatchCount < 560 || catalog.watches.length < 560 ||
@@ -73,6 +49,10 @@ for (const name of missingImageBrands) {
   }
   console.log(`Recovered ${[...embeddedImages.keys()].filter((id) => ids.has(id)).length} embedded images for ${name}.`);
 }
+// The XLSX export is the current source of truth when Google's image view is
+// unavailable. Never reuse a previously published photo after a Sheet removal.
+catalog.failedImageBrands = [];
+catalog.partial = false;
 
 mkdirSync(cache, { recursive: true });
 rmSync(output, { recursive: true, force: true });
@@ -110,8 +90,7 @@ async function downloadImage(watch) {
     let lastError;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const target = attempt === 2 && publishedImagePaths.has(watch.id) ? origin + publishedImagePaths.get(watch.id) : source.toString();
-        const response = await fetch(target, { signal: AbortSignal.timeout(25000) });
+        const response = await fetch(source, { signal: AbortSignal.timeout(25000) });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const ext = extension(response.headers.get('content-type') || '');
         if (!ext) throw new Error(`Unsupported image type: ${response.headers.get('content-type')}`);
