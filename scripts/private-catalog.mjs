@@ -3,7 +3,6 @@ import { normalizeRows } from '../worker/index.js';
 import { extractWorkbookImages } from './xlsx-images.mjs';
 
 const SHEET_ID = '1YL-EBPWoU3nUNtUwr1GPtlqOUWY7e2GDLCtw8YCwge8';
-const SERVICE_EMAIL = 'firebase-adminsdk-fbsvc@graceful-gifts-manila.iam.gserviceaccount.com';
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const base64url = (value) => Buffer.from(value).toString('base64url');
 const slug = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -11,7 +10,7 @@ const csv = (rows) => rows.map((row) => row.map((value) => `"${String(value ?? '
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function serviceAccountAssertion(credentials, now = Date.now()) {
-  if (credentials.client_email !== SERVICE_EMAIL || !credentials.private_key) throw new Error('The Firebase service account secret does not match the account granted access to the Sheet.');
+  if (!credentials.client_email || !credentials.private_key) throw new Error('The Firebase service account secret is missing an email or private key.');
   const issued = Math.floor(now / 1000);
   const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   const claims = base64url(JSON.stringify({

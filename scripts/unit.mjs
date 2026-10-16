@@ -63,7 +63,7 @@ const assertion = serviceAccountAssertion(credentials, 1_700_000_000_000);
 const [jwtHeader, jwtClaims, signature] = assertion.split('.');
 assert.equal(JSON.parse(Buffer.from(jwtClaims, 'base64url')).iss, credentials.client_email);
 assert.ok(verify('RSA-SHA256', Buffer.from(`${jwtHeader}.${jwtClaims}`), publicKey, Buffer.from(signature, 'base64url')));
-assert.throws(() => serviceAccountAssertion({ ...credentials, client_email: 'wrong@example.com' }), /does not match/);
+assert.throws(() => serviceAccountAssertion({ ...credentials, private_key: '' }), /missing an email or private key/);
 const workbook = storedZip([
   ['xl/workbook.xml', '<workbook><sheets><sheet name="Audemars Piguet" r:id="rId1"/></sheets></workbook>'],
   ['xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>'],

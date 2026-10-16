@@ -6,7 +6,7 @@ Live website: https://graceful-gifts-manila.web.app
 
 ## Local preview
 
-Use Node.js 24 or later from this directory. The private Sheet must be shared with `firebase-adminsdk-fbsvc@graceful-gifts-manila.iam.gserviceaccount.com` as Viewer, and `GOOGLE_SERVICE_ACCOUNT_JSON` must contain the existing Firebase service account JSON for a local export. Keep that JSON out of the repository.
+Use Node.js 24 or later from this directory. The private Sheet must be shared as Viewer with the service account in `GOOGLE_SERVICE_ACCOUNT_JSON`. Keep that JSON out of the repository.
 
 ```powershell
 npm.cmd install
