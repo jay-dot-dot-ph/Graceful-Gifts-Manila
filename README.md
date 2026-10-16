@@ -6,7 +6,7 @@ Live website: https://graceful-gifts-manila.web.app
 
 ## Local preview
 
-Use Node.js 24 or later from this directory. The private Sheet must be shared as Viewer with the service account in `GOOGLE_SERVICE_ACCOUNT_JSON`. Keep that JSON out of the repository.
+Use Node.js 24 or later from this directory. The private Sheet must be shared as Viewer with `github-action-1412906037@graceful-gifts-manila.iam.gserviceaccount.com`, the service account in the existing GitHub Actions secret. Keep the JSON credential out of the repository.
 
 ```powershell
 npm.cmd install
@@ -35,7 +35,7 @@ The Firebase project is `graceful-gifts-manila`. Its Spark plan supports the sta
 
 The authenticated build reads image anchors from the workbook XLSX export and saves photos against their Watch IDs.
 
-The GitHub workflow in `.github/workflows/firebase-hosting.yml` refreshes and deploys the catalog every six hours. Its encrypted `FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA` secret supplies the same service account for private Sheet access and Hosting deployment. Google Sheets API and Drive API must be enabled for the Firebase project. Image filenames change when a source image changes, allowing refreshed photos to replace older cached versions.
+The GitHub workflow in `.github/workflows/firebase-hosting.yml` refreshes and deploys the catalog every six hours. Its encrypted `FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA` secret supplies the same service account for private Sheet access and Hosting deployment. [Google Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com?project=390270720955) and [Google Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com?project=390270720955) must be enabled for the Firebase project. Image filenames change when a source image changes, allowing refreshed photos to replace older cached versions.
 
 For full-site refreshes shortly after staff edits the Sheet, install the bound [Sheet edit trigger](automation/README.md). It dispatches the same GitHub workflow after nearby edits settle. The six-hour schedule remains a fallback for changes made by scripts or APIs. The trigger requires a one-time Google Apps Script authorization and a repository-scoped GitHub Actions token stored in Apps Script Script Properties.
 
