@@ -1,5 +1,5 @@
 import { inflateRawSync } from 'node:zlib';
-import { parseCsv } from '../worker/index.js';
+import { posix } from 'node:path';
 
 function zipFiles(input) {
   const bytes = Buffer.from(input);
@@ -39,35 +39,49 @@ function attribute(tag, name) {
   return tag.match(new RegExp(`(?:^|\\s)${name}="([^"]+)"`))?.[1];
 }
 
-export function extractXlsxImages(xlsx, csv) {
+function relationships(files, path) {
+  const xml = files.get(path)?.().toString('utf8');
+  if (!xml) return new Map();
+  return new Map([...xml.matchAll(/<Relationship\b[^>]*\/>/g)].map(([tag]) => [attribute(tag, 'Id'), attribute(tag, 'Target')]).filter(([id, target]) => id && target));
+}
+
+function zipTarget(source, target) {
+  return target.startsWith('/') ? target.slice(1) : posix.normalize(posix.join(posix.dirname(source), target));
+}
+
+export function extractWorkbookImages(xlsx, rowsByBrand) {
   const files = zipFiles(xlsx);
-  const sheets = [...files.keys()].filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name));
-  if (sheets.length !== 1) throw new Error('Expected a single-sheet XLSX export');
-  const drawings = [...files.keys()].filter((name) => /^xl\/drawings\/drawing\d+\.xml$/.test(name));
-  if (drawings.length > 1) throw new Error('Expected one XLSX image drawing');
-  const drawing = drawings[0];
-  if (!drawing) return new Map();
-  const relationships = drawing.replace('xl/drawings/', 'xl/drawings/_rels/') + '.rels';
-  const xml = files.get(drawing)().toString('utf8');
-  const rels = files.get(relationships)?.().toString('utf8');
-  if (!rels) throw new Error('XLSX drawing relationships are missing');
-  const media = new Map();
-  for (const match of rels.matchAll(/<Relationship\b[^>]*\/>/g)) {
-    const id = attribute(match[0], 'Id');
-    const target = attribute(match[0], 'Target');
-    if (id && /^\.\.\/media\/[\w.-]+\.(?:jpg|jpeg|png|webp)$/i.test(target || '')) media.set(id, `xl/media/${target.split('/').pop()}`);
-  }
-  const rows = parseCsv(csv);
+  const workbook = files.get('xl/workbook.xml')?.().toString('utf8');
+  if (!workbook) throw new Error('XLSX workbook metadata is missing.');
+  const workbookRels = relationships(files, 'xl/_rels/workbook.xml.rels');
   const images = new Map();
-  for (const match of xml.matchAll(/<xdr:(?:oneCell|twoCell)Anchor\b[\s\S]*?<\/xdr:(?:oneCell|twoCell)Anchor>/g)) {
-    const anchor = match[0];
-    if (!/<xdr:col>0<\/xdr:col>/.test(anchor)) continue;
-    const row = Number(anchor.match(/<xdr:row>(\d+)<\/xdr:row>/)?.[1]);
-    const id = rows[row]?.[1]?.trim().toUpperCase();
-    const relationship = anchor.match(/<a:blip\b[^>]*\br:embed="([^"]+)"/)?.[1];
-    const name = media.get(relationship);
-    if (!/^[A-Z0-9-]{2,20}$/.test(id || '') || !name || !files.has(name)) continue;
-    images.set(id, { bytes: files.get(name)(), extension: name.split('.').pop().toLowerCase() });
+  for (const [tag] of workbook.matchAll(/<sheet\b[^>]*\/>/g)) {
+    const brand = attribute(tag, 'name')?.replaceAll('&amp;', '&');
+    if (!rowsByBrand.has(brand)) continue;
+    const worksheet = zipTarget('xl/workbook.xml', workbookRels.get(attribute(tag, 'r:id')) || '');
+    const sheetXml = files.get(worksheet)?.().toString('utf8');
+    if (!sheetXml) throw new Error(`XLSX worksheet is missing for ${brand}.`);
+    const drawingId = sheetXml.match(/<drawing\b[^>]*\br:id="([^"]+)"/)?.[1];
+    if (!drawingId) continue;
+    const sheetRelsPath = posix.join(posix.dirname(worksheet), '_rels', posix.basename(worksheet) + '.rels');
+    const drawingTarget = relationships(files, sheetRelsPath).get(drawingId);
+    if (!drawingTarget) throw new Error(`XLSX drawing relationship is missing for ${brand}.`);
+    const drawing = zipTarget(worksheet, drawingTarget);
+    const drawingXml = files.get(drawing)?.().toString('utf8');
+    if (!drawingXml) throw new Error(`XLSX drawing is missing for ${brand}.`);
+    const drawingRelsPath = posix.join(posix.dirname(drawing), '_rels', posix.basename(drawing) + '.rels');
+    const media = relationships(files, drawingRelsPath);
+    for (const [anchor] of drawingXml.matchAll(/<xdr:(?:oneCell|twoCell)Anchor\b[\s\S]*?<\/xdr:(?:oneCell|twoCell)Anchor>/g)) {
+      if (!/<xdr:col>0<\/xdr:col>/.test(anchor)) continue;
+      const row = Number(anchor.match(/<xdr:row>(\d+)<\/xdr:row>/)?.[1]);
+      const id = String(rowsByBrand.get(brand)[row]?.[1] || '').trim().toUpperCase();
+      const target = media.get(anchor.match(/<a:blip\b[^>]*\br:embed="([^"]+)"/)?.[1]);
+      const path = target && zipTarget(drawing, target);
+      if (!/^[A-Z0-9-]{2,20}$/.test(id) || !path || !files.has(path)) continue;
+      const extension = path.split('.').pop().toLowerCase();
+      if (!['jpg', 'jpeg', 'png', 'webp'].includes(extension)) continue;
+      images.set(id, { bytes: files.get(path)(), extension });
+    }
   }
   return images;
 }

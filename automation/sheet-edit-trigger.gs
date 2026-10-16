@@ -1,6 +1,6 @@
-// Copy this file into the Apps Script project bound to the 2026 WATCHES Sheet.
+// Copy this file into the Apps Script project bound to the 2026 WATCHES - GRACE Sheet.
 // Store the repository-scoped GitHub token in Script Properties as GITHUB_ACTIONS_TOKEN.
-const GGM_SHEET_ID = '1qowXiNelPflvWPYv1lWWCf7z9AnltCL5Tem8Sus-arI';
+const GGM_SHEET_ID = '1YL-EBPWoU3nUNtUwr1GPtlqOUWY7e2GDLCtw8YCwge8';
 const GGM_WORKFLOW_URL = 'https://api.github.com/repos/jay-dot-dot-ph/Graceful-Gifts-Manila/actions/workflows/firebase-hosting.yml/dispatches';
 const GGM_PENDING_KEY = 'GGM_PENDING_EDIT_AT';
 const GGM_FIRST_PENDING_KEY = 'GGM_FIRST_PENDING_EDIT_AT';
@@ -18,7 +18,7 @@ const GGM_MAX_ATTEMPTS = 5;
 function setupSheetTriggers() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   if (!spreadsheet || spreadsheet.getId() !== GGM_SHEET_ID) {
-    throw new Error('Open the 2026 WATCHES spreadsheet before installing these triggers.');
+    throw new Error('Open the 2026 WATCHES - GRACE spreadsheet before installing these triggers.');
   }
   if (!PropertiesService.getScriptProperties().getProperty(GGM_TOKEN_KEY)) {
     throw new Error('Set GITHUB_ACTIONS_TOKEN in Project Settings > Script Properties first.');

@@ -6,13 +6,9 @@ const OPENING_SCRIPT = "__OPENING_SCRIPT__";
 const OPENING_BG = "__OPENING_BG__";
 const OPENING_BG_PATH = "__OPENING_BG_PATH__";
 const FEEDBACK_IMAGES = "__FEEDBACK_IMAGES__";
-const SHEET_ID = "1qowXiNelPflvWPYv1lWWCf7z9AnltCL5Tem8Sus-arI";
-export const SHEET_BASE = `https://docs.google.com/spreadsheets/d/${SHEET_ID}`;
 const FACEBOOK = "https://www.facebook.com/GracefulGifts.Manila";
 const MESSENGER = "https://m.me/GracefulGifts.Manila";
-const CACHE_MS = 5 * 60 * 1000;
 let catalogCache = null;
-let catalogPromise = null;
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 const slug = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const watchName = (watch) => {
@@ -38,122 +34,43 @@ export function parseCsv(input) {
   return rows;
 }
 
-export function discoverTabs(html) {
-  const captions = [...html.matchAll(/docs-sheet-tab-caption[^>]*>([^<]+)<\/div>/g)]
-    .map((match) => match[1].trim()).filter((name) => name && !["CATEGORIES", "DEFINITION"].includes(name));
-  // Google embeds tab names and gids in an escaped metadata block, separate from the tab buttons.
-  const metadata = html.replace(/\\+"/g, '"').replace(/\\+u003d/g, '=');
-  const gids = new Map([...metadata.matchAll(/"3":\[2,"([^"]+)"\],"6":1,"24":"#gid=(\d+)"/g)]
-    .map((match) => [match[1], match[2]]));
-  const missing = captions.filter((name) => !gids.has(name));
-  if (!captions.length || missing.length || new Set(captions.map((name) => gids.get(name))).size !== captions.length) {
-    throw new Error(`Could not discover every brand tab: ${missing.join(', ') || 'missing or duplicate sheet IDs'}`);
-  }
-  return captions.map((name) => [name, gids.get(name)]);
-}
-
-export function extractImages(html) {
-  const images = new Map();
-  for (const row of html.matchAll(/<tr\b[^>]*>[\s\S]*?<\/tr>/g)) {
-    const cells = [...row[0].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)];
-    const id = cells[1]?.[1]?.replace(/<[^>]+>/g, "").trim().toUpperCase();
-    const source = row[0].match(/<img\s+src="(https:\/\/docs\.google\.com\/sheets-images-rt\/[^"]+)"/i)?.[1];
-    if (/^[A-Z0-9-]{2,20}$/.test(id || "") && source) images.set(id, source.replace(/&amp;/g, "&").replace(/=w\d+-h\d+$/, "=w800-h800"));
-  }
-  return images;
-}
-
 export function normalizeRows(csv, tabName, images = new Map()) {
   const rows = parseCsv(csv);
-  if (rows.length < 2) return [];
+  if (!rows.length) throw new Error(`Missing headers in ${tabName}`);
+  const columns = new Map(rows[0].map((header, index) => [String(header).trim().toLowerCase(), index]));
+  for (const header of ["watch id", "model name", "price (php)", "stock quantity"]) {
+    if (!columns.has(header)) throw new Error(`Missing ${header} column in ${tabName}`);
+  }
+  const cell = (row, header) => String(row[columns.get(header)] || "").trim();
   const watches = [];
   for (const cells of rows.slice(1)) {
-    const id = String(cells[1] || "").trim().toUpperCase();
+    const id = cell(cells, "watch id").toUpperCase();
     if (!/^[A-Z0-9-]{2,20}$/.test(id)) continue;
-    const rawPrice = String(cells[10] || "").replace(/[^\d.]/g, "");
-    const rawStock = String(cells[11] || "").trim();
-    const imageUrl = String(cells[13] || "").trim();
+    const rawPrice = cell(cells, "price (php)").replace(/[^\d.]/g, "");
+    const rawStock = cell(cells, "stock quantity");
+    const imageUrl = cell(cells, "image url");
     watches.push({
-      id, brand: String(cells[2] || tabName).trim() || tabName, brandTab: tabName, brandSlug: slug(tabName),
-      model: String(cells[3] || "").trim(), size: String(cells[4] || "").trim(),
-      category: String(cells[5] || "").trim(), dialColor: String(cells[6] || "").trim(),
-      caseMaterial: String(cells[7] || "").trim(), strapMaterial: String(cells[8] || "").trim(),
-      movement: String(cells[9] || "").trim(),
+      id, brand: cell(cells, "brand") || tabName, brandTab: tabName, brandSlug: slug(tabName),
+      model: cell(cells, "model name"), size: cell(cells, "size"),
+      category: cell(cells, "category"), dialColor: cell(cells, "dial color"),
+      caseMaterial: cell(cells, "case material"), strapMaterial: cell(cells, "strap material"),
+      movement: cell(cells, "movement type"),
       price: rawPrice && Number.isFinite(Number(rawPrice)) ? Number(rawPrice) : null,
       stock: /^\d+$/.test(rawStock) ? Number(rawStock) : null,
-      description: String(cells[12] || "").trim(),
+      description: cell(cells, "description"),
       image: images.get(id) || (/^https:\/\//i.test(imageUrl) ? imageUrl : null),
-      dateAdded: String(cells[15] || "").trim(),
+      dateAdded: cell(cells, "date added"),
     });
   }
   return watches;
 }
 
-async function fetchText(url) {
-  let lastError;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(14000) });
-      if (!response.ok) throw new Error(`Source returned HTTP ${response.status}`);
-      return await response.text();
-    } catch (error) { lastError = error; if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 350)); }
-  }
-  throw lastError;
+export async function getCatalog() {
+  if (!catalogCache) throw new Error('The catalog must be loaded by the authenticated build.');
+  return catalogCache;
 }
-async function loadTabs() {
-  let lastError;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try { return discoverTabs(await fetchText(`${SHEET_BASE}/edit`)); }
-    catch (error) {
-      lastError = error;
-      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
-    }
-  }
-  throw lastError;
-}
-async function loadBrand([name, gid]) {
-  const csv = `${SHEET_BASE}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
-  const page = `${SHEET_BASE}/edit?gid=${encodeURIComponent(gid)}`;
-  const [data, imagePage] = await Promise.all([fetchText(csv), fetchText(page).catch(() => null)]);
-  let images = imagePage ? extractImages(imagePage) : new Map();
-  const watches = normalizeRows(data, name, images);
-  if (watches.length && !watches.some((watch) => watch.image)) {
-    for (let attempt = 0; attempt < 2 && !images.size; attempt++) {
-      const retryPage = await fetchText(page).catch(() => null);
-      if (retryPage) images = extractImages(retryPage);
-    }
-  }
-  return { watches: normalizeRows(data, name, images), missingImages: watches.length > 0 && !images.size && !watches.some((watch) => watch.image) };
-}
-async function loadCatalog() {
-  const tabs = await loadTabs();
-  const results = [];
-  for (let i = 0; i < tabs.length; i += 6) results.push(...await Promise.allSettled(tabs.slice(i, i + 6).map(loadBrand)));
-  const failedBrands = [], failedImageBrands = [], watches = [], ids = new Set(), duplicateIds = [];
-  let excludedMisfiledCount = 0;
-  results.forEach((result, index) => {
-    if (result.status === "rejected") { failedBrands.push(tabs[index][0]); return; }
-    if (result.value.missingImages) failedImageBrands.push(tabs[index][0]);
-    for (const watch of result.value.watches) {
-      if (ids.has(watch.id)) { duplicateIds.push(watch.id); continue; }
-      ids.add(watch.id);
-      // The VACHERON tab currently has unrelated legacy rows after its nine Vacheron watches.
-      if (watch.brandTab === "VACHERON" && !/^vacheron(?:\s|$)/i.test(watch.brand)) {
-        excludedMisfiledCount++;
-        continue;
-      }
-      watches.push(watch);
-    }
-  });
-  if (!watches.length) throw new Error("The watch catalog could not be loaded.");
-  if (failedBrands.length && catalogCache) return { ...catalogCache, stale: true, failedBrands };
-  return { watches, brands: tabs.map(([name, gid]) => ({ name, slug: slug(name), gid, count: watches.filter((watch) => watch.brandTab === name).length })), sourceWatchCount: ids.size, excludedMisfiledCount, fetchedAt: new Date().toISOString(), partial: failedBrands.length > 0 || failedImageBrands.length > 0, failedBrands, failedImageBrands, duplicateIds, stale: false };
-}
-async function getCatalog() {
-  if (catalogCache && Date.now() - Date.parse(catalogCache.fetchedAt) < CACHE_MS) return catalogCache;
-  if (!catalogPromise) catalogPromise = loadCatalog().then((data) => { catalogCache = data; return data; }).finally(() => { catalogPromise = null; });
-  try { return await catalogPromise; }
-  catch (error) { if (catalogCache) return { ...catalogCache, stale: true }; throw error; }
+export function setCatalogForBuild(catalog) {
+  catalogCache = { ...catalog, fetchedAt: new Date().toISOString() };
 }
 
 function htmlPage(request, product = null) {

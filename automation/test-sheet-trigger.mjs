@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(root, 'sheet-edit-trigger.gs'), 'utf8');
-const sheetId = '1qowXiNelPflvWPYv1lWWCf7z9AnltCL5Tem8Sus-arI';
+const sheetId = '1YL-EBPWoU3nUNtUwr1GPtlqOUWY7e2GDLCtw8YCwge8';
 const values = new Map([['GITHUB_ACTIONS_TOKEN', 'test-token-never-sent-to-github']]);
 const triggers = [];
 const calls = [];

@@ -3,56 +3,23 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync,
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { feedbackAssets } from './feedback-assets.mjs';
-import { extractXlsxImages } from './xlsx-images.mjs';
-import { SHEET_BASE } from '../worker/index.js';
+import { loadPrivateCatalog } from './private-catalog.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, 'hosting-dist');
 const cache = resolve(root, '.image-cache');
 if (!output.startsWith(root + sep) || !cache.startsWith(root + sep)) throw new Error('Build paths escaped the site checkout.');
 const origin = 'https://graceful-gifts-manila.web.app';
-const { default: worker } = await import('../dist/server/index.js');
-const catalogResponse = await worker.fetch(new Request(`${origin}/api/catalog`));
-if (!catalogResponse.ok) throw new Error(`Live catalog returned ${catalogResponse.status}`);
-const catalog = await catalogResponse.json();
+const { default: worker, setCatalogForBuild } = await import('../dist/server/index.js');
+const { catalog, embeddedImages } = await loadPrivateCatalog();
 if (catalog.stale || catalog.failedBrands.length || catalog.duplicateIds.length) {
   throw new Error(`Catalog is incomplete; refusing to publish a partial snapshot. Failed brands: ${catalog.failedBrands.join(', ') || 'none'}; failed image brands: ${catalog.failedImageBrands.join(', ') || 'none'}; duplicate IDs: ${catalog.duplicateIds.join(', ') || 'none'}; stale: ${catalog.stale}.`);
 }
-if (catalog.sourceWatchCount < 560 || catalog.watches.length < 560 ||
-    catalog.sourceWatchCount - catalog.watches.length !== catalog.excludedMisfiledCount) {
+if (catalog.brands.length < 23 || catalog.sourceWatchCount !== catalog.watches.length || !catalog.watches.length) {
   throw new Error(`Unexpected source/public catalog size: ${catalog.sourceWatchCount}/${catalog.watches.length}`);
 }
-if ((catalog.brands.find((brand) => brand.name === 'VACHERON')?.count ?? 0) < 9 ||
-    catalog.watches.some((watch) => watch.brandTab === 'VACHERON' && !/^vacheron(?:\s|$)/i.test(watch.brand))) {
-  throw new Error('VACHERON public catalog contains unexpected brands or too few watches.');
-}
 
-const embeddedImages = new Map();
-const missingImageBrands = new Set(catalog.watches.filter((watch) => !watch.image).map((watch) => watch.brandTab));
-for (const name of missingImageBrands) {
-  const brand = catalog.brands.find((item) => item.name === name);
-  if (!brand?.gid) throw new Error(`Missing sheet ID for ${name}`);
-  const [csvResponse, xlsxResponse] = await Promise.all([
-    fetch(`${SHEET_BASE}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`, { signal: AbortSignal.timeout(30000) }),
-    fetch(`${SHEET_BASE}/export?format=xlsx&gid=${encodeURIComponent(brand.gid)}`, { signal: AbortSignal.timeout(120000) }),
-  ]);
-  if (!csvResponse.ok || !xlsxResponse.ok) throw new Error(`Could not read embedded images for ${name}: CSV ${csvResponse.status}, XLSX ${xlsxResponse.status}`);
-  const csv = await csvResponse.text();
-  const xlsx = Buffer.from(await xlsxResponse.arrayBuffer());
-  if (xlsx.length > 100_000_000) throw new Error(`XLSX export for ${name} is too large`);
-  const images = extractXlsxImages(xlsx, csv);
-  const brandWatches = catalog.watches.filter((watch) => watch.brandTab === name);
-  const ids = new Set(brandWatches.map((watch) => watch.id));
-  if ([...images.keys()].some((id) => !ids.has(id))) throw new Error(`XLSX images do not match the ${name} catalog`);
-  for (const watch of brandWatches) {
-    if (!watch.image && images.has(watch.id)) embeddedImages.set(watch.id, images.get(watch.id));
-  }
-  console.log(`Recovered ${[...embeddedImages.keys()].filter((id) => ids.has(id)).length} embedded images for ${name}.`);
-}
-// The XLSX export is the current source of truth when Google's image view is
-// unavailable. Never reuse a previously published photo after a Sheet removal.
-catalog.failedImageBrands = [];
-catalog.partial = false;
+// The authenticated workbook export is the source of truth for product photos.
 
 mkdirSync(cache, { recursive: true });
 rmSync(output, { recursive: true, force: true });
@@ -119,6 +86,7 @@ async function imagePool() {
 }
 await Promise.all(Array.from({ length: 8 }, imagePool));
 if (failures.length) throw new Error(`Image export failed for ${failures.length} watches: ${failures.slice(0, 12).join('; ')}`);
+setCatalogForBuild(catalog);
 
 const readRoute = async (path) => {
   const response = await worker.fetch(new Request(origin + path));

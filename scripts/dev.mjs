@@ -1,17 +1,23 @@
 import http from 'node:http';
-import { pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { extname, resolve, sep } from 'node:path';
 
-const worker = (await import(pathToFileURL(resolve('dist/server/index.js')).href)).default;
+const root = resolve('hosting-dist');
+if (!existsSync(resolve(root, 'api/catalog.json'))) throw new Error('Run npm run build:firebase before starting the local preview.');
 const port = Number(process.env.PORT || 4173);
-http.createServer(async (req, res) => {
+const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
+http.createServer((request, response) => {
   try {
-    const request = new Request(`http://127.0.0.1:${port}${req.url}`, { method: req.method });
-    const response = await worker.fetch(request);
-    res.writeHead(response.status, Object.fromEntries(response.headers));
-    res.end(Buffer.from(await response.arrayBuffer()));
+    const pathname = decodeURIComponent(new URL(request.url, `http://127.0.0.1:${port}`).pathname);
+    let relative = pathname === '/' ? 'index.html' : pathname.slice(1);
+    if (/^watch\/[A-Z0-9-]+$/i.test(relative)) relative += '.html';
+    else if (/^(watches(?:\/[a-z0-9-]+)?|brands|favorites|contact)$/.test(relative)) relative = 'index.html';
+    let path = resolve(root, relative);
+    if (!path.startsWith(root + sep) || !existsSync(path)) path = resolve(root, '404.html');
+    response.writeHead(path.endsWith('404.html') ? 404 : 200, { 'content-type': types[extname(path)] || 'application/octet-stream', 'cache-control': 'no-store' });
+    response.end(readFileSync(path));
   } catch (error) {
     console.error(error);
-    res.writeHead(500); res.end('Server error');
+    response.writeHead(500); response.end('Server error');
   }
 }).listen(port, '127.0.0.1', () => console.log(`Local: http://127.0.0.1:${port}`));

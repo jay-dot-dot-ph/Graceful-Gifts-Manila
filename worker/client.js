@@ -15,8 +15,8 @@ let selected = new Set();
 let catalog = null;
 let shown = 24;
 let feedbackTimer = null;
-// Store-selected best sellers, in display order.
-const bestSellerIds = ['CT-W011', 'TG-W004', 'TG-W054', 'RLX-W025'];
+// Add current Watch IDs here only when the store selects best sellers.
+const bestSellerIds = [];
 let filters = { query: new URLSearchParams(location.search).get('q') || '', brand: '', size: '', dial: '', movement: '', category: '', availability: '', min: '', max: '', sort: 'newest' };
 let path = decodeURIComponent(location.pathname);
 if (path.startsWith('/watches/')) filters.brand = path.split('/')[2];
@@ -69,7 +69,7 @@ function mixedBrandPreview(watches, limit, previousIds = []) {
   return preview;
 }
 function home() {
-  const visual = catalog.watches.find((watch) => watch.id === 'RLX-W001' && watch.image) || catalog.watches.find((watch) => watch.image && watch.stock !== 0);
+  const visual = catalog.watches.find((watch) => watch.id === 'ROLEX-001' && watch.image) || catalog.watches.find((watch) => watch.image && watch.stock !== 0);
 
   const bestSellers = bestSellerIds.map((id) => catalog.watches.find((watch) => watch.id === id)).filter(Boolean);
   let previousPreview = [];
@@ -93,7 +93,7 @@ function optionList(values, selectedValue, first) {
 }
 function filterForm() {
   const rows = catalog.watches;
-  return `<div class="filter-heading"><h2>Filter watches</h2><button type="button" data-close-filters aria-label="Close filters">×</button></div><label>Brand<select data-filter="brand"><option value="">All brands</option>${catalog.brands.map((brand) => `<option value="${esc(brand.slug)}" ${filters.brand === brand.slug ? 'selected' : ''}>${esc(brand.name)}</option>`).join('')}</select></label><label>Size<select data-filter="size">${optionList(rows.map((watch) => watch.size), filters.size, 'All sizes')}</select></label><label>Dial color<select data-filter="dial">${optionList(rows.map((watch) => watch.dialColor), filters.dial, 'All colors')}</select></label><label>Movement<select data-filter="movement">${optionList(rows.map((watch) => watch.movement), filters.movement, 'All movements')}</select></label><label>Category<select data-filter="category">${optionList(rows.map((watch) => watch.category), filters.category, 'All categories')}</select></label><label>Availability<select data-filter="availability"><option value="">All watches</option><option value="instock" ${filters.availability === 'instock' ? 'selected' : ''}>In stock</option><option value="soldout" ${filters.availability === 'soldout' ? 'selected' : ''}>Sold out</option></select></label><div class="price-fields"><label>Min price<input type="number" min="0" inputmode="numeric" placeholder="₱ 0" data-filter="min" value="${esc(filters.min)}"></label><label>Max price<input type="number" min="0" inputmode="numeric" placeholder="Any" data-filter="max" value="${esc(filters.max)}"></label></div><button class="clear-button" type="button" data-clear>Clear filters</button>`;
+  return `<div class="filter-heading"><h2>Filter watches</h2><button type="button" data-close-filters aria-label="Close filters">×</button></div><label>Brand<select data-filter="brand"><option value="">All brands</option>${catalog.brands.filter((brand) => brand.count).map((brand) => `<option value="${esc(brand.slug)}" ${filters.brand === brand.slug ? 'selected' : ''}>${esc(brand.name)}</option>`).join('')}</select></label><label>Size<select data-filter="size">${optionList(rows.map((watch) => watch.size), filters.size, 'All sizes')}</select></label><label>Dial color<select data-filter="dial">${optionList(rows.map((watch) => watch.dialColor), filters.dial, 'All colors')}</select></label><label>Movement<select data-filter="movement">${optionList(rows.map((watch) => watch.movement), filters.movement, 'All movements')}</select></label>${rows.some((watch) => watch.category) ? `<label>Category<select data-filter="category">${optionList(rows.map((watch) => watch.category), filters.category, 'All categories')}</select></label>` : ''}<label>Availability<select data-filter="availability"><option value="">All watches</option><option value="instock" ${filters.availability === 'instock' ? 'selected' : ''}>In stock</option><option value="soldout" ${filters.availability === 'soldout' ? 'selected' : ''}>Sold out</option></select></label><div class="price-fields"><label>Min price<input type="number" min="0" inputmode="numeric" placeholder="₱ 0" data-filter="min" value="${esc(filters.min)}"></label><label>Max price<input type="number" min="0" inputmode="numeric" placeholder="Any" data-filter="max" value="${esc(filters.max)}"></label></div><button class="clear-button" type="button" data-clear>Clear filters</button>`;
 }
 function filteredRows() {
   const q = filters.query.trim().toLowerCase();
