@@ -76,6 +76,7 @@ async function workbookExport(token) {
 export async function loadPrivateCatalog() {
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is required to read the private Sheet.');
   const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  console.log(`Private Sheet build account: ${credentials.client_email}`);
   const token = await accessToken(credentials);
   const metadata = await googleJson(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets(properties(sheetId,title,hidden))`, token, 'Sheet metadata');
   const tabs = metadata.sheets.map(({ properties }) => properties).filter((sheet) => !sheet.hidden && sheet.title.toLowerCase() !== 'brands');
