@@ -6,6 +6,7 @@ const root = resolve('hosting-dist');
 const catalog = JSON.parse(readFileSync(resolve(root, 'api/catalog.json'), 'utf8'));
 assert.ok(catalog.watches.length > 0, 'The public Sheet should provide watches');
 assert.equal(catalog.sourceWatchCount, catalog.watches.length);
+assert.match(catalog.sourceFingerprint, /^[a-f0-9]{64}$/, 'The live refresh check needs a Sheet fingerprint');
 assert.ok(catalog.brands.length >= 23, 'Every brand tab should be present');
 assert.ok(catalog.brands.find((brand) => brand.name === 'Audemars Piguet')?.count >= 9);
 assert.ok(catalog.brands.find((brand) => brand.name === 'Tag Heuer'));

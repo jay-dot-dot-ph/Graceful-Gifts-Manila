@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   schedule:
+    - cron: '3-58/5 * * * *'
     - cron: '17 */6 * * *'
   workflow_dispatch:
 
@@ -23,13 +24,25 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - name: Check whether the public Sheet changed
+        id: source_check
+        if: github.event_name == 'schedule' && github.event.schedule != '17 */6 * * *'
+        run: node scripts/check-sheet-sync.mjs source
       - run: npm ci
+        if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'
       - run: npm run build:firebase
+        if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'
+      - name: Check whether the built catalog changed
+        id: artifact_check
+        if: github.event_name == 'schedule' && steps.source_check.outputs.changed != 'false'
+        run: node scripts/check-sheet-sync.mjs artifact
       - name: Keep one previous Hosting release
+        if: github.event_name != 'schedule' || steps.artifact_check.outputs.changed == 'true'
         run: node scripts/set-hosting-retention.mjs --apply
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA }}'
       - uses: FirebaseExtended/action-hosting-deploy@v0
+        if: github.event_name != 'schedule' || steps.artifact_check.outputs.changed == 'true'
         with:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA }}'
           projectId: graceful-gifts-manila

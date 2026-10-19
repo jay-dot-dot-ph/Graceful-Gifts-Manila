@@ -1,5 +1,6 @@
 import { parseCsv, normalizeRows } from '../worker/index.js';
 import { extractWorkbookImages } from './xlsx-images.mjs';
+import { createHash } from 'node:crypto';
 
 export const SHEET_ID = '1YL-EBPWoU3nUNtUwr1GPtlqOUWY7e2GDLCtw8YCwge8';
 export const BRAND_TABS = [
@@ -35,15 +36,24 @@ async function download(url, label, timeout) {
   return response;
 }
 
-async function readBrand([name, gid]) {
+async function readBrandSource([name, gid], requireImagePage = false) {
   const [csvResponse, pageResponse] = await Promise.all([
     download(`${base}/export?format=csv&gid=${gid}`, `${name} CSV`, 60000),
-    download(`${base}/edit?gid=${gid}`, `${name} image page`, 60000).catch(() => null),
+    download(`${base}/edit?gid=${gid}`, `${name} image page`, 60000).catch((error) => {
+      if (requireImagePage) throw error;
+      return null;
+    }),
   ]);
   const csv = await csvResponse.text();
   const rows = parseCsv(csv);
   const pageImages = pageResponse ? extractSheetImages(await pageResponse.text()) : new Map();
   const watches = normalizeRows(csv, name, pageImages);
+  const sourceFingerprint = createHash('sha256').update(JSON.stringify([name, gid, csv, [...pageImages].sort(([a], [b]) => a.localeCompare(b))])).digest('hex');
+  return { name, gid, rows, pageImages, watches, sourceFingerprint };
+}
+
+async function readBrand(tab) {
+  const { name, gid, rows, pageImages, watches, sourceFingerprint } = await readBrandSource(tab);
   const ids = new Set(watches.map((watch) => watch.id));
   const images = new Map();
   if (watches.some((watch) => !watch.image)) {
@@ -59,19 +69,30 @@ async function readBrand([name, gid]) {
   }
   const missingPhotos = watches.filter((watch) => !watch.image && !images.has(watch.id)).map((watch) => watch.id);
   console.log(`Read ${name}: ${watches.length} watches, ${pageImages.size} public photo links, ${images.size} workbook photos, ${missingPhotos.length} without photos.`);
-  return { name, gid, watches, images };
+  return { name, gid, watches, images, sourceFingerprint };
 }
 
-export async function loadPublicCatalog(tabs = BRAND_TABS) {
+async function readTabs(tabs, reader) {
   let next = 0;
   const results = new Array(tabs.length);
   async function pool() {
     while (next < tabs.length) {
       const index = next++;
-      results[index] = await readBrand(tabs[index]);
+      results[index] = await reader(tabs[index]);
     }
   }
   await Promise.all(Array.from({ length: Math.min(4, tabs.length) }, pool));
+  return results;
+}
+
+const fingerprintFor = (brands) => createHash('sha256').update(brands.map((brand) => brand.sourceFingerprint).join('\n')).digest('hex');
+
+export async function getPublicSourceFingerprint(tabs = BRAND_TABS) {
+  return fingerprintFor(await readTabs(tabs, (tab) => readBrandSource(tab, true)));
+}
+
+export async function loadPublicCatalog(tabs = BRAND_TABS) {
+  const results = await readTabs(tabs, readBrand);
   const watches = [], embeddedImages = new Map(), ids = new Set(), duplicateIds = [];
   for (const brand of results) {
     for (const watch of brand.watches) {
@@ -85,6 +106,7 @@ export async function loadPublicCatalog(tabs = BRAND_TABS) {
     catalog: {
       watches,
       brands: results.map((brand) => ({ name: brand.name, slug: slug(brand.name), gid: String(brand.gid), count: brand.watches.length })),
+      sourceFingerprint: fingerprintFor(results),
       sourceWatchCount: watches.length,
       fetchedAt: new Date().toISOString(),
       partial: false, failedBrands: [], failedImageBrands: [], duplicateIds: [], stale: false,

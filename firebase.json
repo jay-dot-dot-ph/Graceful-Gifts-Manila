@@ -24,7 +24,7 @@
       { "source": "/favorites", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/contact", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/watch/**", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
-      { "source": "/api/catalog.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] },
+      { "source": "/api/catalog.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=60" }] },
       { "source": "**/*.html", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] }
     ]
   }

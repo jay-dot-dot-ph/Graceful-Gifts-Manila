@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { parseCsv, normalizeRows, getCatalog, setCatalogForBuild } from '../worker/index.js';
-import { extractSheetImages, loadPublicCatalog, SHEET_ID, BRAND_TABS } from './public-catalog.mjs';
+import { extractSheetImages, getPublicSourceFingerprint, loadPublicCatalog, SHEET_ID, BRAND_TABS } from './public-catalog.mjs';
 import { extractWorkbookImages } from './xlsx-images.mjs';
 
 function storedZip(entries) {
@@ -77,6 +77,7 @@ globalThis.fetch = async (input) => {
   if (url === `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`) {
     return new Response(`${header}\n,ap-001,Audemars Piguet Royal Oak,42mm,Blue,Steel,Steel,Automatic,"5,950",20,Details,2026-10-15`);
   }
+  if (url === `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit?gid=0`) return new Response('<html></html>');
   if (url === `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=xlsx&gid=0`) return new Response(workbook);
   throw new Error(`Unexpected public source request: ${url}`);
 };
@@ -84,6 +85,7 @@ try {
   const result = await loadPublicCatalog([['Audemars Piguet', 0]]);
   assert.equal(result.catalog.watches[0].id, 'AP-001');
   assert.equal(result.catalog.brands.length, 1);
+  assert.equal(result.catalog.sourceFingerprint, await getPublicSourceFingerprint([['Audemars Piguet', 0]]));
   assert.equal(result.embeddedImages.get('AP-001')?.bytes.toString(), 'mock-image');
 } finally {
   globalThis.fetch = oldFetch;
