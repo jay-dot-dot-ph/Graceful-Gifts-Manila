@@ -109,6 +109,13 @@
 .header-search-submit{height:48px;border:1px solid var(--dark);background:var(--dark);color:white;padding:0 24px;font-size:.78rem;font-weight:700}
 .header-search-close{width:36px;height:36px;border:0;background:transparent;color:var(--ink);font-size:1.65rem;line-height:1}
 /* Keep the main watch photo in its frame while following the pointer at higher magnification. */
+.detail-image[data-photo-zoom]{position:relative}
+.detail-zoom-hint{display:none;position:absolute;left:50%;bottom:18px;z-index:1;transform:translateX(-50%);white-space:nowrap;padding:8px 12px;background:#24241fd9;color:#fff;font-size:.68rem;letter-spacing:.03em;border-radius:2px;pointer-events:none}
+.detail-image[data-photo-zoom].touch-zoom{touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.detail-image[data-photo-zoom].touch-zoom.zoom-active{touch-action:none}
+.detail-image[data-photo-zoom].touch-zoom img{transform-origin:var(--zoom-x,50%) var(--zoom-y,50%);transition:transform .18s ease-out}
+.detail-image[data-photo-zoom].touch-zoom.zoom-active img{transform:scale(2.25)}
+@media(hover:none),(pointer:coarse){.detail-zoom-hint{display:block}}
 @media(hover:hover) and (pointer:fine){
   .detail-image[data-photo-zoom]{cursor:zoom-in}
   .detail-image[data-photo-zoom] img{transform-origin:var(--zoom-x,50%) var(--zoom-y,50%);transition:transform .18s ease-out}

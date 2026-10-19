@@ -154,23 +154,103 @@ function catalogPage() {
 function setupDetailZoom() {
   const photo = document.querySelector('[data-photo-zoom]');
   if (!photo) return;
+  const hint = photo.querySelector('.detail-zoom-hint');
+  const zoom = 2.25;
+  let touch = null;
+  const clamp = (value) => Math.max(0, Math.min(100, value));
+  const setPosition = (x, y) => {
+    photo.style.setProperty('--zoom-x', `${clamp(x)}%`);
+    photo.style.setProperty('--zoom-y', `${clamp(y)}%`);
+  };
+  const resetZoom = () => {
+    photo.classList.remove('zoom-active');
+    photo.style.removeProperty('--zoom-x');
+    photo.style.removeProperty('--zoom-y');
+    if (photo.classList.contains('touch-zoom')) {
+      photo.setAttribute('aria-pressed', 'false');
+      photo.setAttribute('aria-label', 'Tap to zoom watch photo');
+    }
+    if (hint) hint.textContent = 'Tap to zoom';
+  };
+  const enableTouchZoom = () => {
+    photo.classList.add('touch-zoom');
+    photo.setAttribute('role', 'button');
+    photo.setAttribute('tabindex', '0');
+    if (!photo.hasAttribute('aria-pressed')) resetZoom();
+  };
+  if (matchMedia('(hover: none), (pointer: coarse)').matches) enableTouchZoom();
 
   const moveZoom = (event) => {
     if (event.pointerType !== 'mouse') return;
     const bounds = photo.getBoundingClientRect();
-    const x = Math.max(0, Math.min(100, (event.clientX - bounds.left) / bounds.width * 100));
-    const y = Math.max(0, Math.min(100, (event.clientY - bounds.top) / bounds.height * 100));
-    photo.style.setProperty('--zoom-x', `${x}%`);
-    photo.style.setProperty('--zoom-y', `${y}%`);
+    if (photo.classList.contains('touch-zoom')) {
+      photo.classList.remove('touch-zoom');
+      photo.removeAttribute('role');
+      photo.removeAttribute('tabindex');
+      photo.removeAttribute('aria-pressed');
+      photo.removeAttribute('aria-label');
+    }
+    setPosition((event.clientX - bounds.left) / bounds.width * 100,
+      (event.clientY - bounds.top) / bounds.height * 100);
     photo.classList.add('zoom-active');
   };
 
   photo.addEventListener('pointerenter', moveZoom);
-  photo.addEventListener('pointermove', moveZoom);
-  photo.addEventListener('pointerleave', () => {
-    photo.classList.remove('zoom-active');
-    photo.style.removeProperty('--zoom-x');
-    photo.style.removeProperty('--zoom-y');
+  photo.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'mouse') { moveZoom(event); return; }
+    if (event.pointerType !== 'touch' || !touch || event.pointerId !== touch.id) return;
+    const dx = event.clientX - touch.startX;
+    const dy = event.clientY - touch.startY;
+    if (Math.hypot(dx, dy) > 8) touch.moved = true;
+    if (touch.moved && photo.classList.contains('zoom-active')) {
+      const bounds = photo.getBoundingClientRect();
+      setPosition(touch.originX - dx / ((zoom - 1) * bounds.width) * 100,
+        touch.originY - dy / ((zoom - 1) * bounds.height) * 100);
+    }
+  });
+  photo.addEventListener('pointerleave', (event) => {
+    if (event.pointerType === 'mouse') resetZoom();
+  });
+  photo.addEventListener('pointerdown', (event) => {
+    if (event.pointerType !== 'touch') return;
+    enableTouchZoom();
+    const originX = parseFloat(photo.style.getPropertyValue('--zoom-x'));
+    const originY = parseFloat(photo.style.getPropertyValue('--zoom-y'));
+    touch = {
+      id: event.pointerId, startX: event.clientX, startY: event.clientY,
+      originX: Number.isFinite(originX) ? originX : 50,
+      originY: Number.isFinite(originY) ? originY : 50,
+      moved: false
+    };
+  });
+  photo.addEventListener('pointerup', (event) => {
+    if (event.pointerType !== 'touch' || !touch || event.pointerId !== touch.id) return;
+    if (!touch.moved) {
+      if (photo.classList.contains('zoom-active')) resetZoom();
+      else {
+        const bounds = photo.getBoundingClientRect();
+        setPosition((event.clientX - bounds.left) / bounds.width * 100,
+          (event.clientY - bounds.top) / bounds.height * 100);
+        photo.classList.add('zoom-active');
+        photo.setAttribute('aria-pressed', 'true');
+        photo.setAttribute('aria-label', 'Zoomed watch photo. Drag to explore or tap to zoom out');
+        if (hint) hint.textContent = 'Drag to explore · Tap to close';
+      }
+    }
+    touch = null;
+  });
+  photo.addEventListener('pointercancel', () => { touch = null; });
+  photo.addEventListener('keydown', (event) => {
+    if (!photo.classList.contains('touch-zoom') || !['Enter', ' '].includes(event.key)) return;
+    event.preventDefault();
+    if (photo.classList.contains('zoom-active')) resetZoom();
+    else {
+      setPosition(50, 50);
+      photo.classList.add('zoom-active');
+      photo.setAttribute('aria-pressed', 'true');
+      photo.setAttribute('aria-label', 'Zoomed watch photo. Drag to explore or tap to zoom out');
+      if (hint) hint.textContent = 'Drag to explore · Tap to close';
+    }
   });
 }
 
@@ -184,7 +264,7 @@ function detailPage(watch) {
     <main class="container detail-page">
       <div class="detail-topline"><button class="detail-back" type="button" data-detail-back="${esc(watch.brandSlug)}"><span aria-hidden="true">←</span> Back to watches</button></div>
       <div class="detail-grid">
-        <div class="detail-image" ${watch.image ? 'data-photo-zoom' : ''}>${watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" width="800" height="800">` : `<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>`}</div>
+        <div class="detail-image" ${watch.image ? 'data-photo-zoom' : ''}>${watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" width="800" height="800"><span class="detail-zoom-hint" aria-hidden="true">Tap to zoom</span>` : `<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>`}</div>
         <div class="detail-copy">
           <p class="eyebrow">${esc(watch.brand)}</p>
           <h1>${esc(watch.model || 'Watch details on request')}</h1>
