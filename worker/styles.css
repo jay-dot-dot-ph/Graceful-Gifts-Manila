@@ -108,6 +108,12 @@
 .header-search-form input:focus{border-color:var(--gold)}
 .header-search-submit{height:48px;border:1px solid var(--dark);background:var(--dark);color:white;padding:0 24px;font-size:.78rem;font-weight:700}
 .header-search-close{width:36px;height:36px;border:0;background:transparent;color:var(--ink);font-size:1.65rem;line-height:1}
+/* Keep the main watch photo in its frame while following the pointer at higher magnification. */
+@media(hover:hover) and (pointer:fine){
+  .detail-image[data-photo-zoom]{cursor:zoom-in}
+  .detail-image[data-photo-zoom] img{transform-origin:var(--zoom-x,50%) var(--zoom-y,50%);transition:transform .18s ease-out}
+  .detail-image[data-photo-zoom].zoom-active img{transform:scale(2.25)}
+}
 @media(max-width:760px){
   .header-search-form{gap:8px;padding-top:12px;padding-bottom:12px}
   .header-search-submit{padding:0 13px}

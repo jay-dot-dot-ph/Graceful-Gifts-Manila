@@ -151,6 +151,29 @@ function catalogPage() {
   }));
   updateResults(); afterRender();
 }
+function setupDetailZoom() {
+  const photo = document.querySelector('[data-photo-zoom]');
+  if (!photo) return;
+
+  const moveZoom = (event) => {
+    if (event.pointerType !== 'mouse') return;
+    const bounds = photo.getBoundingClientRect();
+    const x = Math.max(0, Math.min(100, (event.clientX - bounds.left) / bounds.width * 100));
+    const y = Math.max(0, Math.min(100, (event.clientY - bounds.top) / bounds.height * 100));
+    photo.style.setProperty('--zoom-x', `${x}%`);
+    photo.style.setProperty('--zoom-y', `${y}%`);
+    photo.classList.add('zoom-active');
+  };
+
+  photo.addEventListener('pointerenter', moveZoom);
+  photo.addEventListener('pointermove', moveZoom);
+  photo.addEventListener('pointerleave', () => {
+    photo.classList.remove('zoom-active');
+    photo.style.removeProperty('--zoom-x');
+    photo.style.removeProperty('--zoom-y');
+  });
+}
+
 function detailPage(watch) {
   document.title = `${watch ? watchName(watch) : 'Watch not found'} | Graceful Gifts Manila`;
   if (!watch) { app.innerHTML = nav('Watches') + `<main class="container empty-state"><h1>Watch not found</h1><p>This watch may no longer be listed.</p><a class="button button-dark" href="/watches">Browse watches</a></main>` + footer(); afterRender(); return; }
@@ -161,7 +184,7 @@ function detailPage(watch) {
     <main class="container detail-page">
       <div class="detail-topline"><button class="detail-back" type="button" data-detail-back="${esc(watch.brandSlug)}"><span aria-hidden="true">←</span> Back to watches</button></div>
       <div class="detail-grid">
-        <div class="detail-image">${watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" width="800" height="800">` : `<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>`}</div>
+        <div class="detail-image" ${watch.image ? 'data-photo-zoom' : ''}>${watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" width="800" height="800">` : `<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>`}</div>
         <div class="detail-copy">
           <p class="eyebrow">${esc(watch.brand)}</p>
           <h1>${esc(watch.model || 'Watch details on request')}</h1>
@@ -177,6 +200,7 @@ function detailPage(watch) {
     </main>
     <div class="mobile-inquiry-bar"><span>${watch.stock === 0 ? 'SOLD OUT' : money(watch.price)}</span><button type="button" data-inquire="${esc(watch.id)}">${inquiryLabel} ↗</button></div>` + footer();
   afterRender();
+  setupDetailZoom();
 }
 function favoritesPage() {
   const rows = catalog.watches.filter((watch) => favorites.has(watch.id));
