@@ -5,7 +5,7 @@ on:
     branches: [main]
   schedule:
     - cron: '3-58/5 * * * *'
-    - cron: '17 */6 * * *'
+    - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -26,7 +26,7 @@ jobs:
           cache: npm
       - name: Check whether the public Sheet changed
         id: source_check
-        if: github.event_name == 'schedule' && github.event.schedule != '17 */6 * * *'
+        if: github.event_name == 'schedule' && github.event.schedule != '17 * * * *'
         run: node scripts/check-sheet-sync.mjs source
       - run: npm ci
         if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'

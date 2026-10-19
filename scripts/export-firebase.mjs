@@ -74,8 +74,11 @@ async function downloadImage(watch) {
     }
     if (!existing) throw new Error(`${watch.id}: ${lastError?.message || 'image unavailable'}`);
   }
-  copyFileSync(join(cache, existing), join(output, 'images', existing));
-  watch.localImage = `/images/${existing}`;
+  const bytes = readFileSync(join(cache, existing));
+  const contentDigest = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
+  const filename = `${watch.id}-${contentDigest}.${existing.split('.').pop()}`;
+  writeFileSync(join(output, 'images', filename), bytes);
+  watch.localImage = `/images/${filename}`;
 }
 async function imagePool() {
   while (nextImage < imageWatches.length) {

@@ -36,19 +36,36 @@ async function download(url, label, timeout) {
   return response;
 }
 
-async function readBrandSource([name, gid], requireImagePage = false) {
-  const [csvResponse, pageResponse] = await Promise.all([
-    download(`${base}/export?format=csv&gid=${gid}`, `${name} CSV`, 60000),
-    download(`${base}/edit?gid=${gid}`, `${name} image page`, 60000).catch((error) => {
-      if (requireImagePage) throw error;
-      return null;
-    }),
-  ]);
+async function readImagePage(name, gid) {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await download(`${base}/edit?gid=${gid}`, `${name} image page`, 60000);
+      const html = await response.text();
+      if (!html.includes('<table') || !html.includes('Watch ID')) throw new Error(`${name} image page did not contain the public Sheet table`);
+      return extractSheetImages(html);
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) await new Promise((resolveDelay) => setTimeout(resolveDelay, 500 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
+async function readBrandCsv([name, gid]) {
+  const csvResponse = await download(`${base}/export?format=csv&gid=${gid}`, `${name} CSV`, 60000);
   const csv = await csvResponse.text();
+  const sourceFingerprint = createHash('sha256').update(JSON.stringify([name, gid, csv])).digest('hex');
+  return { name, gid, csv, sourceFingerprint };
+}
+
+async function readBrandSource(tab) {
+  const [{ name, gid, csv, sourceFingerprint }, pageImages] = await Promise.all([
+    readBrandCsv(tab),
+    readImagePage(tab[0], tab[1]).catch(() => new Map()),
+  ]);
   const rows = parseCsv(csv);
-  const pageImages = pageResponse ? extractSheetImages(await pageResponse.text()) : new Map();
   const watches = normalizeRows(csv, name, pageImages);
-  const sourceFingerprint = createHash('sha256').update(JSON.stringify([name, gid, csv, [...pageImages].sort(([a], [b]) => a.localeCompare(b))])).digest('hex');
   return { name, gid, rows, pageImages, watches, sourceFingerprint };
 }
 
@@ -88,7 +105,7 @@ async function readTabs(tabs, reader) {
 const fingerprintFor = (brands) => createHash('sha256').update(brands.map((brand) => brand.sourceFingerprint).join('\n')).digest('hex');
 
 export async function getPublicSourceFingerprint(tabs = BRAND_TABS) {
-  return fingerprintFor(await readTabs(tabs, (tab) => readBrandSource(tab, true)));
+  return fingerprintFor(await readTabs(tabs, readBrandCsv));
 }
 
 export async function loadPublicCatalog(tabs = BRAND_TABS) {
