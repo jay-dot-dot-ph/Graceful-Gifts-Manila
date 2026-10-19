@@ -46,12 +46,14 @@ export function normalizeRows(csv, tabName, images = new Map()) {
   for (const cells of rows.slice(1)) {
     const id = cell(cells, "watch id").toUpperCase();
     if (!/^[A-Z0-9-]{2,20}$/.test(id)) continue;
+    const model = cell(cells, "model name");
+    if (!model) continue;
     const rawPrice = cell(cells, "price (php)").replace(/[^\d.]/g, "");
     const rawStock = cell(cells, "stock quantity");
     const imageUrl = cell(cells, "image url");
     watches.push({
       id, brand: cell(cells, "brand") || tabName, brandTab: tabName, brandSlug: slug(tabName),
-      model: cell(cells, "model name"), size: cell(cells, "size"),
+      model, size: cell(cells, "size"),
       category: cell(cells, "category"), dialColor: cell(cells, "dial color"),
       caseMaterial: cell(cells, "case material"), strapMaterial: cell(cells, "strap material"),
       movement: cell(cells, "movement type"),

@@ -51,6 +51,7 @@ assert.equal(watches[0].price, 5950);
 assert.equal(watches[0].stock, 0);
 assert.equal(watches[1].id, 'INV-002');
 assert.equal(watches[1].stock, null);
+assert.equal(normalizeRows(`${header}\n,rm-001,RM 35-02,,,,,,"5,950",1,,\n,hb-w040,,,,,,,,,,`, 'Richard Mille').length, 1);
 assert.deepEqual(normalizeRows(header, 'Tag Heuer'), []);
 assert.throws(() => normalizeRows('Watch ID,Model Name\nabc,Example', 'Broken'), /Missing price \(php\) column/);
 await assert.rejects(getCatalog(), /static build/);

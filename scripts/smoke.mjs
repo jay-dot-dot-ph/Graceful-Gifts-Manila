@@ -9,6 +9,8 @@ assert.equal(catalog.sourceWatchCount, catalog.watches.length);
 assert.ok(catalog.brands.length >= 23, 'Every brand tab should be present');
 assert.ok(catalog.brands.find((brand) => brand.name === 'Audemars Piguet')?.count >= 9);
 assert.ok(catalog.brands.find((brand) => brand.name === 'Tag Heuer'));
+assert.equal(catalog.brands.find((brand) => brand.name === 'Richard Mille')?.count, 7);
+assert.ok(catalog.watches.filter((watch) => watch.brandTab === 'Richard Mille').every((watch) => watch.localImage));
 assert.ok(!catalog.brands.some((brand) => brand.name === 'Brands'));
 assert.deepEqual(catalog.duplicateIds, []);
 assert.equal(catalog.watches.find((watch) => watch.id === 'AP-001')?.price, 5950);
