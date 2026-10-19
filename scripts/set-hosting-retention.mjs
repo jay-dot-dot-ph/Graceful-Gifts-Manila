@@ -48,3 +48,23 @@ if (!response.ok) throw new Error(`Could not set live Hosting retention: HTTP ${
 const updated = await response.json();
 if (updated.retainedReleaseCount !== 1) throw new Error('Firebase did not confirm the new Hosting retention setting.');
 console.log('Live Hosting now retains one previous release. Older rollback versions are scheduled for deletion.');
+
+let pageToken = '';
+const statuses = new Map();
+let versionCount = 0;
+let storedBytes = 0;
+do {
+  const versionsUrl = new URL(`https://firebasehosting.googleapis.com/v1beta1/sites/${site}/versions`);
+  versionsUrl.searchParams.set('pageSize', '100');
+  if (pageToken) versionsUrl.searchParams.set('pageToken', pageToken);
+  const versionsResponse = await fetch(versionsUrl, { headers, signal: AbortSignal.timeout(30000) });
+  if (!versionsResponse.ok) throw new Error(`Could not inspect Hosting versions: HTTP ${versionsResponse.status}`);
+  const page = await versionsResponse.json();
+  for (const version of page.versions || []) {
+    versionCount++;
+    statuses.set(version.status, (statuses.get(version.status) || 0) + 1);
+    if (!['DELETED', 'ABANDONED', 'EXPIRED'].includes(version.status)) storedBytes += Number(version.versionBytes || 0);
+  }
+  pageToken = page.nextPageToken || '';
+} while (pageToken);
+console.log(`Hosting versions: ${versionCount}; status counts: ${JSON.stringify(Object.fromEntries(statuses))}; active version bytes (before deduplication): ${storedBytes}.`);
