@@ -41,6 +41,8 @@
 @media(max-width:760px){.brands-page-heading{padding:55px 0 48px}.brands-page-content{padding-top:45px}}
 
 /* Storefront trust banner and Messenger shortcut */
+.catalog-layout .filters{align-self:start}
+@media(min-width:761px){.catalog-layout .filters{position:sticky;top:102px;max-height:calc(100vh - 118px);overflow-y:auto}}
 .trust-banner{background:#e9e0cf;border-bottom:1px solid #d5c8b3;color:#4b4438}
 .trust-banner-inner{min-height:39px;display:flex;justify-content:center;align-items:center;gap:clamp(16px,3vw,45px);flex-wrap:wrap;padding-top:7px;padding-bottom:7px}
 .trust-banner span{font-size:.68rem;font-weight:700;letter-spacing:.035em;white-space:nowrap}
