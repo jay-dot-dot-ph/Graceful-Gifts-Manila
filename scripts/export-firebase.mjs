@@ -27,11 +27,7 @@ mkdirSync(join(output, 'images'), { recursive: true });
 mkdirSync(join(output, 'api'), { recursive: true });
 mkdirSync(join(output, 'watch'), { recursive: true });
 mkdirSync(join(output, 'feedback'), { recursive: true });
-mkdirSync(join(output, 'assets'), { recursive: true });
 for (const { path, bytes } of feedbackAssets(root)) writeFileSync(join(output, path), bytes);
-const openingBackground = readFileSync(join(root, 'assets/loading-background.jpg'));
-const openingBackgroundName = `opening-bg-${createHash('sha256').update(openingBackground).digest('hex').slice(0, 12)}.jpg`;
-writeFileSync(join(output, 'assets', openingBackgroundName), openingBackground);
 
 const imageWatches = catalog.watches.filter((watch) => watch.image || embeddedImages.has(watch.id));
 let nextImage = 0;
