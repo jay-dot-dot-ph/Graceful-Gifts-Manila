@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync,
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { feedbackAssets } from './feedback-assets.mjs';
-import { loadPrivateCatalog } from './private-catalog.mjs';
+import { loadPublicCatalog } from './public-catalog.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, 'hosting-dist');
@@ -11,7 +11,7 @@ const cache = resolve(root, '.image-cache');
 if (!output.startsWith(root + sep) || !cache.startsWith(root + sep)) throw new Error('Build paths escaped the site checkout.');
 const origin = 'https://graceful-gifts-manila.web.app';
 const { default: worker, setCatalogForBuild } = await import('../dist/server/index.js');
-const { catalog, embeddedImages } = await loadPrivateCatalog();
+const { catalog, embeddedImages } = await loadPublicCatalog();
 if (catalog.stale || catalog.failedBrands.length || catalog.duplicateIds.length) {
   throw new Error(`Catalog is incomplete; refusing to publish a partial snapshot. Failed brands: ${catalog.failedBrands.join(', ') || 'none'}; failed image brands: ${catalog.failedImageBrands.join(', ') || 'none'}; duplicate IDs: ${catalog.duplicateIds.join(', ') || 'none'}; stale: ${catalog.stale}.`);
 }
@@ -19,7 +19,7 @@ if (catalog.brands.length < 23 || catalog.sourceWatchCount !== catalog.watches.l
   throw new Error(`Unexpected source/public catalog size: ${catalog.sourceWatchCount}/${catalog.watches.length}`);
 }
 
-// The authenticated workbook export is the source of truth for product photos.
+// Each public brand-tab workbook export is the source of truth for embedded photos.
 
 mkdirSync(cache, { recursive: true });
 rmSync(output, { recursive: true, force: true });

@@ -66,7 +66,7 @@ export function normalizeRows(csv, tabName, images = new Map()) {
 }
 
 export async function getCatalog() {
-  if (!catalogCache) throw new Error('The catalog must be loaded by the authenticated build.');
+  if (!catalogCache) throw new Error('The catalog must be loaded by the static build.');
   return catalogCache;
 }
 export function setCatalogForBuild(catalog) {

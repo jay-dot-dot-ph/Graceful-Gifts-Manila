@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 
 const root = resolve('hosting-dist');
 const catalog = JSON.parse(readFileSync(resolve(root, 'api/catalog.json'), 'utf8'));
-assert.ok(catalog.watches.length > 0, 'The private Sheet should provide watches');
+assert.ok(catalog.watches.length > 0, 'The public Sheet should provide watches');
 assert.equal(catalog.sourceWatchCount, catalog.watches.length);
 assert.ok(catalog.brands.length >= 23, 'Every brand tab should be present');
 assert.ok(catalog.brands.find((brand) => brand.name === 'Audemars Piguet')?.count >= 9);
@@ -18,4 +18,4 @@ assert.match(page, /Audemars Piguet Royal Oak/);
 for (const watch of catalog.watches.filter((item) => item.localImage)) {
   assert.ok(existsSync(resolve(root, watch.localImage.slice(1))), `Missing exported image for ${watch.id}`);
 }
-console.log(`Private Sheet export passed: ${catalog.watches.length} watches, ${catalog.watches.filter((watch) => watch.localImage).length} images, ${catalog.brands.length} brand tabs.`);
+console.log(`Public Sheet export passed: ${catalog.watches.length} watches, ${catalog.watches.filter((watch) => watch.localImage).length} images, ${catalog.brands.length} brand tabs.`);

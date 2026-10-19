@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, verify } from 'node:crypto';
 import { parseCsv, normalizeRows, getCatalog, setCatalogForBuild } from '../worker/index.js';
-import { loadPrivateCatalog, serviceAccountAssertion } from './private-catalog.mjs';
+import { extractSheetImages, loadPublicCatalog, SHEET_ID, BRAND_TABS } from './public-catalog.mjs';
 import { extractWorkbookImages } from './xlsx-images.mjs';
 
 function storedZip(entries) {
@@ -54,16 +53,12 @@ assert.equal(watches[1].id, 'INV-002');
 assert.equal(watches[1].stock, null);
 assert.deepEqual(normalizeRows(header, 'Tag Heuer'), []);
 assert.throws(() => normalizeRows('Watch ID,Model Name\nabc,Example', 'Broken'), /Missing price \(php\) column/);
-await assert.rejects(getCatalog(), /authenticated build/);
+await assert.rejects(getCatalog(), /static build/);
 setCatalogForBuild({ watches, brands: [{ name: 'Invicta', count: 2 }] });
 assert.equal((await getCatalog()).watches[0].id, 'INV-001');
-const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
-const credentials = { client_email: 'firebase-adminsdk-fbsvc@graceful-gifts-manila.iam.gserviceaccount.com', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }) };
-const assertion = serviceAccountAssertion(credentials, 1_700_000_000_000);
-const [jwtHeader, jwtClaims, signature] = assertion.split('.');
-assert.equal(JSON.parse(Buffer.from(jwtClaims, 'base64url')).iss, credentials.client_email);
-assert.ok(verify('RSA-SHA256', Buffer.from(`${jwtHeader}.${jwtClaims}`), publicKey, Buffer.from(signature, 'base64url')));
-assert.throws(() => serviceAccountAssertion({ ...credentials, private_key: '' }), /missing an email or private key/);
+assert.equal(BRAND_TABS.length, 23);
+assert.equal(SHEET_ID, '1YL-EBPWoU3nUNtUwr1GPtlqOUWY7e2GDLCtw8YCwge8');
+assert.equal(extractSheetImages('<tr><td><img src="https://docs.google.com/sheets-images-rt/example=w100-h120"></td><td>ap-001</td></tr>').get('AP-001'), 'https://docs.google.com/sheets-images-rt/example=w800-h800');
 const workbook = storedZip([
   ['xl/workbook.xml', '<workbook><sheets><sheet name="Audemars Piguet" r:id="rId1"/></sheets></workbook>'],
   ['xl/_rels/workbook.xml.rels', '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>'],
@@ -76,26 +71,20 @@ const workbook = storedZip([
 const workbookImages = extractWorkbookImages(workbook, new Map([['Audemars Piguet', [['Image', 'Watch ID'], ['', 'ap-001']]]]));
 assert.equal(workbookImages.get('AP-001')?.bytes.toString(), 'mock-image');
 const oldFetch = globalThis.fetch;
-const oldCredentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-const tabs = ['Audemars Piguet', ...Array.from({ length: 22 }, (_, index) => `Brand ${index + 1}`)];
-process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify(credentials);
 globalThis.fetch = async (input) => {
   const url = String(input);
-  if (url === 'https://oauth2.googleapis.com/token') return Response.json({ access_token: 'test-token' });
-  if (url.includes('/values:batchGet')) return Response.json({ valueRanges: tabs.map((name) => ({ values: name === 'Audemars Piguet' ? [header.split(','), ['', 'ap-001', 'Audemars Piguet Royal Oak', '42mm', 'Blue', 'Steel', 'Steel', 'Automatic', '5,950', '20', 'Details', '2026-10-15']] : [header.split(',')] })) });
-  if (url.startsWith('https://sheets.googleapis.com/v4/spreadsheets/')) return Response.json({ sheets: [{ properties: { title: 'Brands', sheetId: 100 } }, ...tabs.map((title, sheetId) => ({ properties: { title, sheetId } }))] });
-  if (url.includes('/download?mimeType=')) return Response.json({ done: true, response: { downloadUri: 'https://www.googleapis.com/mock-download' } });
-  if (url === 'https://www.googleapis.com/mock-download') return new Response(workbook);
-  throw new Error(`Unexpected private source request: ${url}`);
+  if (url === `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`) {
+    return new Response(`${header}\n,ap-001,Audemars Piguet Royal Oak,42mm,Blue,Steel,Steel,Automatic,"5,950",20,Details,2026-10-15`);
+  }
+  if (url === `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=xlsx&gid=0`) return new Response(workbook);
+  throw new Error(`Unexpected public source request: ${url}`);
 };
 try {
-  const result = await loadPrivateCatalog();
+  const result = await loadPublicCatalog([['Audemars Piguet', 0]]);
   assert.equal(result.catalog.watches[0].id, 'AP-001');
-  assert.equal(result.catalog.brands.length, 23);
+  assert.equal(result.catalog.brands.length, 1);
   assert.equal(result.embeddedImages.get('AP-001')?.bytes.toString(), 'mock-image');
 } finally {
   globalThis.fetch = oldFetch;
-  if (oldCredentials === undefined) delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  else process.env.GOOGLE_SERVICE_ACCOUNT_JSON = oldCredentials;
 }
-console.log('Private catalog parsing, authentication, and workbook image checks passed.');
+console.log('Public catalog parsing and workbook image checks passed.');

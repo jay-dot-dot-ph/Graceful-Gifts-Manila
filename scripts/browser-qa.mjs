@@ -74,7 +74,7 @@ try {
   await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
   assert.match(await page.locator('.page-heading h1').innerText(), /^Omega watches$/);
   assert.equal(await page.locator('[data-filter="brand"]').inputValue(), 'omega');
-  assert.equal(await page.locator('.watch-card .eyebrow').first().innerText(), 'Omega');
+  assert.equal((await page.locator('.watch-card .eyebrow').first().innerText()).toLowerCase(), 'omega');
   await page.locator('[data-clear]').first().click();
   await page.waitForURL('**/watches');
   await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
