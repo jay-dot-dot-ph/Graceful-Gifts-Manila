@@ -141,7 +141,9 @@
 :root[data-theme=dark] .trust-banner{background:#242820;border-color:#464a3d;color:#ece4d4}
 :root[data-theme=dark] .site-header{background:rgba(18,20,16,.96)}
 :root[data-theme=dark] .desktop-nav a:hover,:root[data-theme=dark] .desktop-nav a[aria-current=page]{color:#e6c48e}
-:root[data-theme=dark] .hero{background:linear-gradient(112deg,#161914 0%,#1b1d17 52%,#d2c2a6 52%,#bba985 100%)}
+:root[data-theme=dark] .hero{background:linear-gradient(112deg,#161914 0%,#1b1d17 52%,#292d24 52%,#20241d 100%)}
+:root[data-theme=dark] .hero-visual{background:#272b24}
+:root[data-theme=dark] .hero-visual>img{mix-blend-mode:normal;filter:brightness(.72) saturate(.86) drop-shadow(0 24px 30px #0006);border-radius:8px}
 :root[data-theme=dark] .hero h1 em{color:#dbb980}
 :root[data-theme=dark] .hero-stats{border-color:#4a4d41}
 :root[data-theme=dark] .hero-stats span,:root[data-theme=dark] .hero-description{color:#c6c3b7}
@@ -161,8 +163,9 @@
 :root[data-theme=dark] .card-meta,:root[data-theme=dark] .catalog-count,:root[data-theme=dark] .sort-control,:root[data-theme=dark] .breadcrumbs,:root[data-theme=dark] .watch-id,:root[data-theme=dark] .favorite-description small,:root[data-theme=dark] .favorites-actions span{color:#b6b0a3}
 :root[data-theme=dark] .card-bottom span,:root[data-theme=dark] .detail-stock{color:#a9c9a5}
 :root[data-theme=dark] .card-bottom span.soldout,:root[data-theme=dark] .detail-stock.soldout{color:#e3a39a}
-:root[data-theme=dark] .card-image,:root[data-theme=dark] .detail-image,:root[data-theme=dark] .favorite-photo{background:#e8e1d6}
-:root[data-theme=dark] .image-placeholder{background:radial-gradient(circle at 50% 45%,#f0e9dd,#dbd0bf);color:#766346}
+:root[data-theme=dark] .card-image,:root[data-theme=dark] .detail-image,:root[data-theme=dark] .favorite-photo{background:#272b24}
+:root[data-theme=dark] .card-image img,:root[data-theme=dark] .detail-image img,:root[data-theme=dark] .favorite-photo img,:root[data-theme=dark] .product-initial img{mix-blend-mode:normal;filter:brightness(.72) saturate(.86)}
+:root[data-theme=dark] .image-placeholder{background:radial-gradient(circle at 50% 45%,#30352b,#20241d);color:#d2af78}
 :root[data-theme=dark] .heart{border-color:#7b6c53;background:#22251eea;color:#f5e9d5}
 :root[data-theme=dark] .heart:hover,:root[data-theme=dark] .heart.saved{color:#e7bb7c}
 :root[data-theme=dark] .filters select,:root[data-theme=dark] .filters input,:root[data-theme=dark] .sort-control select,:root[data-theme=dark] .search-field,:root[data-theme=dark] .header-search-form input{background:#20241d;border-color:#555a4a;color:#f3efe6}
@@ -186,4 +189,4 @@
 :root[data-theme=dark] .mobile-inquiry-bar button{background:#d3ae76;color:#1b1d17}
 :root[data-theme=dark] .feedback-float button{background:#20241d;color:#f3efe6}
 :root[data-theme=dark] .data-warning{background:#493721;color:#fff0d8}
-@media(max-width:760px){:root[data-theme=dark] .hero{background:#181b15}:root[data-theme=dark] .hero-visual{background:#d2c2a6}}
+@media(max-width:760px){:root[data-theme=dark] .hero{background:#181b15}:root[data-theme=dark] .hero-visual{background:#272b24}}
