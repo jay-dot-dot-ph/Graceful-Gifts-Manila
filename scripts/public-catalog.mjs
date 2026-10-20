@@ -36,6 +36,18 @@ async function download(url, label, timeout) {
   return response;
 }
 
+async function retryRead(label, read) {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { return await read(); }
+    catch (error) {
+      lastError = error;
+      if (attempt < 2) await new Promise((resolveDelay) => setTimeout(resolveDelay, 1000 * (attempt + 1)));
+    }
+  }
+  throw new Error(`${label} failed after 3 attempts: ${lastError?.message || lastError}`);
+}
+
 async function readImagePage(name, gid) {
   let lastError;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -53,8 +65,10 @@ async function readImagePage(name, gid) {
 }
 
 async function readBrandCsv([name, gid]) {
-  const csvResponse = await download(`${base}/export?format=csv&gid=${gid}`, `${name} CSV`, 60000);
-  const csv = await csvResponse.text();
+  const csv = await retryRead(`${name} CSV`, async () => {
+    const response = await download(`${base}/export?format=csv&gid=${gid}`, `${name} CSV`, 60000);
+    return response.text();
+  });
   const sourceFingerprint = createHash('sha256').update(JSON.stringify([name, gid, csv])).digest('hex');
   return { name, gid, csv, sourceFingerprint };
 }
@@ -74,11 +88,14 @@ async function readBrand(tab) {
   const ids = new Set(watches.map((watch) => watch.id));
   const images = new Map();
   if (watches.some((watch) => !watch.image)) {
-    const xlsxResponse = await download(`${base}/export?format=xlsx&gid=${gid}`, `${name} workbook`, 300000);
-    const bytes = Buffer.from(await xlsxResponse.arrayBuffer());
-    if (bytes.length < 100 || bytes.length > 250_000_000 || bytes.readUInt32LE(0) !== 0x04034b50) {
-      throw new Error(`${name} workbook export is invalid or exceeds 250 MB`);
-    }
+    const bytes = await retryRead(`${name} workbook`, async () => {
+      const response = await download(`${base}/export?format=xlsx&gid=${gid}`, `${name} workbook`, 300000);
+      const data = Buffer.from(await response.arrayBuffer());
+      if (data.length < 100 || data.length > 250_000_000 || data.readUInt32LE(0) !== 0x04034b50) {
+        throw new Error(`${name} workbook export is invalid or exceeds 250 MB`);
+      }
+      return data;
+    });
     for (const [id, image] of extractWorkbookImages(bytes, new Map([[name, rows]]))) {
       if (!ids.has(id)) throw new Error(`${name} workbook image ${id} does not match a product ID`);
       if (!pageImages.has(id)) images.set(id, image);

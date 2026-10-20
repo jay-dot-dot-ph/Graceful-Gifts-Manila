@@ -32,17 +32,17 @@ jobs:
         if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'
       - run: npm run build:firebase
         if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'
-      - name: Check whether the built catalog changed
+      - name: Check whether the built site changed
         id: artifact_check
-        if: github.event_name == 'schedule' && steps.source_check.outputs.changed != 'false'
+        if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'
         run: node scripts/check-sheet-sync.mjs artifact
       - name: Keep one previous Hosting release
-        if: github.event_name != 'schedule' || steps.artifact_check.outputs.changed == 'true'
+        if: steps.artifact_check.outputs.changed == 'true'
         run: node scripts/set-hosting-retention.mjs --apply
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA }}'
       - uses: FirebaseExtended/action-hosting-deploy@v0
-        if: github.event_name != 'schedule' || steps.artifact_check.outputs.changed == 'true'
+        if: steps.artifact_check.outputs.changed == 'true'
         with:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA }}'
           projectId: graceful-gifts-manila

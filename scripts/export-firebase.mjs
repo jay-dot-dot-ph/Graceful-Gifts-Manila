@@ -4,6 +4,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { feedbackAssets } from './feedback-assets.mjs';
 import { loadPublicCatalog } from './public-catalog.mjs';
+import { writeSiteFingerprint } from './site-fingerprint.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, 'hosting-dist');
@@ -85,6 +86,7 @@ async function imagePool() {
 }
 await Promise.all(Array.from({ length: 8 }, imagePool));
 if (failures.length) throw new Error(`Image export failed for ${failures.length} watches: ${failures.slice(0, 12).join('; ')}`);
+for (const watch of catalog.watches) if (watch.localImage) watch.image = watch.localImage;
 setCatalogForBuild(catalog);
 
 const readRoute = async (path) => {
@@ -117,4 +119,6 @@ for (const watch of catalog.watches) {
 const escapeXml = (value) => value.replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&apos;' })[char]);
 const urls = ['/', '/watches', '/brands', '/favorites', '/contact', ...catalog.brands.map((brand) => `/watches/${brand.slug}`), ...catalog.watches.map((watch) => `/watch/${encodeURIComponent(watch.id)}`)];
 writeFileSync(join(output, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map((path) => `<url><loc>${escapeXml(origin + path)}</loc></url>`).join('')}</urlset>`);
+const { fingerprint } = writeSiteFingerprint(output);
 console.log(`Firebase export ready: ${catalog.watches.length} watches, ${imageWatches.length} images (${downloaded} downloaded, ${imageWatches.length - downloaded} cached), ${catalog.brands.length} brands.`);
+console.log(`Site fingerprint: ${fingerprint}`);
