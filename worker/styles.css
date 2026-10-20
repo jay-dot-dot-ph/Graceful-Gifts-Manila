@@ -190,3 +190,6 @@
 :root[data-theme=dark] .feedback-float button{background:#20241d;color:#f3efe6}
 :root[data-theme=dark] .data-warning{background:#493721;color:#fff0d8}
 @media(max-width:760px){:root[data-theme=dark] .hero{background:#181b15}:root[data-theme=dark] .hero-visual{background:#272b24}}
+.brands-more{display:flex;justify-content:center;margin-top:32px}
+.brands-more .button{min-width:230px}
+@media(max-width:760px){.brands-section .brand-tile:nth-child(n+5){display:none}.brands-more .button{width:100%}}
