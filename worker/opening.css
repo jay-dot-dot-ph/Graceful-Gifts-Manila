@@ -10,6 +10,9 @@ html:has(.opening-screen){overflow:hidden}
 .opening-mark{width:clamp(66px,8vw,88px);height:clamp(66px,8vw,88px);display:grid;place-items:center;border:1px solid #b99b6b;border-radius:50%;font-family:'Libre Caslon Display',Georgia,serif;font-size:clamp(2.5rem,5vw,3.3rem);color:#866b42;line-height:1}
 .opening-name{font-family:'DM Sans',Arial,sans-serif;font-size:clamp(.85rem,1.8vw,1.12rem);font-weight:700;letter-spacing:.23em;line-height:1.5;margin:25px 0 0}
 .opening-name span{display:block;font-size:.68em;letter-spacing:.42em;margin-top:3px}
+:root[data-theme=dark] .opening-screen{background:#151812 linear-gradient(112deg,#151812 0%,#1f231b 52%,#39372b 52%,#252820 100%);color:#f3efe6}
+:root[data-theme=dark] .opening-brand{background:#20241df2;border-color:#655d4b;box-shadow:0 12px 45px #0007}
+:root[data-theme=dark] .opening-mark{color:#e3bd82}
 .opening-rule{width:42px;height:1px;background:#b99b6b;margin:26px 0 21px}
 .opening-message{font-family:'Libre Caslon Display',Georgia,serif;font-size:clamp(1.1rem,2.5vw,1.45rem);color:#756b5d;margin:0}
 .opening-collage{position:absolute;inset:0;overflow:hidden;pointer-events:none}
