@@ -36,14 +36,22 @@ jobs:
         id: artifact_check
         if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'
         run: node scripts/check-sheet-sync.mjs artifact
-      - name: Keep one previous Hosting release
+      - name: Set minimum Hosting retention
+        id: retention
         if: steps.artifact_check.outputs.changed == 'true'
         run: node scripts/set-hosting-retention.mjs --apply
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA }}'
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      - id: deploy
+        uses: FirebaseExtended/action-hosting-deploy@v0
         if: steps.artifact_check.outputs.changed == 'true'
         with:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA }}'
           projectId: graceful-gifts-manila
           channelId: live
+      - name: Delete older Hosting versions
+        if: steps.deploy.outcome == 'success'
+        run: node scripts/cleanup-hosting-versions.mjs --apply
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA }}'
+          PREVIOUS_VERSION: '${{ steps.retention.outputs.previous_version }}'

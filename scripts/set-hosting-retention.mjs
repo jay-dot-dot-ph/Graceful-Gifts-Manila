@@ -1,4 +1,5 @@
 import { createSign } from 'node:crypto';
+import { appendFileSync } from 'node:fs';
 
 const site = 'graceful-gifts-manila';
 const channel = `sites/${site}/channels/live`;
@@ -33,6 +34,11 @@ const currentResponse = await fetch(url, { headers, signal: AbortSignal.timeout(
 if (!currentResponse.ok) throw new Error(`Could not read live Hosting channel: HTTP ${currentResponse.status}`);
 const current = await currentResponse.json();
 console.log(`Live Hosting channel currently retains ${current.retainedReleaseCount ?? 'an unspecified number of'} releases.`);
+const previousVersion = current.release?.version?.name;
+if (!previousVersion?.startsWith(`projects/${site}/sites/${site}/versions/`) && !previousVersion?.startsWith(`sites/${site}/versions/`)) {
+  throw new Error('Could not identify the current live Hosting version.');
+}
+if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `previous_version=${previousVersion}\n`);
 if (process.argv[2] !== '--apply') {
   console.log('Dry run only. Pass --apply to retain one previous release.');
   process.exit(0);
