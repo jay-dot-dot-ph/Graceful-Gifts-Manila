@@ -205,10 +205,10 @@ html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
 .admin-inbox-row {
   position: relative;
   display: grid;
-  gap: 4px;
+  gap: 2px;
   width: 100%;
-  min-height: 85px;
-  padding: 13px 15px;
+  min-height: 64px;
+  padding: 8px 12px;
   border: 0;
   border-bottom: 1px solid var(--admin-line);
   background: var(--admin-surface);
@@ -228,11 +228,11 @@ html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
   width: 3px;
   background: var(--admin-accent);
 }
-.admin-row-top { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.admin-row-top { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-left: 43px; }
 .guest-identity { min-width: 0; display: inline-flex; align-items: center; gap: 10px; }
 .guest-names { display: grid; min-width: 0; gap: 1px; }
 .guest-names strong, .guest-names small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.guest-names strong { font-size: .82rem; font-weight: 800; }
+.guest-names strong { font-size: .82rem; font-weight: 600; }
 .guest-names small { font-size: .68rem; color: var(--admin-muted); }
 .guest-avatar {
   width: 40px;
@@ -252,6 +252,7 @@ html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
 .guest-shape-1 { border-radius: 38% 62% 55% 45%; }
 .guest-shape-2 { border-radius: 46% 54% 35% 65%; }
 .guest-shape-3 { border-radius: 58% 42% 61% 39%; }
+.admin-inbox-row .guest-avatar { position: absolute; top: 50%; left: 12px; width: 34px; height: 34px; transform: translateY(-50%); font-size: .68rem; }
 .admin-row-top time {
   flex: none;
   max-width: 114px;
@@ -265,15 +266,17 @@ html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
   align-items: center;
   gap: 6px;
   min-width: 0;
-  margin-left: 50px;
+  margin-left: 43px;
   color: var(--admin-muted);
   font-size: .69rem;
 }
-.admin-row-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-row-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .admin-row-unread { width: 7px; height: 7px; flex: none; margin-left: auto; border-radius: 50%; background: var(--admin-accent); }
 .admin-row-meta em { font-style: normal; text-transform: capitalize; }
 .admin-row-meta em::after { content: '·'; margin-left: 6px; }
-.admin-inbox-row.unread .guest-names strong { color: var(--admin-ink); }
+.admin-inbox-row.unread .guest-names strong,
+.admin-inbox-row.unread .admin-row-preview { color: var(--admin-ink); font-weight: 800; }
+.admin-inbox-row.unread .admin-row-top time { color: var(--admin-ink); font-weight: 700; }
 .admin-more, .admin-thread-body > button {
   display: block;
   margin: 12px auto;
