@@ -10,13 +10,17 @@ export function createNotifier(kind, changed = () => {}) {
     if (!context || context.state !== 'running') { state = 'blocked'; report(); return false; }
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(720, context.currentTime);
-    oscillator.frequency.setValueAtTime(880, context.currentTime + .13);
+    // A square wave has more audible energy than a sine wave at the same full-scale peak.
+    oscillator.type = 'square'; oscillator.frequency.setValueAtTime(720, context.currentTime);
+    oscillator.frequency.setValueAtTime(880, context.currentTime + .23);
     gain.gain.setValueAtTime(.001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(.055, context.currentTime + .015);
-    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .25);
+    gain.gain.exponentialRampToValueAtTime(1, context.currentTime + .015);
+    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .17);
+    gain.gain.setValueAtTime(.001, context.currentTime + .21);
+    gain.gain.exponentialRampToValueAtTime(1, context.currentTime + .24);
+    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .48);
     oscillator.connect(gain).connect(context.destination);
-    oscillator.start(); oscillator.stop(context.currentTime + .26);
+    oscillator.start(); oscillator.stop(context.currentTime + .49);
     return true;
   };
   return {
