@@ -10,19 +10,34 @@ export function createNotifier(kind, changed = () => {}) {
     if (!context || context.state !== 'running') { state = 'blocked'; report(); return false; }
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    // A square wave has more audible energy than a sine wave at the same full-scale peak.
-    oscillator.type = 'square'; oscillator.frequency.setValueAtTime(720, context.currentTime);
-    oscillator.frequency.setValueAtTime(880, context.currentTime + .23);
+    oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(784, context.currentTime);
     gain.gain.setValueAtTime(.001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(1, context.currentTime + .015);
-    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .17);
-    gain.gain.setValueAtTime(.001, context.currentTime + .21);
-    gain.gain.exponentialRampToValueAtTime(1, context.currentTime + .24);
-    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .48);
+    gain.gain.exponentialRampToValueAtTime(1, context.currentTime + .012);
+    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .32);
     oscillator.connect(gain).connect(context.destination);
-    oscillator.start(); oscillator.stop(context.currentTime + .49);
+    oscillator.start(); oscillator.stop(context.currentTime + .33);
     return true;
   };
+  const unlock = async (testSound = false) => {
+    try {
+      context ||= new (window.AudioContext || window.webkitAudioContext)();
+      await context.resume();
+      if (context.state !== 'running') throw new Error('Audio is blocked');
+      state = 'on'; preferred = true;
+      try { localStorage.setItem(key, 'on'); } catch {}
+      if (testSound) tone();
+      report();
+    } catch { state = 'blocked'; report(); }
+  };
+  // Mobile browsers may suspend audio after a reload or when a tab is backgrounded.
+  // A later tap or key press can resume the saved preference with a fresh user gesture.
+  const resumeOnGesture = (event) => {
+    if (!preferred || event.target?.closest?.('[data-sound]')) return;
+    if (state !== 'on' || context?.state !== 'running') unlock();
+  };
+  document.addEventListener('pointerup', resumeOnGesture, true);
+  document.addEventListener('touchend', resumeOnGesture, { capture: true, passive: true });
+  document.addEventListener('keydown', resumeOnGesture, true);
   return {
     get state() { return state; },
     async toggle() {
@@ -30,13 +45,7 @@ export function createNotifier(kind, changed = () => {}) {
         state = 'off'; preferred = false; try { localStorage.setItem(key, 'off'); } catch {}
         await context?.suspend(); report(); return;
       }
-      try {
-        context ||= new (window.AudioContext || window.webkitAudioContext)();
-        await context.resume();
-        if (context.state !== 'running') throw new Error('Audio is blocked');
-        state = 'on'; preferred = true; try { localStorage.setItem(key, 'on'); } catch {}
-        tone(); report();
-      } catch { state = 'blocked'; report(); }
+      await unlock(true);
     },
     notify() { if (state === 'on' && document.visibilityState === 'visible') return tone(); return false; },
     label() { return state === 'on' ? 'Sounds on' : state === 'blocked' ? 'Sound blocked — tap to retry' : 'Enable sounds'; }
