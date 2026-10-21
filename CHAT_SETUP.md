@@ -10,13 +10,13 @@
 
 ## Production state and required setup
 
-**No website, Firestore rules, indexes, or Auth providers were deployed by this work.** During a Firebase CLI `--dry-run`, the CLI unexpectedly created the project's first/default Firestore database in the free-tier `nam5` location. Check it in Firebase Console. This is the only production project change made; do not create a second database. The dry run compiled the earlier rules revision, while the final rules were tested locally in the emulator.
+**Production state (October 21, 2026):** The default Firestore database exists in the free-tier `nam5` location. A Firebase CLI `--dry-run` unexpectedly created it during initial setup; do not create a second database. Anonymous and Email/Password Authentication are enabled, and the current email/password owner user has an active `staff/{uid}` profile. With the owner's approval, `firestore.rules` and `firestore.indexes.json` were deployed. The deployed rules match this repository, and the composite index is Ready. With the owner's later approval, Hosting was deployed to https://graceful-gifts-manila.web.app. The live catalog fingerprint matched the tested build, the browser catalog journey passed, a real anonymous chat opened with an attached watch, and the admin route required login. Production staff login and message exchange still require a manual check with the owner's private credentials.
 
-Complete these steps in [Firebase Console](https://console.firebase.google.com/project/graceful-gifts-manila/overview) before publishing the new site:
+Steps 1–5 are complete. Step 6 is the remaining owner action:
 
-1. **Firestore:** Open **Build → Firestore Database**. Confirm the `(default)` database exists in `nam5`. Keep it in **production/locked mode** until `firestore.rules` is deployed. Do not enter customer data before the rules are active.
-2. **Authentication:** Open **Build → Authentication → Sign-in method**. Enable **Anonymous** and **Email/Password**. Do not enable phone sign-in or Identity Platform unless you choose to use them.
-3. **Initial owner:** In Authentication **Users**, create your individual email/password user. Keep its password private. Copy its UID. In Firestore Console, create document `staff/{OWNER_UID}` with:
+1. **Firestore (complete):** The `(default)` database exists in `nam5`. The deployed rules replace the initial deny-all rules with customer and staff authorization.
+2. **Authentication (complete):** Anonymous and Email/Password providers are enabled. Phone sign-in and Identity Platform are not needed.
+3. **Initial owner (complete):** The current email/password Auth user's UID has a matching Firestore `staff/{OWNER_UID}` document with:
 
    | Field | Type | Value |
    | --- | --- | --- |
@@ -27,10 +27,10 @@ Complete these steps in [Firebase Console](https://console.firebase.google.com/p
    | `createdAt` | timestamp | Current time |
    | `createdBy` | string | `initial-setup` |
 
-   The Console writes this privileged bootstrap record. Public clients cannot create an owner. Rules prevent the only owner from being disabled, deleted, or changed through the dashboard. Keep Firebase Console access restricted to the actual owner.
-4. **Rules and index:** From this repository, after reviewing the files, run `firebase deploy --only firestore:rules,firestore:indexes --project graceful-gifts-manila`. Wait for the `assignedStaffUid` + `lastMessageAt` composite index to finish building in Firestore **Indexes**. The rules deployment must precede Hosting publication.
-5. **Staff onboarding:** In Authentication **Users**, create a separate email/password user for each staff member. Copy that user's UID. Sign in as owner at `/admin/staff`, enter the UID, name, email, and `staff` or `admin` role, and grant access. Deliver each person's own initial password through a private channel and ask them to change it. Staff creation in the dashboard grants access to an already created Auth user; it does not create Auth credentials. Disable a person in the owner dashboard to deny future protected Firestore operations immediately, even if their Auth session remains signed in.
-6. **Hosting:** Only after explicit approval to publish, run `npm ci`, `npm run build:firebase`, the tests below, and `firebase deploy --only hosting --project graceful-gifts-manila`. The existing GitHub Action automatically deploys pushes to `main`, so do not push the branch to `main` before approval and setup. A local Firebase CLI deployment is not necessary if you use the approved GitHub workflow.
+   The current owner profile was created through authenticated privileged project access after verifying the Auth UID. Public clients cannot create an owner. Rules prevent the only owner from being disabled, deleted, or changed through the dashboard. Keep Firebase Console access restricted to the actual owner.
+4. **Rules and index (complete):** `firebase deploy --only firestore:rules,firestore:indexes --project graceful-gifts-manila` completed successfully. The `assignedStaffUid` + `lastMessageAt` composite index reached **Ready** before Hosting publication.
+5. **Hosting (complete):** After explicit approval, `npm ci`, `npm run build:firebase`, and the tests below passed. `firebase deploy --only hosting --project graceful-gifts-manila` published the new site. The existing GitHub Action continues to refresh the catalog from the public Sheet.
+6. **Staff onboarding:** Create a separate email/password user for each staff member in Authentication **Users**. Copy that user's UID. Sign in as owner at `/admin/staff`, enter the UID, name, email, and `staff` or `admin` role, and grant access. Deliver each person's own initial password through a private channel and ask them to change it. Staff creation in the dashboard grants access to an already created Auth user; it does not create Auth credentials. Disable a person in the owner dashboard to deny future protected Firestore operations immediately, even if their Auth session remains signed in.
 
 Firebase Hosting supplies the public web app configuration through its [reserved init JSON URL](https://firebase.google.com/docs/hosting/reserved-urls). It contains identifiers, not administrator secrets. For a non-Hosting preview, use a gitignored `firebase-config.local.json`; the build copies it to `hosting-dist/firebase-config.json`. Never put administrator passwords, service-account JSON, private keys, or privileged tokens in that file. The client uses `/__/firebase/init.json` first on Hosting. The local emulator configuration is read only on `localhost` or `127.0.0.1`.
 

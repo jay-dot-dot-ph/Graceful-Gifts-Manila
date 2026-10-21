@@ -2,7 +2,7 @@
 
 Responsive watch showroom backed by the **2026 WATCHES - GRACE** Google Sheet. Customers browse the catalog, save favorites in their browser, and use built-in live chat to inquire. Staff use individual Firebase Authentication accounts at `/admin/chat`. There is no cart, checkout, or payment collection.
 
-**Chat deployment and owner setup:** [CHAT_SETUP.md](CHAT_SETUP.md). Do not push this change to `main` or deploy Hosting until the Firebase setup and Firestore rules are ready; the existing workflow deploys pushes to `main` automatically.
+**Chat deployment and owner setup:** [CHAT_SETUP.md](CHAT_SETUP.md). Authentication, owner setup, Firestore rules, the chat index, and Hosting are live. Staff onboarding is available to the owner at `/admin/staff`.
 
 Live website: https://graceful-gifts-manila.web.app
 
