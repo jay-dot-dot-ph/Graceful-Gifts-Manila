@@ -4,6 +4,8 @@ Responsive watch showroom backed by the **2026 WATCHES - GRACE** Google Sheet. C
 
 **Chat deployment and owner setup:** [CHAT_SETUP.md](CHAT_SETUP.md). Authentication, owner setup, Firestore rules, the chat index, and Hosting are live. Staff onboarding is available to the owner at `/admin/staff`.
 
+The Messenger-inspired chat UI and accurate message receipts are implemented locally and await separate production approval. See [CHAT_UI_UPGRADE.md](CHAT_UI_UPGRADE.md).
+
 Live website: https://graceful-gifts-manila.web.app
 
 ## Local preview

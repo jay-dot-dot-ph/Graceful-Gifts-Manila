@@ -14,6 +14,7 @@
     "test:search": "node scripts/search-qa.mjs",
     "test:opening": "node scripts/opening-qa.mjs",
     "test:chat-rules": "node scripts/chat-rules.mjs",
+    "test:chat-ui-unit": "node scripts/chat-presentation-unit.mjs",
     "test:chat-browser": "node scripts/chat-browser-qa.mjs"
   },
   "devDependencies": {
