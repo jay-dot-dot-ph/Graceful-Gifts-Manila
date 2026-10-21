@@ -346,6 +346,27 @@ html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
   border-top: 1px solid var(--admin-line);
 }
 .admin-refs > strong { color: var(--admin-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
+@media (min-width: 1151px) {
+  .admin-thread:has(.admin-refs) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(270px, 26%, 350px);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .admin-thread:has(.admin-refs) .admin-thread-head { grid-column: 1 / -1; grid-row: 1; }
+  .admin-thread:has(.admin-refs) .admin-thread-body { grid-column: 1; grid-row: 2; }
+  .admin-thread:has(.admin-refs) .admin-refs {
+    grid-column: 2;
+    grid-row: 2 / 4;
+    min-height: 0;
+    max-height: none;
+    padding: 20px 16px;
+    border-top: 0;
+    border-left: 1px solid var(--admin-line);
+    background: var(--admin-soft);
+  }
+  .admin-thread:has(.admin-refs) .admin-refs > strong { display: block; margin-bottom: 12px; }
+  .admin-thread:has(.admin-refs) #admin-reply { grid-column: 1; grid-row: 3; }
+}
 .admin-product {
   width: 100%;
   min-width: 0;

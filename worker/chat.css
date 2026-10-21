@@ -8,3 +8,6 @@
 .ggm-chat-head .chat-store-label{display:flex;flex:1;min-width:0;flex-direction:column;gap:2px}.ggm-chat-head .chat-store-label strong,.ggm-chat-head .chat-store-label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ggm-chat-head .chat-close{display:grid;place-items:center;padding:0;line-height:1}.ggm-chat-head .chat-sound{flex:none;font-size:.7rem;min-height:40px}
 @media(max-width:760px){.is-watch-detail .floating-chat{display:none}.ggm-chat-head{padding:max(10px,env(safe-area-inset-top)) 12px 10px;min-height:64px;box-sizing:border-box}.ggm-chat-head .chat-store-avatar{width:32px;height:32px}.ggm-chat-head strong{font-size:1rem}.ggm-chat-head .chat-sound{max-width:92px;white-space:normal;text-align:center;line-height:1.2}.ggm-chat-body{min-height:0;overflow-y:auto}.ggm-chat-form textarea,.ggm-chat-identity input{font-size:16px}}
+:root[data-theme=dark] .ggm-chat-bubble.outgoing{background:#57432a;border-color:#8b6e45;color:#fff7e8}
+:root[data-theme=dark] .ggm-chat-bubble.outgoing small,:root[data-theme=dark] .ggm-chat-bubble.outgoing .chat-receipt,:root[data-theme=dark] .ggm-chat-bubble.outgoing .chat-seen-avatar{color:#e7d8bd}
+:root[data-theme=dark] .ggm-chat-bubble.outgoing .chat-receipt button{color:#fff2d2}
