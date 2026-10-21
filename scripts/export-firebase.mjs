@@ -29,6 +29,11 @@ mkdirSync(join(output, 'images'), { recursive: true });
 mkdirSync(join(output, 'api'), { recursive: true });
 mkdirSync(join(output, 'watch'), { recursive: true });
 mkdirSync(join(output, 'feedback'), { recursive: true });
+const storeAvatar = join(root, 'chat', 'store-avatar.webp');
+if (existsSync(storeAvatar)) {
+  if (readFileSync(storeAvatar).length > 1_000_000) throw new Error('Store avatar must be under 1 MB.');
+  copyFileSync(storeAvatar, join(output, 'images', 'store-avatar.webp'));
+}
 for (const { path, bytes } of feedbackAssets(root)) writeFileSync(join(output, path), bytes);
 
 const imageWatches = catalog.watches.filter((watch) => watch.image || embeddedImages.has(watch.id));

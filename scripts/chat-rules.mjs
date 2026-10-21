@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, getDoc, collection, query, where, orderBy, limit, getDocs, runTransaction, updateDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { sendMessage } from '../chat/firebase.js';
+import { acknowledge, receiptRef, olderReceipts } from '../chat/receipts.js';
 
 const projectId = 'demo-graceful-gifts-manila';
 const environment = await initializeTestEnvironment({ projectId, firestore: { host: '127.0.0.1', port: 8080, rules: readFileSync('firestore.rules', 'utf8') } });
@@ -19,6 +20,18 @@ try {
   await assertSucceeds(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Is this watch available?', [{ id: 'AP-001', name: 'Royal Oak', brand: 'Audemars Piguet', price: 5950, image: '/images/AP-001-test.jpg', url: 'https://graceful-gifts-manila.web.app/watch/AP-001' }], { name: 'Test customer', contact: 'customer@example.com' }));
   assert.equal((await assertSucceeds(getDoc(doc(customer, 'conversations', 'customer-uid')))).data().status, 'new');
   assert.equal((await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().customerName, 'Test customer');
+  const firstMessageId = (await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessageId;
+  const first = { id: firstMessageId, senderUid: 'customer-uid', senderRole: 'customer' };
+  await assertFails(updateDoc(doc(owner, 'conversations', 'customer-uid'), { staffReadAt: serverTimestamp() }));
+  await assertFails(setDoc(receiptRef(customer, 'customer-uid', firstMessageId), { recipientUid: 'customer-uid', deliveredAt: serverTimestamp(), seenAt: serverTimestamp(), seenByUid: 'customer-uid' }));
+  await assertFails(acknowledge(otherStaff, 'customer-uid', first, 'other-staff-uid', true));
+  await assertFails(acknowledge(otherCustomer, 'customer-uid', first, 'other-customer-uid', true));
+  await assertFails(getDoc(receiptRef(environment.unauthenticatedContext().firestore(), 'customer-uid', firstMessageId)));
+  await assertSucceeds(acknowledge(owner, 'customer-uid', first, 'owner-uid'));
+  assert.equal((await getDoc(receiptRef(customer, 'customer-uid', firstMessageId))).data().seenAt, undefined);
+  await assertSucceeds(acknowledge(owner, 'customer-uid', first, 'owner-uid', true));
+  assert.equal((await olderReceipts(customer, 'customer-uid', [first])).get(firstMessageId).seenByUid, 'owner-uid');
+  await assertSucceeds(updateDoc(doc(owner, 'conversations', 'customer-uid'), { staffReadAt: serverTimestamp() }));
   await assertFails(getDoc(doc(otherCustomer, 'conversations', 'customer-uid')));
   await assertFails(getDoc(doc(staff, 'conversations', 'customer-uid')));
   await assertSucceeds(getDoc(doc(admin, 'conversations', 'customer-uid')));
@@ -49,17 +62,29 @@ try {
   await assertSucceeds(getDocs(query(collection(owner, 'auditLogs'), orderBy('createdAt', 'desc'))));
   await assertSucceeds(sendMessage(staff, 'customer-uid', 'staff-uid', 'staff', 'It is available.'));
   assert.equal((await assertSucceeds(getDoc(doc(customer, 'conversations', 'customer-uid')))).data().lastMessage, 'It is available.');
+  const replyId = (await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessageId;
+  const staffReply = { id: replyId, senderUid: 'staff-uid', senderRole: 'staff' };
+  await assertFails(updateDoc(doc(customer, 'conversations', 'customer-uid'), { customerReadAt: serverTimestamp() }));
+  await assertFails(setDoc(receiptRef(staff, 'customer-uid', replyId), { recipientUid: 'staff-uid', deliveredAt: serverTimestamp(), seenAt: serverTimestamp(), seenByUid: 'staff-uid' }));
+  await assertSucceeds(acknowledge(customer, 'customer-uid', staffReply, 'customer-uid'));
+  await assertSucceeds(acknowledge(customer, 'customer-uid', staffReply, 'customer-uid', true));
+  await assertSucceeds(updateDoc(doc(customer, 'conversations', 'customer-uid'), { customerReadAt: serverTimestamp() }));
   await environment.withSecurityRulesDisabled(async (context) => {
     await updateDoc(doc(context.firestore(), 'conversations', 'customer-uid'), { productReferences: [{ id: 'AP-001', name: 'Royal Oak', brand: 'Audemars Piguet', price: 5950, image: '/images/AP-001-test.jpg', url: 'https://graceful-gifts-manila.web.app/watch/AP-001', size: '42mm', stock: 20 }] });
   });
   await new Promise((resolve) => setTimeout(resolve, 3100));
   await assertSucceeds(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Can I ask about this watch again?'));
+  const finalCustomerMessageId = (await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessageId;
   await assertSucceeds(updateDoc(doc(owner, 'staff', 'staff-uid'), { active: false }));
   await assertFails(sendMessage(staff, 'customer-uid', 'staff-uid', 'staff', 'I should be disabled.'));
+  await assertFails(acknowledge(staff, 'customer-uid', { id: finalCustomerMessageId, senderUid: 'customer-uid', senderRole: 'customer' }, 'staff-uid', true));
   await assertFails(updateDoc(doc(owner, 'staff', 'owner-uid'), { active: false }));
   await assertFails(updateDoc(doc(admin, 'staff', 'other-staff-uid'), { role: 'admin' }));
   await assertSucceeds(setDoc(doc(owner, 'settings', 'chat'), { staffSoundEnabled: true, updatedAt: serverTimestamp() }));
   await assertSucceeds(getDoc(doc(admin, 'settings', 'chat')));
+  await assertSucceeds(getDoc(doc(customer, 'settings', 'chat')));
+  await assertSucceeds(updateDoc(doc(owner, 'settings', 'chat'), { storeAvatarUrl: '/images/store-avatar.webp', updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(owner, 'settings', 'chat'), { storeAvatarUrl: 'https://untrusted.example/photo.png', updatedAt: serverTimestamp() }));
   await assertFails(updateDoc(doc(staff, 'settings', 'chat'), { staffSoundEnabled: false }));
   console.log('Firestore rules passed: customer isolation, inquiry, assignment, staff scope, role protection, rate limit, and revocation.');
 } finally { await environment.cleanup(); }

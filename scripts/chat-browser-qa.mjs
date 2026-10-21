@@ -40,12 +40,15 @@ try {
   await customer.locator('.inquiry-button').click();
   await customer.locator('.ggm-chat.is-open').waitFor();
   await customer.locator('.ggm-chat-products .chat-product').waitFor();
+  await customer.locator('.ggm-chat [data-sound]').click();
+  assert.equal(await customer.locator('.ggm-chat [data-sound]').getAttribute('aria-pressed'), 'true', 'Customer sound unlocks from click');
   assert.match(await customer.locator('.ggm-chat-products').innerText(), /AP-001/);
   await customer.locator('.ggm-chat-identity [name=name]').fill('Test customer');
   await customer.locator('.ggm-chat-identity [name=contact]').fill('customer@example.com');
   await customer.locator('#ggm-chat-message').fill('Is AP-001 available?');
   await customer.locator('.ggm-chat-form button').click();
   await customer.getByText('Is AP-001 available?').waitFor();
+  await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').last().getByText('Sent').waitFor();
   await customer.locator('.ggm-chat-form button:not([disabled])').waitFor();
   let persisted = false;
   for (let attempt = 0; attempt < 30 && !persisted; attempt++) {
@@ -59,6 +62,10 @@ try {
   await customer.setViewportSize({ width: 390, height: 844 });
   const mobileChat = await customer.locator('.ggm-chat.is-open').boundingBox();
   assert.ok(mobileChat.width <= 390 && mobileChat.x >= 0 && mobileChat.y >= 0, 'Chat fits the mobile viewport');
+  assert.ok(await customer.locator('#ggm-chat-message').evaluate((node) => parseFloat(getComputedStyle(node).fontSize) >= 16), 'Phone composer avoids iOS focus zoom');
+  assert.ok(await customer.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Phone page has no horizontal overflow');
+  await customer.locator('#ggm-chat-message').fill('A draft that must survive a real-time update');
+  await customer.locator('#ggm-chat-message').focus();
   await customer.evaluate(() => localStorage.setItem('ggm-favorites', JSON.stringify(['AP-001', 'AP-002'])));
   await customer.goto(base + '/favorites');
   await customer.locator('[data-select-all]').click();
@@ -75,16 +82,43 @@ try {
   await login(owner, ownerEmail);
   await owner.getByText('Test customer').first().waitFor();
   await owner.getByText('Are these favorites available?').first().waitFor();
+  await owner.locator('.admin-inbox-link[aria-label="Inbox, 1 unread"]').waitFor();
+  await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').last().getByText('Delivered').waitFor();
+  await owner.locator('[data-sound]').click();
+  assert.equal(await owner.locator('[data-sound]').getAttribute('aria-pressed'), 'true', 'Staff sound unlocks from click');
+  await customer.waitForTimeout(3100);
+  await customer.locator('#ggm-chat-message').fill('A second question while this inbox is unread.');
+  await customer.locator('.ggm-chat-form button').click();
+  await owner.getByText('A second question while this inbox is unread.').first().waitFor();
+  await owner.locator('.admin-inbox-link[aria-label="Inbox, 1 unread"]').waitFor();
+  await owner.locator('.admin-notice').getByText('New customer message').waitFor();
   await owner.locator('.admin-inbox-row').first().click();
+  await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').last().getByText('Seen').waitFor();
+  await customer.locator('.chat-seen-avatar').last().waitFor();
+  await owner.locator('.admin-inbox-link[aria-label="Inbox, 0 unread"]').waitFor();
+  await owner.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await owner.locator('.admin-thread').isVisible(), 'Mobile thread is visible after selection');
+  assert.ok(await owner.locator('#admin-message').evaluate((node) => parseFloat(getComputedStyle(node).fontSize) >= 16), 'Mobile staff composer avoids focus zoom');
+  const mobileThread = await owner.locator('.admin-thread').boundingBox();
+  assert.ok(mobileThread.width <= 390 && mobileThread.x >= 0, 'Mobile admin thread fits viewport');
+  await owner.setViewportSize({ width: 1280, height: 720 });
+  await customer.locator('[data-chat-close]').click();
+  await customer.evaluate(() => Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }));
   await owner.locator('#admin-message').fill('Yes, AP-001 is available.');
   await owner.locator('#admin-reply button').click();
   try { await owner.locator('#admin-thread-body').getByText('Yes, AP-001 is available.').waitFor({ timeout: 5000 }); }
   catch (error) { let saved = []; await environment.withSecurityRulesDisabled(async (context) => { const conversation = (await getDocs(collection(context.firestore(), 'conversations'))).docs[0]; if (conversation) saved = (await getDocs(collection(context.firestore(), 'conversations', conversation.id, 'messages'))).docs.map((item) => item.data().message); }); console.error('Owner reply diagnosis:', await owner.locator('.admin-thread').innerText(), await owner.locator('.admin-toast').allInnerTexts(), 'draft:', await owner.locator('#admin-message').inputValue(), 'disabled:', await owner.locator('#admin-reply button').isDisabled(), 'saved:', saved); throw error; }
+  await owner.locator('.admin-message.staff .chat-receipt').last().getByText('Sent').waitFor();
+  await customer.evaluate(() => { delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange')); });
+  await owner.locator('.admin-message.staff .chat-receipt').last().getByText('Delivered').waitFor();
+  await customer.locator('[data-open-chat]').click();
   await customer.getByText('Yes, AP-001 is available.').waitFor();
+  await owner.locator('.admin-message.staff .chat-receipt').last().getByText('Seen').waitFor();
   await customer.locator('[data-chat-close]').click();
   await owner.locator('#admin-message').fill('We can also show similar watches.');
   await owner.locator('#admin-reply button').click();
   await owner.locator('#admin-thread-body').getByText('We can also show similar watches.').waitFor();
+  await customer.locator('#ggm-chat-notice:not([hidden])').waitFor();
   await customer.reload();
   await customer.locator('[data-chat-badge]:not([hidden])').waitFor();
   await customer.locator('[data-open-chat]').click();
@@ -92,7 +126,12 @@ try {
   await customer.waitForFunction(() => document.querySelector('[data-chat-badge]')?.hidden === true);
   await owner.goto(base + '/admin/staff');
   await owner.locator('#staff-form').waitFor();
-  await owner.locator('#staff-sound').check();
+  await customer.waitForTimeout(3100);
+  await customer.locator('#ggm-chat-message').fill('Can staff see this new question?');
+  await customer.locator('.ggm-chat-form button').click();
+  await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').last().getByText('Sent').waitFor();
+  await owner.locator('.admin-inbox-link[aria-label="Inbox, 1 unread"]').waitFor();
+  await owner.locator('#store-avatar').fill('');
   await owner.locator('#staff-form input[name=uid]').fill(staffUid);
   await owner.locator('#staff-form input[name=name]').fill('Sales staff');
   await owner.locator('#staff-form input[name=email]').fill(staffEmail);
@@ -133,5 +172,5 @@ try {
   await staff.reload();
   await staff.getByText(/no active staff access|Access denied/i).waitFor();
   assert.deepEqual(errors, []);
-  console.log('Chat browser QA passed: product and Favorites inquiries, history, refresh unread badge, owner and staff replies, staff creation, assignment, and revocation.');
+  console.log('Chat browser QA passed: cross-client Sent/Delivered/Seen, hidden-tab delivery guard, repeated unread alerts, staff-page badge, sound unlock, mobile customer/admin layout, product and Favorites inquiries, history, owner/staff replies, assignment, and revocation.');
 } finally { await browser.close(); await environment.cleanup(); }

@@ -53,16 +53,27 @@ export const safeProduct = (watch) => ({
   brand: String(watch.brand || '').slice(0, 80),
   price: watch.price == null ? null : Number(watch.price),
   image: String(watch.image || '').slice(0, 300),
-  url: String(watch.url || '').slice(0, 300)
+  url: String(watch.url || '').slice(0, 300),
+  ...(typeof watch.size === 'string' && watch.size.trim() ? { size: watch.size.trim().slice(0, 40) } : {})
 });
 
-export async function sendMessage(db, conversationId, uid, role, text, products = [], identity = {}) {
+export function newMessageId(db, conversationId) { return doc(collection(db, 'conversations', conversationId, 'messages')).id; }
+
+export async function sendMessage(db, conversationId, uid, role, text, products = [], identity = {}, messageId = newMessageId(db, conversationId)) {
   const body = messageText(text);
   if (!body) throw new Error('Write a message first.');
   const conversation = doc(db, 'conversations', conversationId);
-  const message = doc(collection(conversation, 'messages'));
+  if (!/^[A-Za-z0-9]{20}$/.test(messageId)) throw new Error('Invalid message ID.');
+  const message = doc(collection(conversation, 'messages'), messageId);
   await runTransaction(db, async (tx) => {
     const snapshot = await tx.get(conversation);
+    if (snapshot.exists()) {
+      const previous = await tx.get(message);
+      if (previous.exists()) {
+        if (previous.data().senderUid !== uid || previous.data().message !== body) throw new Error('Message ID already used.');
+        return;
+      }
+    }
     const now = serverTimestamp();
     const base = {
       lastMessage: body, lastMessageAt: now, lastMessageId: message.id,

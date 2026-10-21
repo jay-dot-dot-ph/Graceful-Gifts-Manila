@@ -15,15 +15,23 @@ service cloud.firestore {
     function validMessageLink(id, data) { return data.lastMessageId is string && data.lastMessageId.size() == 20 && getAfter(/databases/$(database)/documents/conversations/$(id)/messages/$(data.lastMessageId)).data.message == data.lastMessage; }
     function validSummary(id, data) { return data.lastMessage is string && data.lastMessage.size() > 0 && data.lastMessage.size() <= 2000 && data.lastMessageAt == request.time && data.updatedAt == request.time && data.lastSenderUid == request.auth.uid && validMessageLink(id, data); }
     function validAuditLink(id, action, oldValue, newValue) { return request.resource.data.lastAuditId is string && request.resource.data.lastAuditId.size() == 20 && getAfter(/databases/$(database)/documents/auditLogs/$(request.resource.data.lastAuditId)).data == { 'action': action, 'conversationId': id, 'actorUid': request.auth.uid, 'oldValue': oldValue, 'newValue': newValue, 'createdAt': request.time }; }
+    function conversationFor(id) { return get(/databases/$(database)/documents/conversations/$(id)).data; }
+    function messageFor(id, mid) { return get(/databases/$(database)/documents/conversations/$(id)/messages/$(mid)).data; }
+    function mayAcknowledge(id, mid) {
+      return signed() && messageFor(id, mid).senderUid != request.auth.uid &&
+        ((customer() && conversationFor(id).customerUid == request.auth.uid && messageFor(id, mid).senderRole != 'customer') ||
+        (messageFor(id, mid).senderRole == 'customer' && canHandle(conversationFor(id))));
+    }
+    function latestSeen(id) { return get(/databases/$(database)/documents/conversations/$(id)/receipts/$(resource.data.lastMessageId)).data.seenAt != null; }
 
     match /conversations/{conversationId} {
       allow get: if customer() && conversationId == request.auth.uid || signed() && resource != null && canReadConversation(resource.data);
       allow list: if signed() && canReadConversation(resource.data);
       allow create: if customer() && conversationId == request.auth.uid && request.resource.data.keys().hasOnly(['customerUid','customerName','customerContact','assignedStaffUid','status','createdAt','customerReadAt','staffReadAt','productReferences','lastMessage','lastMessageAt','lastMessageId','lastSenderUid','lastSenderRole','updatedAt']) && request.resource.data.customerUid == request.auth.uid && request.resource.data.customerName is string && request.resource.data.customerName.size() <= 80 && request.resource.data.customerContact is string && request.resource.data.customerContact.size() <= 120 && request.resource.data.assignedStaffUid == null && request.resource.data.status == 'new' && request.resource.data.createdAt == request.time && request.resource.data.customerReadAt == request.time && request.resource.data.staffReadAt == null && request.resource.data.lastSenderRole == 'customer' && validProducts(request.resource.data.productReferences) && validSummary(conversationId, request.resource.data);
       allow update: if signed() && (
-        (customer() && resource.data.customerUid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerReadAt']) && request.resource.data.customerReadAt == request.time) ||
+        (customer() && resource.data.customerUid == request.auth.uid && resource.data.lastSenderRole != 'customer' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerReadAt']) && request.resource.data.customerReadAt == request.time && latestSeen(conversationId)) ||
         (customer() && resource.data.customerUid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage','lastMessageAt','lastMessageId','lastSenderUid','lastSenderRole','updatedAt','customerReadAt','productReferences']) && request.resource.data.lastMessageId != resource.data.lastMessageId && request.resource.data.lastSenderRole == 'customer' && request.resource.data.customerReadAt == request.time && validProducts(request.resource.data.productReferences) && (resource.data.lastMessageAt + duration.value(3, 's') <= request.time) && validSummary(conversationId, request.resource.data)) ||
-        (canHandle(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['staffReadAt']) && request.resource.data.staffReadAt == request.time) ||
+        (canHandle(resource.data) && resource.data.lastSenderRole == 'customer' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['staffReadAt']) && request.resource.data.staffReadAt == request.time && latestSeen(conversationId)) ||
         (canHandle(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage','lastMessageAt','lastMessageId','lastSenderUid','lastSenderRole','updatedAt','staffReadAt']) && request.resource.data.lastMessageId != resource.data.lastMessageId && request.resource.data.lastSenderRole == staffData().role && request.resource.data.staffReadAt == request.time && validSummary(conversationId, request.resource.data)) ||
         (canHandle(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt','lastAuditId']) && request.resource.data.status in ['new','open','pending','resolved'] && request.resource.data.status != resource.data.status && request.resource.data.updatedAt == request.time && validAuditLink(conversationId, 'status', resource.data.status, request.resource.data.status)) ||
         (manager() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedStaffUid','updatedAt','lastAuditId']) && request.resource.data.assignedStaffUid != resource.data.assignedStaffUid && request.resource.data.updatedAt == request.time && validAuditLink(conversationId, 'assignment', resource.data.assignedStaffUid, request.resource.data.assignedStaffUid) && (request.resource.data.assignedStaffUid == null || (exists(staffPath(request.resource.data.assignedStaffUid)) && get(staffPath(request.resource.data.assignedStaffUid)).data.active == true && get(staffPath(request.resource.data.assignedStaffUid)).data.role in ['staff','admin'])))
@@ -33,6 +41,12 @@ service cloud.firestore {
         allow get, list: if signed() && canReadConversation(get(/databases/$(database)/documents/conversations/$(conversationId)).data);
         allow create: if signed() && request.resource.data.keys().hasOnly(['senderUid','senderRole','message','createdAt','productReferences']) && request.resource.data.senderUid == request.auth.uid && request.resource.data.message is string && request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 2000 && request.resource.data.createdAt == request.time && validProducts(request.resource.data.productReferences) && (customer() && request.resource.data.senderRole == 'customer' && getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.customerUid == request.auth.uid || canHandle(get(/databases/$(database)/documents/conversations/$(conversationId)).data) && request.resource.data.senderRole == staffData().role) && getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.lastMessageId == messageId && getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.lastMessage == request.resource.data.message && getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.lastMessageAt == request.time;
         allow update, delete: if false;
+      }
+      match /receipts/{messageId} {
+        allow get, list: if signed() && canReadConversation(conversationFor(conversationId));
+        allow create: if messageId.matches('^[A-Za-z0-9]{20}$') && mayAcknowledge(conversationId, messageId) && request.resource.data.keys().hasOnly(['recipientUid','deliveredAt','seenAt','seenByUid']) && request.resource.data.recipientUid == request.auth.uid && request.resource.data.deliveredAt == request.time && (request.resource.data.get('seenAt', null) == null && request.resource.data.get('seenByUid', null) == null || request.resource.data.seenAt == request.time && request.resource.data.seenByUid == request.auth.uid);
+        allow update: if mayAcknowledge(conversationId, messageId) && resource.data.get('seenAt', null) == null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenAt','seenByUid']) && request.resource.data.seenAt == request.time && request.resource.data.seenByUid == request.auth.uid;
+        allow delete: if false;
       }
     }
     match /staff/{uid} {
@@ -47,9 +61,9 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     match /settings/{settingId} {
-      allow get: if settingId == 'chat' && staff();
+      allow get: if settingId == 'chat' && (staff() || customer());
       allow list: if false;
-      allow create, update: if settingId == 'chat' && owner() && request.resource.data.keys().hasOnly(['staffSoundEnabled','updatedAt']) && request.resource.data.staffSoundEnabled is bool && request.resource.data.updatedAt == request.time;
+      allow create, update: if settingId == 'chat' && owner() && request.resource.data.keys().hasOnly(['staffSoundEnabled','storeAvatarUrl','updatedAt']) && request.resource.data.staffSoundEnabled is bool && request.resource.data.get('storeAvatarUrl', '') is string && (request.resource.data.get('storeAvatarUrl', '') == '' || request.resource.data.storeAvatarUrl.matches('^/images/[A-Za-z0-9._-]+$')) && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
     match /{document=**} { allow read, write: if false; }
