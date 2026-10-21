@@ -146,13 +146,8 @@ function brandsPage() {
 function catalogPage() {
   const brand = catalog.brands.find((item) => item.slug === filters.brand);
   document.title = `${brand ? brand.name + ' watches' : 'Watches'} | Graceful Gifts Manila`;
-  app.innerHTML = nav('Watches') + `<main><section class="page-heading catalog-heading"><div class="container catalog-container"><p class="eyebrow">THE COLLECTION</p><h1>${brand ? esc(brand.name) + ' watches' : 'Explore the collection'}</h1></div></section><section class="container catalog-container brand-list-section" id="brands">${brandTiles(catalog.brands, undefined, 'catalog-brand-grid')}<button class="brand-toggle" type="button" data-brand-toggle aria-controls="catalog-brand-grid" aria-expanded="false">See more brands</button></section><section class="container catalog-container catalog-layout"><aside class="filters" id="filters-panel">${filterForm()}</aside><div class="catalog-main"><div class="catalog-toolbar"><label class="search-field"><span aria-hidden="true">⌕</span><input id="catalog-search" type="search" placeholder="Search brand, model, Watch ID…" value="${esc(filters.query)}" aria-label="Search watches"></label><button class="mobile-filter-button" type="button" data-open-filters>Filter & sort <span>☷</span></button><label class="sort-control">Sort by <select id="catalog-sort"><option value="newest">Newest</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="brand">Brand: A–Z</option></select></label></div><div class="catalog-count"><span id="result-count"></span><span>Prices in Philippine pesos</span></div><div id="catalog-results"></div></div></section></main><div class="filter-backdrop" data-close-filters></div>` + footer();
+  app.innerHTML = nav('Watches') + `<main><section class="page-heading catalog-heading"><div class="container catalog-container"><p class="eyebrow">THE COLLECTION</p><h1>${brand ? esc(brand.name) + ' watches' : 'Explore the collection'}</h1></div></section><section class="container catalog-container catalog-layout"><aside class="filters" id="filters-panel">${filterForm()}</aside><div class="catalog-main"><div class="catalog-toolbar"><label class="search-field"><span aria-hidden="true">⌕</span><input id="catalog-search" type="search" placeholder="Search brand, model, Watch ID…" value="${esc(filters.query)}" aria-label="Search watches"></label><button class="mobile-filter-button" type="button" data-open-filters>Filter & sort <span>☷</span></button><label class="sort-control">Sort by <select id="catalog-sort"><option value="newest">Newest</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="brand">Brand: A–Z</option></select></label></div><div class="catalog-count"><span id="result-count"></span><span>Prices in Philippine pesos</span></div><div id="catalog-results"></div></div></section></main><div class="filter-backdrop" data-close-filters></div>` + footer();
   document.getElementById('catalog-sort').value = filters.sort;
-  document.querySelector('[data-brand-toggle]').addEventListener('click', (event) => {
-    const expanded = document.getElementById('brands').classList.toggle('expanded');
-    event.currentTarget.setAttribute('aria-expanded', String(expanded));
-    event.currentTarget.textContent = expanded ? 'See fewer brands' : 'See more brands';
-  });
   document.getElementById('catalog-search').addEventListener('input', (event) => { filters.query = event.target.value; shown = 24; updateResults(); });
   document.getElementById('catalog-sort').addEventListener('change', (event) => { filters.sort = event.target.value; shown = 24; updateResults(); });
   document.querySelectorAll('[data-filter]').forEach((field) => field.addEventListener('input', (event) => {
@@ -378,8 +373,7 @@ function routeState() {
   return {
     scrollY: window.scrollY,
     filters: { ...filters },
-    shown,
-    brandsExpanded: document.getElementById('brands')?.classList.contains('expanded') || false
+    shown
   };
 }
 function saveRouteState() {
@@ -445,7 +439,6 @@ window.addEventListener('popstate', (event) => {
   if (state?.filters) filters = { ...state.filters };
   if (Number.isInteger(state?.shown)) shown = state.shown;
   renderRoute();
-  if (state?.brandsExpanded && path.startsWith('/watches')) document.querySelector('[data-brand-toggle]')?.click();
   jumpTo(state?.scrollY || 0);
 });
 document.addEventListener('click', async (event) => {
