@@ -97,6 +97,7 @@ try {
   await owner.locator('.admin-inbox-row').first().click();
   await customer.waitForFunction(() => [...document.querySelectorAll('.ggm-chat-bubble.outgoing .chat-receipt')].at(-1)?.textContent.trim() === 'Seen');
   await owner.screenshot({ path: '.sites-runtime/chat-admin-desktop.png' });
+  await customer.locator('[data-chat-close]').click();
   await owner.setViewportSize({ width: 390, height: 844 });
   const mobileInbox = await owner.locator('.admin-thread').boundingBox();
   assert.ok(mobileInbox && mobileInbox.width <= 390 && mobileInbox.x >= 0, 'Admin thread fits a mobile screen');
@@ -109,7 +110,12 @@ try {
   await owner.locator('#admin-reply button').click();
   try { await owner.locator('#admin-thread-body').getByText('Yes, AP-001 is available.').waitFor({ timeout: 5000 }); }
   catch (error) { let saved = []; await environment.withSecurityRulesDisabled(async (context) => { const conversation = (await getDocs(collection(context.firestore(), 'conversations'))).docs[0]; if (conversation) saved = (await getDocs(collection(context.firestore(), 'conversations', conversation.id, 'messages'))).docs.map((item) => item.data().message); }); console.error('Owner reply diagnosis:', await owner.locator('.admin-thread').innerText(), await owner.locator('.admin-toast').allInnerTexts(), 'draft:', await owner.locator('#admin-message').inputValue(), 'disabled:', await owner.locator('#admin-reply button').isDisabled(), 'saved:', saved); throw error; }
-  await customer.locator('#ggm-chat-body').getByText('Yes, AP-001 is available.').waitFor();
+  await owner.locator('#admin-message').fill('We can provide more details.');
+  await owner.locator('#admin-reply button').click();
+  await owner.locator('#admin-thread-body').getByText('We can provide more details.').waitFor();
+  await owner.waitForFunction(() => [...document.querySelectorAll('.admin-message.staff')].filter((row) => row.textContent.includes('Yes, AP-001 is available.') || row.textContent.includes('We can provide more details.')).every((row) => row.querySelector('.chat-receipt')?.textContent.trim() === 'Delivered'));
+  await customer.locator('[data-open-chat]').click();
+  await customer.locator('#ggm-chat-body').getByText('We can provide more details.').waitFor();
   await owner.waitForFunction(() => [...document.querySelectorAll('.admin-message.staff .chat-receipt')].at(-1)?.textContent.trim() === 'Seen');
   await customer.locator('[data-chat-close]').click();
   await customer.evaluate(() => Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }));

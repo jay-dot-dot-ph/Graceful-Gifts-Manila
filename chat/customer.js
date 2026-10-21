@@ -1,7 +1,7 @@
 import { customerSession, doc, collection, query, orderBy, limit, startAfter, getDocs, onSnapshot, sendMessage, newMessageId, acknowledgeMessage, displayError, safeProduct } from './firebase.js';
 import { escapeHtml as esc, watchCard, receiptLabel, isVisibleInThread, bindBrokenImages } from './presentation.js';
 
-const state = { open: false, products: [], messages: [], older: [], first: null, unsubConversation: null, unsubMessages: null, loading: false, synced: false, sending: false, draft: '', name: '', contact: '', error: '', conversation: null, pending: null };
+const state = { open: false, products: [], messages: [], older: [], first: null, unsubConversation: null, unsubMessages: null, loading: false, synced: false, messagesSynced: false, sending: false, draft: '', name: '', contact: '', error: '', conversation: null, pending: null };
 let connectionPromise;
 const time = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Now';
 const day = (value) => value?.toDate ? value.toDate().toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'Today';
@@ -45,10 +45,19 @@ function render() {
 }
 
 function scheduleSeen() {
-  if (!state.open || document.visibilityState !== 'visible' || !document.hasFocus()) return;
+  if (!state.open || !state.messagesSynced || document.visibilityState !== 'visible' || !document.hasFocus()) return;
   const body = document.getElementById('ggm-chat-body');
   for (const element of body?.querySelectorAll('.ggm-chat-bubble.incoming') || []) {
     if (isVisibleInThread(element, body)) customerSession().then(({ db, user }) => acknowledgeMessage(db, user.uid, element.dataset.messageId, user.uid, true)).catch(() => {});
+  }
+}
+
+function acknowledgeLoadedReplies(db, uid) {
+  if (!state.messagesSynced || document.visibilityState !== 'visible') return;
+  for (const item of [...state.older, ...state.messages]) {
+    if (item.senderRole !== 'customer' && item.senderUid !== uid && !item.deliveredAt && !item.metadata?.hasPendingWrites) {
+      acknowledgeMessage(db, uid, item.id, uid).catch(() => {});
+    }
   }
 }
 
@@ -56,16 +65,17 @@ async function connect() {
   const { db, user } = await customerSession();
   const ref = doc(db, 'conversations', user.uid);
   state.unsubConversation?.(); state.unsubMessages?.();
-  state.unsubConversation = onSnapshot(ref, (snapshot) => {
+  state.unsubConversation = onSnapshot(ref, { includeMetadataChanges: true }, (snapshot) => {
     state.synced = !snapshot.metadata.fromCache;
     state.conversation = snapshot.exists() ? snapshot.data() : null;
-    if (snapshot.exists() && !state.unsubMessages) state.unsubMessages = onSnapshot(query(collection(ref, 'messages'), orderBy('createdAt', 'desc'), limit(40)), (messages) => {
+    if (snapshot.exists() && !state.unsubMessages) state.unsubMessages = onSnapshot(query(collection(ref, 'messages'), orderBy('createdAt', 'desc'), limit(40)), { includeMetadataChanges: true }, (messages) => {
+      state.messagesSynced = !messages.metadata.fromCache;
       state.first = messages.docs.length === 40 ? messages.docs.at(-1) : null;
       state.messages = messages.docs.map((item) => ({ id: item.id, ...item.data(), metadata: item.metadata })).reverse();
       if (state.pending && state.messages.some((item) => item.id === state.pending.id)) state.pending = null;
-      state.loading = false; render();
+      state.loading = false; render(); acknowledgeLoadedReplies(db, user.uid);
     }, (error) => { state.loading = false; state.error = displayError(error); render(); });
-    if (snapshot.exists() && !snapshot.metadata.fromCache && document.visibilityState === 'visible' && snapshot.data().lastSenderRole !== 'customer' && (!snapshot.data().customerReadAt || snapshot.data().lastMessageAt?.toMillis() > snapshot.data().customerReadAt?.toMillis())) acknowledgeMessage(db, user.uid, snapshot.data().lastMessageId, user.uid).catch(() => {});
+    if (snapshot.exists() && !snapshot.metadata.fromCache && document.visibilityState === 'visible' && snapshot.data().lastSenderRole !== 'customer') acknowledgeMessage(db, user.uid, snapshot.data().lastMessageId, user.uid).catch(() => {});
     if (!snapshot.exists()) state.loading = false;
     render();
   }, (error) => { state.loading = false; state.error = displayError(error); render(); });
@@ -79,7 +89,7 @@ function ensureConnected() {
 
 async function loadOlder() {
   if (!state.first) return;
-  try { const { db, user } = await customerSession(); const snapshot = await getDocs(query(collection(db, 'conversations', user.uid, 'messages'), orderBy('createdAt', 'desc'), startAfter(state.first), limit(40))); state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; state.older = [...snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).reverse(), ...state.older]; render(); }
+  try { const { db, user } = await customerSession(); const snapshot = await getDocs(query(collection(db, 'conversations', user.uid, 'messages'), orderBy('createdAt', 'desc'), startAfter(state.first), limit(40))); state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; state.older = [...snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).reverse(), ...state.older]; render(); acknowledgeLoadedReplies(db, user.uid); }
   catch (error) { state.error = displayError(error); render(); }
 }
 
@@ -120,6 +130,6 @@ document.addEventListener('ggm:route', render);
 document.addEventListener('visibilitychange', () => {
   scheduleSeen();
   const last = state.conversation;
-  if (document.visibilityState === 'visible' && state.synced && last?.lastSenderRole !== 'customer' && last?.lastMessageId && (!last.customerReadAt || last.lastMessageAt?.toMillis() > last.customerReadAt?.toMillis())) customerSession().then(({ db, user }) => acknowledgeMessage(db, user.uid, last.lastMessageId, user.uid)).catch(() => {});
+  if (document.visibilityState === 'visible' && state.synced && last?.lastSenderRole !== 'customer' && last?.lastMessageId) customerSession().then(({ db, user }) => { acknowledgeMessage(db, user.uid, last.lastMessageId, user.uid).catch(() => {}); acknowledgeLoadedReplies(db, user.uid); }).catch(() => {});
 });
 window.addEventListener('focus', scheduleSeen);

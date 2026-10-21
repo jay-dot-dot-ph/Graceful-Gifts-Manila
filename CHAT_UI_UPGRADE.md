@@ -1,6 +1,6 @@
-# Chat UI and message receipts (local implementation)
+# Chat UI and message receipts
 
-This upgrade is **not deployed**. The live site continues to use its previous chat until the owner explicitly approves a production release. It changes only the existing chat, admin inbox, product inquiry snapshot, Firestore rules, and their tests. The Google Sheets catalog adapter and scheduled refresh are unchanged.
+The chat UI and receipt rules are live. The October 21 receipt follow-up handles cached listener confirmation and acknowledges each received message in the loaded thread, including consecutive staff replies while the customer chat is minimized. It changes only the chat clients and their browser test; the Firestore rules and Google Sheets catalog adapter are unchanged.
 
 ## Receipt meanings
 
@@ -42,11 +42,11 @@ npm run test:opening
 
 Run the rules and chat browser tests against the emulator only. Do not put emulator configuration into a production build.
 
-## Production release after owner approval
+## Production release
 
 1. Review the diff and verify that `hosting-dist/firebase-config.json` is `{}` for Firebase Hosting. Hosting uses its reserved `/__/firebase/init.json` web configuration.
-2. Deploy `firestore.rules` first with `firebase deploy --only firestore:rules --project graceful-gifts-manila`. The existing index file is unchanged.
-3. Build and verify the Hosting artifact, then deploy Hosting. A push to `main` also triggers the existing automatic Hosting workflow, so do not push to `main` before approval.
+2. If Firestore rules change, deploy `firestore.rules` first with `firebase deploy --only firestore:rules --project graceful-gifts-manila`. This receipt follow-up does not change rules or indexes.
+3. Build and verify the Hosting artifact, then deploy Hosting. A push to `main` triggers the existing automatic Hosting workflow.
 4. Test a customer inquiry, owner reply, inbox-only Delivered, visible-thread Seen, staff assignment, and a mobile chat on the live site. Use real accounts without sharing passwords or service-account keys.
 
 There is no Firebase Console setting to add for this upgrade. Authentication providers, the owner account, and Firestore already exist.

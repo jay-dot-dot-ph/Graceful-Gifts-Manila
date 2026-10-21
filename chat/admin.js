@@ -4,7 +4,7 @@ import { watchCard, receiptLabel, isVisibleInThread, bindBrokenImages } from './
 const root = document.getElementById('admin-app');
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const stamp = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Just now';
-const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false }, rows: [], selected: null, threadReady: false, messages: [], older: [], first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', loading: true, unread: 0, inboxInitialized: false, inboxSynced: false, replyDraft: '', replySending: false, pendingReply: null, mobileThread: false, staffCreating: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
+const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', loading: true, unread: 0, inboxInitialized: false, inboxSynced: false, replyDraft: '', replySending: false, pendingReply: null, mobileThread: false, staffCreating: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
 const deliveredAttempts = new Set();
 function cleanup() { for (const key of ['unsubInbox', 'unsubSelected', 'unsubMessages', 'unsubProfile', 'unsubStaff', 'unsubActivity', 'unsubSettings']) { state[key]?.(); state[key] = null; } }
 function playAlert() { try { const context = new AudioContext(); const oscillator = context.createOscillator(); const gain = context.createGain(); oscillator.frequency.value = 740; gain.gain.value = 0.025; oscillator.connect(gain).connect(context.destination); oscillator.start(); oscillator.stop(context.currentTime + 0.12); oscillator.onended = () => context.close(); } catch {} }
@@ -79,13 +79,21 @@ function decorateChat(selected) {
   bindBrokenImages(layout);
 }
 function scheduleStaffSeen() {
-  if (!state.selected || document.visibilityState !== 'visible' || !document.hasFocus()) return;
+  if (!state.selected || !state.threadSynced || document.visibilityState !== 'visible' || !document.hasFocus()) return;
   const body = root.querySelector('#admin-thread-body');
   for (const element of body?.querySelectorAll('.admin-message.customer') || []) {
     if (isVisibleInThread(element, body)) firebase().then(({ db }) => acknowledgeMessage(db, state.selected, element.dataset.messageId, state.user.uid, true)).catch(() => {});
   }
 }
-document.addEventListener('visibilitychange', () => { scheduleStaffSeen(); if (document.visibilityState === 'visible' && state.inboxSynced && state.page === 'chat') firebase().then(({ db }) => acknowledgeInboxRows(db, state.rows)).catch(() => {}); });
+function acknowledgeLoadedCustomerMessages(db) {
+  if (!state.selected || !state.threadSynced || document.visibilityState !== 'visible' || state.page !== 'chat') return;
+  for (const item of [...state.older, ...state.messages]) {
+    if (item.senderRole === 'customer' && !item.deliveredAt && !item.metadata?.hasPendingWrites) {
+      acknowledgeMessage(db, state.selected, item.id, state.user.uid).catch(() => {});
+    }
+  }
+}
+document.addEventListener('visibilitychange', () => { scheduleStaffSeen(); if (document.visibilityState === 'visible' && state.page === 'chat') firebase().then(({ db }) => { if (state.inboxSynced) acknowledgeInboxRows(db, state.rows); acknowledgeLoadedCustomerMessages(db); }).catch(() => {}); });
 window.addEventListener('focus', scheduleStaffSeen);
 
 function renderStaff() {
@@ -113,9 +121,9 @@ function acknowledgeInboxRows(db, rows) {
   if (document.visibilityState !== 'visible' || state.page !== 'chat') return;
   for (const item of rows) {
     const key = `${item.id}/${item.lastMessageId}`;
-    if (item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()) && !deliveredAttempts.has(key)) {
+    if (item.lastSenderRole === 'customer' && !deliveredAttempts.has(key)) {
       deliveredAttempts.add(key);
-      acknowledgeMessage(db, item.id, item.lastMessageId, state.user.uid).catch(() => deliveredAttempts.delete(key));
+      acknowledgeMessage(db, item.id, item.lastMessageId, state.user.uid).then((found) => { if (!found) deliveredAttempts.delete(key); }).catch(() => deliveredAttempts.delete(key));
     }
   }
 }
@@ -124,10 +132,10 @@ function subscribeInbox(db) {
   state.inboxInitialized = false;
   const base = collection(db, 'conversations');
   const inbox = state.profile.role === 'staff' ? query(base, where('assignedStaffUid', '==', state.user.uid), orderBy('lastMessageAt', 'desc'), limit(50)) : query(base, orderBy('lastMessageAt', 'desc'), limit(50));
-  state.unsubInbox = onSnapshot(inbox, (snapshot) => {
+  state.unsubInbox = onSnapshot(inbox, { includeMetadataChanges: true }, (snapshot) => {
     state.rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })); state.cursor = snapshot.docs.at(-1) || null; state.more = snapshot.docs.length === 50;
     state.inboxSynced = !snapshot.metadata.fromCache;
-    if (state.inboxSynced) acknowledgeInboxRows(db, snapshot.docChanges().map((change) => ({ id: change.doc.id, ...change.doc.data() })));
+    if (state.inboxSynced) acknowledgeInboxRows(db, state.rows);
     const previousUnread = state.unread;
     state.unread = state.rows.filter((item) => item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis())).length;
     if (state.inboxInitialized && state.unread > previousUnread && state.settings.staffSoundEnabled) playAlert();
@@ -141,13 +149,13 @@ async function loadMore() {
   try { const { db } = await firebase(); const base = collection(db, 'conversations'); const q = state.profile.role === 'staff' ? query(base, where('assignedStaffUid', '==', state.user.uid), orderBy('lastMessageAt', 'desc'), startAfter(state.cursor), limit(50)) : query(base, orderBy('lastMessageAt', 'desc'), startAfter(state.cursor), limit(50)); const snapshot = await getDocs(q); state.rows = [...state.rows, ...snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))]; state.cursor = snapshot.docs.at(-1) || null; state.more = snapshot.docs.length === 50; render(); } catch (error) { state.error = displayError(error); render(); }
 }
 async function selectConversation(id) {
-  const { db } = await firebase(); state.selected = id; state.mobileThread = true; state.threadReady = false; state.messages = []; state.older = []; state.first = null; state.replyDraft = ''; state.unsubSelected?.(); state.unsubMessages?.();
+  const { db } = await firebase(); state.selected = id; state.mobileThread = true; state.threadReady = false; state.threadSynced = false; state.messages = []; state.older = []; state.first = null; state.replyDraft = ''; state.unsubSelected?.(); state.unsubMessages?.();
   const ref = doc(db, 'conversations', id);
   state.unsubSelected = onSnapshot(ref, (snapshot) => { if (!snapshot.exists()) { state.selected = null; } else { const data = snapshot.data(); state.rows = state.rows.map((item) => item.id === id ? { id, ...data } : item); } render(); }, (error) => { state.error = displayError(error); render(); });
-  state.unsubMessages = onSnapshot(query(collection(ref, 'messages'), orderBy('createdAt', 'desc'), limit(40)), (snapshot) => { state.messages = snapshot.docs.map((item) => ({ id: item.id, ...item.data(), metadata: item.metadata })).reverse(); if (state.pendingReply && state.messages.some((item) => item.id === state.pendingReply.id)) state.pendingReply = null; state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; state.threadReady = true; render(); }, (error) => { state.error = displayError(error); render(); });
+  state.unsubMessages = onSnapshot(query(collection(ref, 'messages'), orderBy('createdAt', 'desc'), limit(40)), { includeMetadataChanges: true }, (snapshot) => { state.threadSynced = !snapshot.metadata.fromCache; state.messages = snapshot.docs.map((item) => ({ id: item.id, ...item.data(), metadata: item.metadata })).reverse(); if (state.pendingReply && state.messages.some((item) => item.id === state.pendingReply.id)) state.pendingReply = null; state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; state.threadReady = true; render(); acknowledgeLoadedCustomerMessages(db); }, (error) => { state.error = displayError(error); render(); });
   render();
 }
-async function loadOlder() { if (!state.first || !state.selected) return; try { const { db } = await firebase(); const snapshot = await getDocs(query(collection(db, 'conversations', state.selected, 'messages'), orderBy('createdAt', 'desc'), startAfter(state.first), limit(40))); state.older = [...snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).reverse(), ...state.older]; state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; render(); } catch (error) { state.error = displayError(error); render(); } }
+async function loadOlder() { if (!state.first || !state.selected) return; try { const { db } = await firebase(); const snapshot = await getDocs(query(collection(db, 'conversations', state.selected, 'messages'), orderBy('createdAt', 'desc'), startAfter(state.first), limit(40))); state.older = [...snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).reverse(), ...state.older]; state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; render(); acknowledgeLoadedCustomerMessages(db); } catch (error) { state.error = displayError(error); render(); } }
 async function retryReply() {
   if (!state.pendingReply || state.replySending) return;
   state.replySending = true; state.pendingReply.failed = false; state.pendingReply.pending = true; state.error = ''; render();

@@ -113,10 +113,13 @@ export async function acknowledgeMessage(db, conversationId, messageId, uid, see
     const message = doc(collection(conversation, 'messages'), messageId);
     let advanceReadAt = false;
     let senderRole;
+    let available = false;
     await runTransaction(db, async (tx) => {
       advanceReadAt = false;
+      available = false;
       const [parent, item] = await Promise.all([tx.get(conversation), tx.get(message)]);
       if (!parent.exists() || !item.exists() || item.data().senderUid === uid) return;
+      available = true;
       const data = item.data();
       senderRole = data.senderRole;
       const update = {};
@@ -125,11 +128,13 @@ export async function acknowledgeMessage(db, conversationId, messageId, uid, see
       if (Object.keys(update).length) tx.update(message, update);
       advanceReadAt = seen && parent.data().lastMessageId === messageId;
     });
+    if (!available) { receiptAttempts.delete(key); return false; }
     if (advanceReadAt) await runTransaction(db, async (tx) => {
       const parent = await tx.get(conversation);
       if (!parent.exists() || parent.data().lastMessageId !== messageId) return;
       const field = senderRole === 'customer' ? 'staffReadAt' : 'customerReadAt';
       if (!parent.data()[field] || parent.data().lastMessageAt.toMillis() > parent.data()[field].toMillis()) tx.update(conversation, { [field]: serverTimestamp() });
     });
-  } catch (error) { receiptAttempts.delete(key); throw error; }
+    return true;
+  } catch (error) { receiptAttempts.delete(key); console.warn('Chat receipt could not be saved:', error?.code || error?.message || 'unknown error'); throw error; }
 }
