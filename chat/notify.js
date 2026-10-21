@@ -13,9 +13,10 @@ export function createNotifier(kind, changed = () => {}) {
     oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(784, context.currentTime);
     gain.gain.setValueAtTime(.001, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(1, context.currentTime + .012);
-    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .32);
+    gain.gain.setValueAtTime(1, context.currentTime + .28);
+    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .40);
     oscillator.connect(gain).connect(context.destination);
-    oscillator.start(); oscillator.stop(context.currentTime + .33);
+    oscillator.start(); oscillator.stop(context.currentTime + .41);
     return true;
   };
   const unlock = async (testSound = false) => {
