@@ -90,6 +90,9 @@ try {
   await page.locator('[data-filter="availability"]').selectOption('soldout');
   assert.ok(Number((await page.locator('#result-count').innerText()).split(' ')[0]) > 0);
   assert.match(await page.locator('.watch-card').first().innerText(), /Sold out/i);
+  assert.equal(await page.locator('.watch-card.is-sold-out .image-badge').first().innerText(), 'SOLD OUT');
+  assert.match(await page.locator('.watch-card.is-sold-out .soldout-image-message').first().innerText(), /THIS ITEM IS CURRENTLY\s+UNAVAILABLE/i);
+  assert.equal(await page.locator('.watch-card.is-sold-out .was-price').first().evaluate((price) => getComputedStyle(price).textDecorationLine), 'line-through');
   await page.locator('[data-clear]').first().click();
   await page.locator('#catalog-sort').selectOption('price-asc');
   const firstPrices = await page.locator('.watch-card .card-bottom strong').allInnerTexts();
@@ -132,6 +135,7 @@ try {
   await page.goto(`${base}/watch/${soldOut.id}`);
   await page.locator('.detail-copy h1').waitFor({ timeout: 30000 });
   assert.match(await page.locator('.detail-stock').innerText(), /Sold out/i);
+  assert.match(await page.locator('.soldout-notice').innerText(), /This item is currently unavailable/i);
   await page.locator('.inquiry-button').click();
   await page.locator('.inquiry-button.copied').waitFor({ timeout: 5000 });
   assert.match(await page.evaluate(() => navigator.clipboard.readText()), /currently sold out/);

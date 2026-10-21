@@ -193,3 +193,25 @@
 .brands-more{display:flex;justify-content:center;margin-top:32px}
 .brands-more .button{min-width:230px}
 @media(max-width:760px){.brands-section .brand-tile:nth-child(n+5){display:none}.brands-more .button{width:100%}}
+
+/* Make unavailable watches unmistakable while keeping their details accessible. */
+.is-sold-out .card-image>a{position:relative}
+.is-sold-out .card-image>a::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(17,16,14,.28),rgba(17,16,14,.6));pointer-events:none}
+.is-sold-out .card-image img{filter:saturate(.72)}
+.is-sold-out .heart{z-index:3}
+.is-sold-out .image-badge{z-index:2;top:16px;left:0;padding:10px 20px;background:linear-gradient(110deg,#9d7949,#c6a370);box-shadow:0 5px 14px #0003;color:#fff;font-size:.62rem;font-weight:700;letter-spacing:.24em}
+.soldout-image-message{position:absolute;z-index:2;top:68%;left:50%;width:90%;transform:translate(-50%,-50%);pointer-events:none;text-align:center;color:#fff;text-shadow:0 2px 9px #0009}
+.soldout-image-message strong{display:block;font-family:var(--serif);font-size:clamp(1.5rem,2vw,2.35rem);font-weight:400;line-height:1.05;letter-spacing:.035em}
+.soldout-image-message small{display:block;margin-top:9px;font-size:.63rem;font-weight:700;line-height:1.55;letter-spacing:.2em}
+.is-sold-out .card-bottom .was-price{color:#888780;text-decoration:line-through;text-decoration-thickness:1px}
+.soldout-notice{display:flex;align-items:center;gap:22px;margin-top:28px;padding:22px 24px;border:1px solid #e8dfd0;border-radius:6px;background:#f8f3ea}
+.soldout-notice-icon{display:grid;place-items:center;flex:none;width:38px;height:38px;border:1px solid #9d7845;border-radius:50%;color:#906a38;font-family:var(--serif);font-size:1.4rem;line-height:1}
+.soldout-notice>div{padding-left:20px;border-left:1px solid #dfd0b7}
+.soldout-notice strong{font-family:var(--serif);font-size:1.2rem;font-weight:400}
+.soldout-notice p{margin:5px 0 0;color:#827b71;font-size:.75rem;line-height:1.5}
+:root[data-theme=dark] .is-sold-out .card-bottom .was-price{color:#a9a59a}
+:root[data-theme=dark] .soldout-notice{background:#252820;border-color:#50503f}
+:root[data-theme=dark] .soldout-notice>div{border-color:#5a5546}
+:root[data-theme=dark] .soldout-notice strong{color:#f3eadb}
+:root[data-theme=dark] .soldout-notice p{color:#c8c0b1}
+@media(max-width:760px){.soldout-notice{gap:14px;padding:18px}.soldout-notice>div{padding-left:14px}.soldout-image-message{top:61%}.soldout-image-message strong{font-size:clamp(1.15rem,5vw,1.5rem)}.soldout-image-message small{margin-top:5px;font-size:.48rem;letter-spacing:.1em}}
