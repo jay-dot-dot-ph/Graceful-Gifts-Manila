@@ -269,6 +269,7 @@ function detailPage(watch) {
   const specs = [['Size', watch.size], ['Category', watch.category], ['Dial color', watch.dialColor], ['Case material', watch.caseMaterial], ['Strap material', watch.strapMaterial], ['Movement', watch.movement]].filter(([, value]) => value);
   const related = catalog.watches.filter((item) => item.id !== watch.id && item.brandSlug === watch.brandSlug).slice(0, 4);
   const inquiryLabel = watch.stock === 0 ? 'Ask about this watch' : 'Message to inquire';
+  const inquiryIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-8 8 8.7 8.7 0 0 1-3.5-.7L4 20l1.3-4A8 8 0 1 1 20 11.5Z"/><path d="M8 12h8"/></svg>';
   app.innerHTML = nav('Watches') + `
     <main class="container detail-page">
       <div class="detail-topline"><button class="detail-back" type="button" data-detail-back="${esc(watch.brandSlug)}"><span aria-hidden="true">←</span> Back to watches</button></div>
@@ -280,7 +281,7 @@ function detailPage(watch) {
           <p class="watch-id">Watch ID: ${esc(watch.id)}</p>
           <div class="detail-price-row"><div class="detail-price">${money(watch.price)}</div><div class="detail-stock ${watch.stock === 0 ? 'soldout' : ''}"><span class="stock-dot"></span>${stockText(watch)}</div></div>
           ${watch.stock === 0 ? `<div class="soldout-notice" role="status"><span class="soldout-notice-icon" aria-hidden="true">!</span><div><strong>This item is currently unavailable.</strong><p>Check back later for restocks or explore more watches from ${esc(watch.brand)} and other brands.</p></div></div>` : ''}
-          <div class="detail-actions"><button class="button button-dark inquiry-button" type="button" data-inquire="${esc(watch.id)}">${inquiryLabel} <span>↗</span></button><button class="button button-outline favorite-detail ${favorites.has(watch.id) ? 'saved' : ''}" type="button" data-favorite="${esc(watch.id)}">${favorites.has(watch.id) ? '♥ Saved' : '♡ Favorite'}</button></div>
+          <div class="detail-actions"><button class="button button-dark inquiry-button" type="button" data-inquire="${esc(watch.id)}">${inquiryIcon}<span>${inquiryLabel}</span></button><button class="button button-outline favorite-detail ${favorites.has(watch.id) ? 'saved' : ''}" type="button" data-favorite="${esc(watch.id)}">${favorites.has(watch.id) ? '♥ Saved' : '♡ Favorite'}</button></div>
           <p class="inquiry-note">Ask us here and return to this browser to see our reply.</p>
           <button class="share-link" type="button" data-share="${esc(watch.id)}">Copy link ↗</button>
         </div>
@@ -288,7 +289,7 @@ function detailPage(watch) {
       ${specs.length ? `<section class="specs-section"><h2>Specifications</h2><dl class="specs-grid">${specs.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl></section>` : ''}
       ${related.length ? `<section class="related-section">${sectionHead('', 'More from ' + esc(watch.brand), '/watches/' + watch.brandSlug, 'View all')}<div class="watch-grid">${related.map(card).join('')}</div></section>` : ''}
     </main>
-    <div class="mobile-inquiry-bar"><span>${watch.stock === 0 ? 'SOLD OUT' : money(watch.price)}</span><button type="button" data-inquire="${esc(watch.id)}">${inquiryLabel} ↗</button></div>` + footer();
+    <div class="mobile-inquiry-bar"><span>${watch.stock === 0 ? 'SOLD OUT' : money(watch.price)}</span><button type="button" data-inquire="${esc(watch.id)}">${inquiryIcon}<span>${inquiryLabel}</span></button></div>` + footer();
   afterRender();
   setupDetailZoom();
 }
@@ -332,7 +333,7 @@ async function copyText(text) {
 async function handleInquiry(button, watches) {
   if (!watches.length && button?.hasAttribute('data-inquire')) { notice('Watch not found.'); return; }
   if (watches.length > 8) { notice('Select up to 8 watches for one inquiry.'); return; }
-  const products = watches.map((watch) => ({ id: watch.id, name: watchName(watch), brand: watch.brand, price: watch.price, image: watch.localImage || '', url: 'https://graceful-gifts-manila.web.app/watch/' + encodeURIComponent(watch.id), ...(watch.size ? { size: watch.size } : {}) }));
+  const products = watches.map((watch) => ({ id: watch.id, name: watchName(watch), brand: watch.brand, price: watch.price, image: watch.localImage || '', url: 'https://graceful-gifts-manila.web.app/watch/' + encodeURIComponent(watch.id), ...(watch.size ? { size: watch.size } : {}), ...(Number.isInteger(watch.stock) && watch.stock >= 0 ? { stock: watch.stock } : {}) }));
   try { const { openChat } = await import('/chat.js'); await openChat(products); }
   catch (error) { notice(error?.message || 'Chat is unavailable right now. Please try again.'); }
 }

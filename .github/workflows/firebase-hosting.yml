@@ -32,6 +32,8 @@ jobs:
         if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'
       - run: npm run build:firebase
         if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'
+        env:
+          GGM_FCM_VAPID_PUBLIC_KEY: '${{ secrets.GGM_FCM_VAPID_PUBLIC_KEY }}'
       - name: Check whether the built site changed
         id: artifact_check
         if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'

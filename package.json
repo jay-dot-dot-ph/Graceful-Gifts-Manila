@@ -14,7 +14,8 @@
     "test:search": "node scripts/search-qa.mjs",
     "test:opening": "node scripts/opening-qa.mjs",
     "test:chat-rules": "node scripts/chat-rules.mjs",
-    "test:chat-browser": "node scripts/chat-browser-qa.mjs"
+    "test:chat-browser": "node scripts/chat-browser-qa.mjs",
+    "test:push-worker": "node scripts/push-worker-qa.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",

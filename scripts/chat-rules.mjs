@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, getDoc, collection, query, where, orderBy, limit, getDocs, runTransaction, updateDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, orderBy, limit, getDocs, runTransaction, updateDoc, serverTimestamp, setDoc, deleteDoc } from 'firebase/firestore';
 import { sendMessage } from '../chat/firebase.js';
 import { acknowledge, receiptRef, olderReceipts } from '../chat/receipts.js';
 
@@ -77,6 +77,7 @@ try {
   const finalCustomerMessageId = (await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessageId;
   await assertSucceeds(updateDoc(doc(owner, 'staff', 'staff-uid'), { active: false }));
   await assertFails(sendMessage(staff, 'customer-uid', 'staff-uid', 'staff', 'I should be disabled.'));
+  await assertFails(setDoc(doc(staff, 'staff', 'staff-uid', 'pushTokens', 'c'.repeat(40)), { token: 't'.repeat(80), createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
   await assertFails(acknowledge(staff, 'customer-uid', { id: finalCustomerMessageId, senderUid: 'customer-uid', senderRole: 'customer' }, 'staff-uid', true));
   await assertFails(updateDoc(doc(owner, 'staff', 'owner-uid'), { active: false }));
   await assertFails(updateDoc(doc(admin, 'staff', 'other-staff-uid'), { role: 'admin' }));
@@ -86,5 +87,12 @@ try {
   await assertSucceeds(updateDoc(doc(owner, 'settings', 'chat'), { storeAvatarUrl: '/images/store-avatar.webp', updatedAt: serverTimestamp() }));
   await assertFails(updateDoc(doc(owner, 'settings', 'chat'), { storeAvatarUrl: 'https://untrusted.example/photo.png', updatedAt: serverTimestamp() }));
   await assertFails(updateDoc(doc(staff, 'settings', 'chat'), { staffSoundEnabled: false }));
-  console.log('Firestore rules passed: customer isolation, inquiry, assignment, staff scope, role protection, rate limit, and revocation.');
+  const tokenRef = doc(owner, 'staff', 'owner-uid', 'pushTokens', 'a'.repeat(40));
+  await assertSucceeds(setDoc(tokenRef, { token: 't'.repeat(80), createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+  await assertSucceeds(getDoc(tokenRef));
+  await assertFails(getDoc(doc(admin, 'staff', 'owner-uid', 'pushTokens', 'a'.repeat(40))));
+  await assertFails(setDoc(doc(customer, 'staff', 'owner-uid', 'pushTokens', 'b'.repeat(40)), { token: 't'.repeat(80), createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(tokenRef, { token: 'replaced' }));
+  await assertSucceeds(deleteDoc(tokenRef));
+  console.log('Firestore rules passed: customer isolation, inquiry, assignment, staff scope, role protection, rate limit, revocation, and private push tokens.');
 } finally { await environment.cleanup(); }

@@ -20,6 +20,8 @@
       { "source": "/app.js", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/admin.html", "headers": [{ "key": "Cache-Control", "value": "private, no-store" }] },
       { "source": "/firebase-config.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] },
+      { "source": "/push-config.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] },
+      { "source": "/firebase-messaging-sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }, { "key": "Service-Worker-Allowed", "value": "/" }] },
       { "source": "/styles.css", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/watches", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },

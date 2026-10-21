@@ -1,8 +1,8 @@
 // Each browser/device must unlock Web Audio from its own user gesture.
 export function createNotifier(kind, changed = () => {}) {
   const key = `ggm-chat-sound-${kind}`;
-  let preferred = false;
-  try { preferred = localStorage.getItem(key) === 'on'; } catch {}
+  let preferred = true;
+  try { preferred = localStorage.getItem(key) !== 'off'; } catch {}
   let context = null;
   let state = preferred ? 'enable' : 'off';
   const report = () => { changed(state); return state; };
@@ -40,14 +40,15 @@ export function createNotifier(kind, changed = () => {}) {
   document.addEventListener('keydown', resumeOnGesture, true);
   return {
     get state() { return state; },
+    get enabled() { return preferred; },
     async toggle() {
-      if (state === 'on') {
+      if (preferred) {
         state = 'off'; preferred = false; try { localStorage.setItem(key, 'off'); } catch {}
         await context?.suspend(); report(); return;
       }
       await unlock(true);
     },
     notify() { if (state === 'on' && document.visibilityState === 'visible') return tone(); return false; },
-    label() { return state === 'on' ? 'Sounds on' : state === 'blocked' ? 'Sound blocked — tap to retry' : 'Enable sounds'; }
+    label() { return preferred ? 'Mute sounds' : 'Unmute sounds'; }
   };
 }

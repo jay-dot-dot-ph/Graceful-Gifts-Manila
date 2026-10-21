@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import { parseCsv, normalizeRows, getCatalog, setCatalogForBuild } from '../worker/index.js';
 import { extractSheetImages, getPublicSourceFingerprint, loadPublicCatalog, SHEET_ID, BRAND_TABS } from './public-catalog.mjs';
 import { extractWorkbookImages } from './xlsx-images.mjs';
+import { guestIdentity } from '../chat/guest.js';
+
+assert.deepEqual(guestIdentity('anonymous-customer-123'), guestIdentity('anonymous-customer-123'));
+assert.notEqual(guestIdentity('anonymous-customer-123').reference, guestIdentity('another-customer-456').reference);
+assert.equal(guestIdentity('anonymous-customer-123', 'Maria').label, 'Maria');
+assert.ok(!guestIdentity('anonymous-customer-123').reference.includes('anonymous-customer-123'));
 
 function storedZip(entries) {
   const locals = [], central = [];

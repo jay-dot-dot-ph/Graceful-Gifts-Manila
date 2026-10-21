@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, connectAuthEmulator, setPersistence, browserLocalPersistence, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, updateDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
 let services;
 export async function firebase() {
@@ -23,7 +23,7 @@ export async function firebase() {
     connectFirestoreEmulator(db, '127.0.0.1', 8080);
   }
   await setPersistence(auth, browserLocalPersistence);
-  services = { auth, db };
+  services = { app, auth, db };
   return services;
 }
 
@@ -35,7 +35,7 @@ export async function customerSession() {
   return { ...services, user: services.auth.currentUser };
 }
 
-export { signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, updateDoc, setDoc };
+export { signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, updateDoc, setDoc, deleteDoc };
 
 export function displayError(error) {
   const code = error?.code || '';
@@ -54,7 +54,8 @@ export const safeProduct = (watch) => ({
   price: watch.price == null ? null : Number(watch.price),
   image: String(watch.image || '').slice(0, 300),
   url: String(watch.url || '').slice(0, 300),
-  ...(typeof watch.size === 'string' && watch.size.trim() ? { size: watch.size.trim().slice(0, 40) } : {})
+  ...(typeof watch.size === 'string' && watch.size.trim() ? { size: watch.size.trim().slice(0, 40) } : {}),
+  ...(Number.isInteger(watch.stock) && watch.stock >= 0 ? { stock: watch.stock } : {})
 });
 
 export function newMessageId(db, conversationId) { return doc(collection(db, 'conversations', conversationId, 'messages')).id; }

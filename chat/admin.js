@@ -1,26 +1,62 @@
 import { firebase, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, updateDoc, setDoc, serverTimestamp, sendMessage, newMessageId, displayError } from './firebase.js';
 import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } from './receipts.js';
 import { createNotifier } from './notify.js';
+import { guestIdentity } from './guest.js';
+import { enablePush, refreshPush, revokePush, pushEnabled, pushAvailable } from './push.js';
 
 const root = document.getElementById('admin-app');
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const stamp = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Just now';
-const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), replyDraft: '', replySending: false, pendingReply: null, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
+const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
 const sound = createNotifier('staff', () => updateHeader());
-let noticeTimer;
-function cleanup() { for (const key of ['unsubInbox', 'unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubProfile', 'unsubStaff', 'unsubActivity', 'unsubSettings']) { state[key]?.(); state[key] = null; } }
+let noticeTimer, deepLinkHandled = false;
+function cleanup() { if (previewDialog?.open) previewDialog.close(); for (const key of ['unsubInbox', 'unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubProfile', 'unsubStaff', 'unsubActivity', 'unsubSettings']) { state[key]?.(); state[key] = null; } }
 function profileName(uid) { return state.staff.find((person) => person.id === uid)?.displayName || (uid ? 'Staff member' : 'Unassigned'); }
-function product(product) { if (!/^[A-Z0-9-]{2,20}$/.test(product.id || '')) return ''; const image = /^\/images\/[A-Za-z0-9._-]+$/.test(product.image || '') ? product.image : ''; const detail = [product.id, product.brand, product.price == null ? 'Price on request' : `₱${Number(product.price).toLocaleString('en-PH')}`, product.size || ''].filter(Boolean).join(' · '); return `<a class="admin-product" href="/watch/${encodeURIComponent(product.id)}" target="_blank" rel="noopener"><span class="chat-watch-photo">${image ? `<img src="${esc(image)}" alt="${esc(product.name || product.id)}" loading="lazy">` : '<span aria-hidden="true">G</span>'}</span><span><strong>${esc(product.name || product.id)}</strong><small>${esc(detail)}</small></span></a>`; }
-function header() { const count = state.unread; return `<header class="admin-header"><a href="/" class="admin-brand">GRACEFUL GIFTS <span>MANILA</span></a><nav><a href="/admin/chat" class="admin-inbox-link" aria-label="Inbox, ${count} unread" ${state.page === 'chat' ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 5h18v13H3zM3 6l9 7 9-7"/></svg><b class="admin-unread-badge" ${count ? '' : 'hidden'}>${count > 9 ? '9+' : count}</b></a>${state.profile?.role === 'owner' ? `<a href="/admin/staff" ${state.page === 'staff' ? 'aria-current="page"' : ''}>Staff</a>` : ''}</nav><button type="button" class="admin-sound" data-sound aria-pressed="${sound.state === 'on'}">${sound.label()}</button><span class="admin-user">${esc(state.profile?.displayName || state.user?.email || '')} · ${esc(state.profile?.role || '')}</span><button type="button" data-logout>Sign out</button><span class="admin-notice" role="status">${esc(state.notice)}</span></header>`; }
-function updateHeader() { const link = root.querySelector('.admin-inbox-link'); if (link) { link.setAttribute('aria-label', `Inbox, ${state.unread} unread`); const badge = link.querySelector('b'); badge.hidden = !state.unread; badge.textContent = state.unread > 9 ? '9+' : String(state.unread); } const button = root.querySelector('[data-sound]'); if (button) { button.textContent = sound.label(); button.setAttribute('aria-pressed', String(sound.state === 'on')); } const notice = root.querySelector('.admin-notice'); if (notice) notice.textContent = state.notice; }
+function product(watch) { if (!/^[A-Z0-9-]{2,20}$/.test(watch.id || '')) return ''; const image = /^\/images\/[A-Za-z0-9._-]+$/.test(watch.image || '') ? watch.image : ''; const detail = [watch.id, watch.brand, watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`, watch.size || ''].filter(Boolean).join(' · '); return `<button type="button" class="admin-product" data-preview-product="${esc(watch.id)}" aria-label="Preview ${esc(watch.name || watch.id)}"><span class="chat-watch-photo">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}" loading="lazy">` : '<span aria-hidden="true">G</span>'}</span><span><strong>${esc(watch.name || watch.id)}</strong><small>${esc(detail)}</small></span></button>`; }
+function avatar(identity) { return `<span class="guest-avatar guest-shape-${identity.shape}" style="--guest-color:${identity.color}" aria-hidden="true">${identity.mark}</span>`; }
+function customerLabel(item) { const identity = guestIdentity(item.id, item.customerName); return `<span class="guest-identity">${avatar(identity)}<span class="guest-names"><strong>${esc(identity.label)}</strong>${identity.label !== identity.reference ? `<small>${esc(identity.reference)}</small>` : ''}</span></span>`; }
+let previewDialog, catalogPromise;
+function openProductPreview(id, opener) {
+  const conversation = state.rows.find((item) => item.id === state.selected);
+  const watches = [...(conversation?.productReferences || []), ...[...state.older, ...state.messages].flatMap((item) => item.productReferences || [])];
+  const watch = watches.find((item) => item.id === id);
+  if (!watch) return;
+  if (!previewDialog) {
+    previewDialog = document.createElement('dialog'); previewDialog.className = 'admin-product-dialog'; document.body.append(previewDialog);
+    previewDialog.addEventListener('click', (event) => { if (event.target === previewDialog) previewDialog.close(); });
+  }
+  const image = /^\/images\/[A-Za-z0-9._-]+$/.test(watch.image || '') ? watch.image : '';
+  const facts = [['Brand', watch.brand], ['Watch ID', watch.id], ['Price', watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`], ['Size', watch.size], ['Stock', Number.isInteger(watch.stock) ? String(watch.stock) : '']].filter(([, value]) => value);
+  previewDialog.dataset.watchId = id;
+  previewDialog.innerHTML = `<div class="admin-preview-panel"><button type="button" class="admin-preview-close" aria-label="Close watch preview">×</button><div class="admin-preview-image">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}">` : '<span aria-hidden="true">GGM</span>'}</div><div><p class="eyebrow">WATCH INQUIRY</p><h2>${esc(watch.name || watch.id)}</h2><dl>${facts.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl><section class="admin-catalog-details" data-catalog-details hidden></section></div></div>`;
+  previewDialog.querySelector('.admin-preview-close').onclick = () => previewDialog.close();
+  previewDialog.querySelector('img')?.addEventListener('error', (event) => { event.target.replaceWith(Object.assign(document.createElement('span'), { textContent: 'Image unavailable' })); });
+  previewDialog.addEventListener('close', () => { if (opener.isConnected) opener.focus(); }, { once: true });
+  previewDialog.showModal(); previewDialog.querySelector('.admin-preview-close').focus();
+  catalogPromise ||= fetch('/api/catalog.json').then((response) => response.ok ? response.json() : null).catch(() => null);
+  catalogPromise.then((catalog) => {
+    if (!previewDialog?.open || previewDialog.dataset.watchId !== id) return;
+    const current = catalog?.watches?.find((item) => item.id === id);
+    if (!current) return;
+    const extras = [['Category', current.category], ['Dial color', current.dialColor], ['Case material', current.caseMaterial], ['Strap material', current.strapMaterial], ['Movement', current.movement]].filter(([, value]) => value);
+    const section = previewDialog.querySelector('[data-catalog-details]');
+    if (!section || !extras.length) return;
+    section.hidden = false;
+    section.innerHTML = `<h3>Current catalog details</h3><dl>${extras.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`;
+  });
+}
+root.addEventListener('click', (event) => { const opener = event.target.closest?.('[data-preview-product]'); if (opener) openProductPreview(opener.dataset.previewProduct, opener); });
+root.addEventListener('error', (event) => { if (event.target.matches?.('.admin-product img')) event.target.replaceWith(Object.assign(document.createElement('span'), { textContent: 'G' })); }, true);
+function header() { const count = state.unread; return `<header class="admin-header"><a href="/" class="admin-brand">GRACEFUL GIFTS <span>MANILA</span></a><nav><a href="/admin/chat" class="admin-inbox-link" aria-label="Inbox, ${count} unread" ${state.page === 'chat' ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 5h18v13H3zM3 6l9 7 9-7"/></svg><b class="admin-unread-badge" ${count ? '' : 'hidden'}>${count > 9 ? '9+' : count}</b></a>${state.profile?.role === 'owner' ? `<a href="/admin/staff" ${state.page === 'staff' ? 'aria-current="page"' : ''}>Staff</a>` : ''}</nav><button type="button" class="admin-push" data-push ${state.pushAvailable ? '' : 'disabled title="Web Push public key or browser support is unavailable"'}>${state.pushAvailable ? state.pushActive ? 'Disable background alerts' : 'Enable background alerts' : 'Background alerts need setup'}</button><button type="button" class="admin-sound" data-sound aria-pressed="${sound.enabled}">${sound.label()}</button><span class="admin-user">${esc(state.profile?.displayName || state.user?.email || '')} · ${esc(state.profile?.role || '')}</span><button type="button" data-logout>Sign out</button><span class="admin-notice" role="status">${esc(state.notice)}</span></header>`; }
+function updateHeader() { const link = root.querySelector('.admin-inbox-link'); if (link) { link.setAttribute('aria-label', `Inbox, ${state.unread} unread`); const badge = link.querySelector('b'); badge.hidden = !state.unread; badge.textContent = state.unread > 9 ? '9+' : String(state.unread); } const button = root.querySelector('[data-sound]'); if (button) { button.textContent = sound.label(); button.setAttribute('aria-pressed', String(sound.enabled)); } const push = root.querySelector('[data-push]'); if (push) { push.disabled = !state.pushAvailable; if (state.pushAvailable) push.removeAttribute('title'); push.textContent = state.pushAvailable ? state.pushActive ? 'Disable background alerts' : 'Enable background alerts' : 'Background alerts need setup'; } const notice = root.querySelector('.admin-notice'); if (notice) notice.textContent = state.notice; }
 function renderLogin() { root.innerHTML = `<main class="admin-login"><form id="admin-login-form" class="admin-card"><p class="eyebrow">GRACEFUL GIFTS MANILA</p><h1>Staff sign in</h1><p>Use your individual staff account.</p><label>Email<input type="email" name="email" autocomplete="username" required></label><label>Password<input type="password" name="password" autocomplete="current-password" required></label><button class="admin-primary" type="submit">Sign in</button>${state.error ? `<p class="admin-error" role="alert">${esc(state.error)}</p>` : ''}</form></main>`; root.querySelector('form').onsubmit = login; }
-function row(item) { const unread = item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); return `<button type="button" class="admin-inbox-row ${unread ? 'unread' : ''} ${state.selected === item.id ? 'selected' : ''}" data-select-chat="${esc(item.id)}"><span><strong>${esc(item.customerName || 'Guest customer')}</strong><time>${stamp(item.lastMessageAt)}</time></span><small>${esc(item.lastMessage || '')}</small><span class="admin-row-meta"><em>${esc(item.status)}</em><span>${esc(profileName(item.assignedStaffUid))}</span>${unread ? '<b aria-label="Unread">●</b>' : ''}</span></button>`; }
+function row(item) { const unread = item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); return `<button type="button" class="admin-inbox-row ${unread ? 'unread' : ''} ${state.selected === item.id ? 'selected' : ''}" data-select-chat="${esc(item.id)}"><span class="admin-row-top">${customerLabel(item)}<time>${stamp(item.lastMessageAt)}</time></span><small>${esc(item.lastMessage || '')}</small><span class="admin-row-meta"><em>${esc(item.status)}</em><span>${esc(profileName(item.assignedStaffUid))}</span>${unread ? '<b aria-label="Unread">●</b>' : ''}</span></button>`; }
 function renderChat() {
-  const matches = state.rows.filter((item) => (state.filter === 'all' || item.status === state.filter) && (!state.search || [item.customerName, item.customerContact, item.lastMessage, ...(item.productReferences || []).map((p) => `${p.id} ${p.name}`)].join(' ').toLowerCase().includes(state.search)));
+  const matches = state.rows.filter(matchesInbox);
   const selected = state.threadReady && state.rows.find((item) => item.id === state.selected);
   const oldReply = root.dataset.selected === state.selected ? root.querySelector('#admin-reply') : null;
   oldReply?.remove();
-  root.innerHTML = header() + `<main class="admin-layout"><aside class="admin-inbox"><div class="admin-inbox-top"><h1>Conversations</h1><p>${state.unread} unread · ${state.rows.length} loaded</p><input id="admin-search" type="search" placeholder="Search loaded conversations" value="${esc(state.search)}"><select id="admin-filter" aria-label="Filter status">${['all','new','open','pending','resolved'].map((status) => `<option value="${status}" ${state.filter === status ? 'selected' : ''}>${status[0].toUpperCase() + status.slice(1)}</option>`).join('')}</select></div><div class="admin-inbox-list">${matches.length ? matches.map(row).join('') : '<p class="admin-empty">No conversations found.</p>'}${state.more ? '<button type="button" class="admin-more" data-more>Load more</button>' : ''}</div></aside><section class="admin-thread">${selected ? `<div class="admin-thread-head"><div><h2>${esc(selected.customerName || 'Guest customer')}</h2><small>${esc(selected.customerContact || 'Anonymous website visitor')} · ${stamp(selected.createdAt)}</small></div><div class="admin-controls"><label>Status<select id="admin-status">${['new','open','pending','resolved'].map((status) => `<option value="${status}" ${selected.status === status ? 'selected' : ''}>${status[0].toUpperCase() + status.slice(1)}</option>`).join('')}</select></label>${state.profile?.role !== 'staff' ? `<label>Assigned<select id="admin-assignee"><option value="">Unassigned</option>${state.staff.filter((person) => person.active).map((person) => `<option value="${esc(person.id)}" ${selected.assignedStaffUid === person.id ? 'selected' : ''}>${esc(person.displayName)}</option>`).join('')}</select></label>` : `<span>Assigned: ${esc(profileName(selected.assignedStaffUid))}</span>`}</div></div><div class="admin-thread-body" id="admin-thread-body">${state.first ? '<button type="button" data-older>Load earlier messages</button>' : ''}${[...state.older, ...state.messages].map((message) => `<div class="admin-message ${message.senderRole === 'customer' ? 'customer' : 'staff'}"><small>${message.senderRole === 'customer' ? 'Customer' : esc(profileName(message.senderUid))} · ${stamp(message.createdAt)}</small><p>${esc(message.message)}</p>${(message.productReferences || []).map(product).join('')}</div>`).join('')}</div>${selected.productReferences?.length ? `<aside class="admin-refs"><strong>Watches discussed</strong>${selected.productReferences.map(product).join('')}</aside>` : ''}<form id="admin-reply"><label class="visually-hidden" for="admin-message">Reply</label><textarea id="admin-message" maxlength="2000" rows="2" placeholder="Write a reply…" required>${esc(state.replyDraft)}</textarea><button class="admin-primary" type="submit">Send reply</button></form>` : '<div class="admin-empty-thread">Select a conversation to read and reply.</div>'}</section></main>${state.error ? `<div class="admin-toast" role="alert">${esc(state.error)}<button type="button" data-clear-error>×</button></div>` : ''}`;
+  root.innerHTML = header() + `<main class="admin-layout"><aside class="admin-inbox"><div class="admin-inbox-top"><h1>Conversations</h1><p>${state.unread} unread · ${state.rows.length} loaded</p><input id="admin-search" type="search" placeholder="Search loaded conversations" value="${esc(state.search)}"><select id="admin-filter" aria-label="Filter status">${['all','new','open','pending','resolved'].map((status) => `<option value="${status}" ${state.filter === status ? 'selected' : ''}>${status[0].toUpperCase() + status.slice(1)}</option>`).join('')}</select></div><div class="admin-inbox-list">${matches.length ? matches.map(row).join('') : '<p class="admin-empty">No conversations found.</p>'}${state.more ? '<button type="button" class="admin-more" data-more>Load more</button>' : ''}</div></aside><section class="admin-thread">${selected ? `<div class="admin-thread-head"><div><h2>${customerLabel(selected)}</h2><small>${esc(selected.customerContact || 'Anonymous website visitor')} · ${stamp(selected.createdAt)}</small></div><div class="admin-controls"><label>Status<select id="admin-status">${['new','open','pending','resolved'].map((status) => `<option value="${status}" ${selected.status === status ? 'selected' : ''}>${status[0].toUpperCase() + status.slice(1)}</option>`).join('')}</select></label>${state.profile?.role !== 'staff' ? `<label>Assigned<select id="admin-assignee"><option value="">Unassigned</option>${state.staff.filter((person) => person.active).map((person) => `<option value="${esc(person.id)}" ${selected.assignedStaffUid === person.id ? 'selected' : ''}>${esc(person.displayName)}</option>`).join('')}</select></label>` : `<span>Assigned: ${esc(profileName(selected.assignedStaffUid))}</span>`}</div></div><div class="admin-thread-body" id="admin-thread-body">${state.first ? '<button type="button" data-older>Load earlier messages</button>' : ''}${[...state.older, ...state.messages].map((message) => `<div class="admin-message ${message.senderRole === 'customer' ? 'customer' : 'staff'}"><small>${message.senderRole === 'customer' ? 'Customer' : esc(profileName(message.senderUid))} · ${stamp(message.createdAt)}</small><p>${esc(message.message)}</p>${(message.productReferences || []).map(product).join('')}</div>`).join('')}</div>${selected.productReferences?.length ? `<aside class="admin-refs"><strong>Watches discussed</strong>${selected.productReferences.map(product).join('')}</aside>` : ''}<form id="admin-reply"><label class="visually-hidden" for="admin-message">Reply</label><textarea id="admin-message" maxlength="2000" rows="2" placeholder="Write a reply…" required>${esc(state.replyDraft)}</textarea><button class="admin-primary" type="submit">Send reply</button></form>` : '<div class="admin-empty-thread">Select a conversation to read and reply.</div>'}</section></main>${state.error ? `<div class="admin-toast" role="alert">${esc(state.error)}<button type="button" data-clear-error>×</button></div>` : ''}`;
   root.dataset.selected = state.selected || '';
   if (oldReply && selected) root.querySelector('#admin-reply')?.replaceWith(oldReply);
   root.querySelector('.admin-layout').classList.toggle('thread-open', !!state.mobileThread);
@@ -38,7 +74,7 @@ function renderChat() {
   bindHeader();
   const body = root.querySelector('#admin-thread-body'); if (body) requestAnimationFrame(() => { body.scrollTop = body.scrollHeight; });
 }
-function matchesInbox(item) { return (state.filter === 'all' || item.status === state.filter) && (!state.search || [item.customerName, item.customerContact, item.lastMessage, ...(item.productReferences || []).map((p) => `${p.id} ${p.name}`)].join(' ').toLowerCase().includes(state.search)); }
+function matchesInbox(item) { return (state.filter === 'all' || item.status === state.filter) && (!state.search || [item.customerName, guestIdentity(item.id).reference, item.customerContact, item.lastMessage, ...(item.productReferences || []).map((p) => `${p.id} ${p.name}`)].join(' ').toLowerCase().includes(state.search)); }
 function bindInboxRows() { root.querySelectorAll('[data-select-chat]').forEach((button) => button.onclick = () => selectConversation(button.dataset.selectChat)); root.querySelector('[data-more]')?.addEventListener('click', loadMore); }
 function renderInboxOnly() {
   const list = root.querySelector('.admin-inbox-list'); if (!list) { updateHeader(); return; }
@@ -97,7 +133,24 @@ function renderStaff() {
   root.querySelectorAll('[data-toggle-staff]').forEach((button) => button.onclick = () => { const person = state.staff.find((item) => item.id === button.dataset.toggleStaff); if (person) editStaff(person.id, { active: !person.active }); });
   bindHeader();
 }
-function bindHeader() { root.querySelector('[data-logout]')?.addEventListener('click', async () => { const { auth } = await firebase(); await signOut(auth); location.assign('/admin/chat'); }); root.querySelector('[data-sound]')?.addEventListener('click', () => sound.toggle()); }
+function bindHeader() {
+  root.querySelector('[data-logout]')?.addEventListener('click', async () => {
+    const services = await firebase();
+    try { await revokePush(services); } catch (error) { state.error = `Could not remove this device's push token: ${displayError(error)}`; render(); return; }
+    await signOut(services.auth); location.assign('/admin/chat');
+  });
+  root.querySelector('[data-sound]')?.addEventListener('click', () => sound.toggle());
+  root.querySelector('[data-push]')?.addEventListener('click', async (event) => {
+    event.currentTarget.disabled = true;
+    try {
+      const services = await firebase();
+      if (state.pushActive) { await revokePush(services); state.pushActive = false; state.notice = 'Background alerts disabled on this browser.'; }
+      else { await enablePush(services); state.pushActive = true; state.notice = 'Browser registered. Automatic background delivery awaits trusted sender setup.'; }
+      updateHeader();
+    } catch (error) { state.error = displayError(error); render(); }
+    finally { const button = root.querySelector('[data-push]'); if (button) button.disabled = false; }
+  });
+}
 function render() { if (state.loading) { root.innerHTML = '<main class="admin-login"><p>Checking access…</p></main>'; return; } if (!state.user || !state.profile?.active) { renderLogin(); return; } if (state.page === 'staff' && state.profile.role === 'owner') renderStaff(); else renderChat(); }
 async function login(event) { event.preventDefault(); const form = event.currentTarget; const button = form.querySelector('button'); button.disabled = true; try { const { auth } = await firebase(); await signInWithEmailAndPassword(auth, form.elements.namedItem('email').value.trim(), form.elements.namedItem('password').value); } catch (error) { state.error = displayError(error); button.disabled = false; renderLogin(); } }
 function subscribeStaff(db) { state.unsubStaff?.(); state.unsubActivity?.(); state.unsubStaff = onSnapshot(query(collection(db, 'staff'), limit(100)), (snapshot) => { state.staff = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })); render(); }, (error) => { state.error = displayError(error); render(); }); if (state.profile.role === 'owner') state.unsubActivity = onSnapshot(query(collection(db, 'auditLogs'), orderBy('createdAt', 'desc'), limit(50)), (snapshot) => { state.activity = snapshot.docs.map((item) => item.data()); render(); }, (error) => { state.error = displayError(error); render(); }); }
@@ -135,12 +188,26 @@ function subscribeInbox(db) {
   const base = collection(db, 'conversations');
   const inbox = state.profile.role === 'staff' ? query(base, where('assignedStaffUid', '==', state.user.uid), orderBy('lastMessageAt', 'desc'), limit(50)) : query(base, orderBy('lastMessageAt', 'desc'), limit(50));
   state.unsubInbox = onSnapshot(inbox, { includeMetadataChanges: true }, (snapshot) => {
-    state.rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })); state.cursor = snapshot.docs.at(-1) || null; state.more = snapshot.docs.length === 50;
+    const selectedRow = state.rows.find((item) => item.id === state.selected);
+    state.rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    if (selectedRow && !state.rows.some((item) => item.id === selectedRow.id)) state.rows.push(selectedRow);
+    state.cursor = snapshot.docs.at(-1) || null; state.more = snapshot.docs.length === 50;
     if (!snapshot.metadata.fromCache) {
       const fresh = state.rows.filter((item) => item.lastSenderRole === 'customer' && state.knownInbox.get(item.id) !== item.lastMessageId);
       if (state.inboxInitialized && fresh.length && document.visibilityState === 'visible') { state.notice = fresh.length === 1 ? 'New customer message' : `${fresh.length} new customer messages`; sound.notify(); clearTimeout(noticeTimer); noticeTimer = setTimeout(() => { state.notice = ''; updateHeader(); }, 5000); }
       state.knownInbox = new Map(state.rows.map((item) => [item.id, item.lastMessageId]));
       state.inboxInitialized = true; acknowledgeInbox(db, state.rows);
+      if (!deepLinkHandled && state.page === 'chat') {
+        deepLinkHandled = true;
+        const id = new URLSearchParams(location.search).get('conversation');
+        if (id && /^[A-Za-z0-9_-]{20,128}$/.test(id)) {
+          getDoc(doc(db, 'conversations', id)).then((record) => {
+            if (!record.exists() || !state.profile?.active) return;
+            if (!state.rows.some((item) => item.id === id)) state.rows.push({ id, ...record.data() });
+            selectConversation(id);
+          }).catch(() => { state.notice = 'This conversation is unavailable to your account.'; updateHeader(); });
+        }
+      }
     }
     state.unread = state.rows.filter((item) => item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis())).length;
     if (state.selected && !state.rows.some((item) => item.id === state.selected)) { state.selected = null; state.unsubSelected?.(); state.unsubMessages?.(); state.unsubReceipts?.(); renderChat(); }
@@ -172,7 +239,32 @@ function reply(event) { event.preventDefault(); const text = state.replyDraft.tr
 async function changeConversation(change) { if (!state.selected) return; try { const { db } = await firebase(); const ref = doc(db, 'conversations', state.selected); const audit = doc(collection(db, 'auditLogs')); const action = 'status' in change ? 'status' : 'assignment'; const field = action === 'status' ? 'status' : 'assignedStaffUid'; const expected = state.rows.find((item) => item.id === state.selected)?.[field]; await runTransaction(db, async (tx) => { const snapshot = await tx.get(ref); if (!snapshot.exists()) throw new Error('Conversation no longer exists.'); if (snapshot.data()[field] !== expected) throw new Error('This conversation changed. Please review it again.'); const now = serverTimestamp(); tx.update(ref, { ...change, updatedAt: now, lastAuditId: audit.id }); tx.set(audit, { action, conversationId: state.selected, actorUid: state.user.uid, oldValue: snapshot.data()[field], newValue: change[field], createdAt: now }); }); } catch (error) { state.error = displayError(error); render(); } }
 async function addStaff(event) { event.preventDefault(); if (state.staffCreating) return; const form = event.currentTarget.closest('form'); if (!form.reportValidity()) return; const field = (name) => form.elements.namedItem(name).value; const uid = field('uid').trim(); if (!/^[A-Za-z0-9_-]{8,128}$/.test(uid)) { state.error = 'Enter a valid Firebase Auth UID.'; render(); return; } const profile = { displayName: field('name').trim(), email: field('email').trim().toLowerCase(), role: field('role'), active: true, createdAt: serverTimestamp(), createdBy: state.user.uid }; state.staffCreating = true; const button = form.querySelector('button'); button.disabled = true; try { const { db } = await firebase(); const ref = doc(db, 'staff', uid); await runTransaction(db, async (tx) => { if ((await tx.get(ref)).exists()) throw new Error('This UID already has a staff profile.'); tx.set(ref, profile); }); form.reset(); } catch (error) { state.error = displayError(error); } finally { state.staffCreating = false; render(); } }
 async function editStaff(uid, change) { try { const { db } = await firebase(); await updateDoc(doc(db, 'staff', uid), change); } catch (error) { state.error = displayError(error); render(); } }
-async function start() { state.page = location.pathname.endsWith('/staff') ? 'staff' : 'chat'; try { const { auth, db } = await firebase(); onAuthStateChanged(auth, (user) => { cleanup(); state.user = user && !user.isAnonymous ? user : null; state.profile = null; state.rows = []; state.staff = []; state.selected = null; state.loading = !!state.user; state.error = ''; render(); if (!state.user) return; state.unsubProfile = onSnapshot(doc(db, 'staff', state.user.uid), (snapshot) => { const profile = snapshot.exists() ? snapshot.data() : null; if (!profile?.active) { cleanup(); state.profile = null; state.loading = false; state.error = 'This account has no active staff access.'; render(); return; } const changed = state.profile?.role !== profile.role; state.profile = profile; state.loading = false; if (state.page === 'staff' && profile.role !== 'owner') state.page = 'chat'; if (changed) { subscribeStaff(db); subscribeSettings(db); subscribeInbox(db); } render(); }, (error) => { state.loading = false; state.error = displayError(error); render(); }); }); } catch (error) { state.loading = false; state.error = displayError(error); render(); } }
+async function start() {
+  state.page = location.pathname.endsWith('/staff') ? 'staff' : 'chat';
+  try {
+    const services = await firebase(); const { auth, db } = services;
+    onAuthStateChanged(auth, (user) => {
+      cleanup(); deepLinkHandled = false;
+      state.user = user && !user.isAnonymous ? user : null;
+      state.profile = null; state.rows = []; state.staff = []; state.selected = null;
+      state.pushActive = false; state.pushAvailable = false; state.loading = !!state.user; state.error = ''; render();
+      if (!state.user) return;
+      state.unsubProfile = onSnapshot(doc(db, 'staff', state.user.uid), (snapshot) => {
+        const profile = snapshot.exists() ? snapshot.data() : null;
+        if (!profile?.active) { cleanup(); revokePush(services).catch(() => {}); state.profile = null; state.loading = false; state.error = 'This account has no active staff access.'; render(); return; }
+        const changed = state.profile?.role !== profile.role;
+        state.profile = profile; state.loading = false;
+        if (state.page === 'staff' && profile.role !== 'owner') state.page = 'chat';
+        if (changed) {
+          subscribeStaff(db); subscribeSettings(db); subscribeInbox(db);
+          pushAvailable().then((available) => { if (state.user?.uid === user.uid) { state.pushAvailable = available; updateHeader(); } });
+          if (pushEnabled(state.user.uid)) refreshPush(services).then((active) => { state.pushActive = active; updateHeader(); });
+        }
+        render();
+      }, (error) => { state.loading = false; state.error = displayError(error); render(); });
+    });
+  } catch (error) { state.loading = false; state.error = displayError(error); render(); }
+}
 start();
 function sizeAdmin() { if (!window.visualViewport) return; document.documentElement.style.setProperty('--ggm-viewport-height', `${window.visualViewport.height}px`); }
 window.visualViewport?.addEventListener('resize', sizeAdmin);

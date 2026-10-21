@@ -54,6 +54,12 @@ service cloud.firestore {
       allow create: if owner() && uid != request.auth.uid && request.resource.data.keys().hasOnly(['displayName','email','role','active','createdAt','createdBy']) && request.resource.data.displayName is string && request.resource.data.displayName.size() > 0 && request.resource.data.displayName.size() <= 80 && request.resource.data.email is string && request.resource.data.email.size() <= 254 && request.resource.data.role in ['admin','staff'] && request.resource.data.active == true && request.resource.data.createdAt == request.time && request.resource.data.createdBy == request.auth.uid;
       allow update: if owner() && uid != request.auth.uid && resource.data.role != 'owner' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','email','role','active']) && request.resource.data.role in ['admin','staff'] && request.resource.data.active is bool && request.resource.data.displayName is string && request.resource.data.displayName.size() > 0 && request.resource.data.displayName.size() <= 80 && request.resource.data.email is string && request.resource.data.email.size() <= 254;
       allow delete: if false;
+      match /pushTokens/{tokenId} {
+        allow get, list: if staff() && request.auth.uid == uid;
+        allow create: if staff() && request.auth.uid == uid && tokenId.matches('^[a-f0-9]{40}$') && request.resource.data.keys().hasOnly(['token','createdAt','updatedAt']) && request.resource.data.token is string && request.resource.data.token.size() >= 40 && request.resource.data.token.size() <= 512 && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+        allow update: if false;
+        allow delete: if signed() && request.auth.uid == uid;
+      }
     }
     match /auditLogs/{auditId} {
       allow get, list: if owner();
