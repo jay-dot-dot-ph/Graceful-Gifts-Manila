@@ -53,28 +53,16 @@ export const safeProduct = (watch) => ({
   brand: String(watch.brand || '').slice(0, 80),
   price: watch.price == null ? null : Number(watch.price),
   image: String(watch.image || '').slice(0, 300),
-  url: String(watch.url || '').slice(0, 300),
-  ...(typeof watch.size === 'string' && watch.size.trim() ? { size: watch.size.trim().slice(0, 40) } : {}),
-  ...(Number.isInteger(watch.stock) && watch.stock >= 0 ? { stock: watch.stock } : {})
+  url: String(watch.url || '').slice(0, 300)
 });
 
-export function newMessageId(db, conversationId) { return doc(collection(db, 'conversations', conversationId, 'messages')).id; }
-
-export async function sendMessage(db, conversationId, uid, role, text, products = [], identity = {}, idempotencyKey = newMessageId(db, conversationId)) {
+export async function sendMessage(db, conversationId, uid, role, text, products = [], identity = {}) {
   const body = messageText(text);
   if (!body) throw new Error('Write a message first.');
   const conversation = doc(db, 'conversations', conversationId);
-  if (!/^[A-Za-z0-9]{20}$/.test(idempotencyKey)) throw new Error('Invalid message ID.');
-  const message = doc(db, 'conversations', conversationId, 'messages', idempotencyKey);
+  const message = doc(collection(conversation, 'messages'));
   await runTransaction(db, async (tx) => {
     const snapshot = await tx.get(conversation);
-    if (snapshot.exists()) {
-      const previous = await tx.get(message);
-      if (previous.exists()) {
-        if (previous.data().senderUid !== uid || previous.data().message !== body) throw new Error('Message ID already used.');
-        return;
-      }
-    }
     const now = serverTimestamp();
     const base = {
       lastMessage: body, lastMessageAt: now, lastMessageId: message.id,
@@ -94,47 +82,10 @@ export async function sendMessage(db, conversationId, uid, role, text, products 
       const unique = [...new Map(merged.map((product) => [product.id, product])).values()].slice(0, 8);
       tx.update(conversation, {
         ...base,
-        ...(role === 'customer' ? { productReferences: unique } : {})
+        ...(role === 'customer' ? { productReferences: unique, customerReadAt: now } : { staffReadAt: now })
       });
     }
     tx.set(message, { senderUid: uid, senderRole: role, message: body, createdAt: now, productReferences: products.slice(0, 8).map(safeProduct) });
   });
-  return idempotencyKey;
-}
-
-const receiptAttempts = new Set();
-export async function acknowledgeMessage(db, conversationId, messageId, uid, seen = false) {
-  if (!/^[A-Za-z0-9]{20}$/.test(messageId)) return;
-  const key = `${conversationId}/${messageId}/${seen ? 'seen' : 'delivered'}`;
-  if (receiptAttempts.has(key)) return;
-  receiptAttempts.add(key);
-  try {
-    const conversation = doc(db, 'conversations', conversationId);
-    const message = doc(collection(conversation, 'messages'), messageId);
-    let advanceReadAt = false;
-    let senderRole;
-    let available = false;
-    await runTransaction(db, async (tx) => {
-      advanceReadAt = false;
-      available = false;
-      const [parent, item] = await Promise.all([tx.get(conversation), tx.get(message)]);
-      if (!parent.exists() || !item.exists() || item.data().senderUid === uid) return;
-      available = true;
-      const data = item.data();
-      senderRole = data.senderRole;
-      const update = {};
-      if (!data.deliveredAt) Object.assign(update, { deliveredAt: serverTimestamp(), deliveredByUid: uid });
-      if (seen && !data.seenAt) Object.assign(update, { seenAt: serverTimestamp(), seenByUid: uid });
-      if (Object.keys(update).length) tx.update(message, update);
-      advanceReadAt = seen && parent.data().lastMessageId === messageId;
-    });
-    if (!available) { receiptAttempts.delete(key); return false; }
-    if (advanceReadAt) await runTransaction(db, async (tx) => {
-      const parent = await tx.get(conversation);
-      if (!parent.exists() || parent.data().lastMessageId !== messageId) return;
-      const field = senderRole === 'customer' ? 'staffReadAt' : 'customerReadAt';
-      if (!parent.data()[field] || parent.data().lastMessageAt.toMillis() > parent.data()[field].toMillis()) tx.update(conversation, { [field]: serverTimestamp() });
-    });
-    return true;
-  } catch (error) { receiptAttempts.delete(key); console.warn('Chat receipt could not be saved:', error?.code || error?.message || 'unknown error'); throw error; }
+  return message.id;
 }

@@ -332,7 +332,7 @@ async function copyText(text) {
 async function handleInquiry(button, watches) {
   if (!watches.length && button?.hasAttribute('data-inquire')) { notice('Watch not found.'); return; }
   if (watches.length > 8) { notice('Select up to 8 watches for one inquiry.'); return; }
-  const products = watches.map((watch) => ({ id: watch.id, name: watchName(watch), brand: watch.brand, price: watch.price, image: watch.localImage || '', url: 'https://graceful-gifts-manila.web.app/watch/' + encodeURIComponent(watch.id), ...(watch.size ? { size: watch.size } : {}), ...(Number.isInteger(watch.stock) && watch.stock >= 0 ? { stock: watch.stock } : {}) }));
+  const products = watches.map((watch) => ({ id: watch.id, name: watchName(watch), brand: watch.brand, price: watch.price, image: watch.localImage || '', url: 'https://graceful-gifts-manila.web.app/watch/' + encodeURIComponent(watch.id) }));
   try { const { openChat } = await import('/chat.js'); await openChat(products); }
   catch (error) { notice(error?.message || 'Chat is unavailable right now. Please try again.'); }
 }
