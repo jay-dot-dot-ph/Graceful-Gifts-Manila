@@ -1,6 +1,8 @@
 # Graceful Gifts Manila watch catalog
 
-Responsive watch showroom backed by the **2026 WATCHES - GRACE** Google Sheet. The site has no accounts, cart, checkout, or payment collection. Customers browse the catalog, save favorites in their browser, copy an inquiry, then continue in Messenger.
+Responsive watch showroom backed by the **2026 WATCHES - GRACE** Google Sheet. Customers browse the catalog, save favorites in their browser, and use built-in live chat to inquire. Staff use individual Firebase Authentication accounts at `/admin/chat`. There is no cart, checkout, or payment collection.
+
+**Chat deployment and owner setup:** [CHAT_SETUP.md](CHAT_SETUP.md). Do not push this change to `main` or deploy Hosting until the Firebase setup and Firestore rules are ready; the existing workflow deploys pushes to `main` automatically.
 
 Live website: https://graceful-gifts-manila.web.app
 
@@ -21,7 +23,7 @@ Open `http://127.0.0.1:4173`. The preview serves the generated static export. `n
 - `scripts/public-catalog.mjs` reads the brand tabs of the [spreadsheet](https://docs.google.com/spreadsheets/d/1YL-EBPWoU3nUNtUwr1GPtlqOUWY7e2GDLCtw8YCwge8/edit) through public Viewer access. It skips the `Brands` index tab, maps product fields by header name, and uses public photo links or a brand-tab workbook export to recover embedded photos.
 - The build writes a product snapshot to `hosting-dist/`. Website visitors read this snapshot; they do not need Google API credentials.
 - Product URLs use `/watch/{watchId}`. Watch ID, price, stock, and specifications come from the Sheet. Blank stock is shown as availability on request; zero stock is shown as sold out.
-- `worker/client.js` renders the interface. Favorites are saved in browser local storage. Inquiry messages include each selected watch's ID, price, and exact page URL.
+- `worker/client.js` renders the interface. Favorites are saved in browser local storage. Inquiry actions open `chat/customer.js`, which sends selected watch references and customer messages to Firestore. `chat/admin.js` handles the private dashboard.
 
 The current Sheet has `Date Added` values for sorting. Featured Watches still has a placeholder because the Sheet has no featured markers. Customer feedback images were not supplied; the gallery and timed floating feedback activate when verified image URLs are added to `feedbackImages` in `window.GGM_CONFIG` in `worker/index.js`. Do not use unverified testimonials.
 
@@ -31,7 +33,7 @@ The site shows Sheet images unchanged. Keep the Sheet's General access set to **
 
 ## Firebase Hosting
 
-The Firebase project is `graceful-gifts-manila`. Its Spark plan supports the static Hosting export in `hosting-dist/`; the Firebase Web SDK snippet is not needed for this catalog. Run `npm.cmd run build:firebase` to read the public Sheet and generate product HTML pages, catalog JSON, and locally hosted copies of the spreadsheet images. `firebase.json` serves these files with clean product URLs. The export fails if the Sheet or workbook photos cannot be downloaded, so an incomplete catalog is not deployed silently.
+The Firebase project is `graceful-gifts-manila`. Hosting serves the static catalog and the Firebase Web SDK bundle for chat. Run `npm.cmd run build:firebase` to read the public Sheet and generate product HTML pages, catalog JSON, locally hosted copies of the spreadsheet images, and the chat/dashboard bundles. The browser reads the project's public Firebase web configuration from Hosting's `/__/firebase/init.json`; a local `firebase-config.local.json` can be used for emulator preview. `firebase.json` serves clean product and admin URLs. The export fails if the Sheet or workbook photos cannot be downloaded, so an incomplete catalog is not deployed silently.
 
 The build uses public Sheet image links when available. For rows beyond Google's page preview, it reads image anchors from that brand tab's XLSX export and saves photos against their Watch IDs.
 

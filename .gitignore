@@ -6,4 +6,5 @@ hosting-dist/
 .image-cache/
 .openai/
 .firebase/
+firebase-config.local.json
 firebase-debug.log

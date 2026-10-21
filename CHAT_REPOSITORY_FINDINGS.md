@@ -1,0 +1,10 @@
+# Repository investigation (before chat changes)
+
+- The site is a vanilla JavaScript static catalog. `worker/index.js` produces HTML, `worker/client.js` renders routes, and `worker/styles.css` contains the shared cream, dark, and gold design. `scripts/build.mjs` embeds those assets into a Worker module; `scripts/export-firebase.mjs` writes `hosting-dist/` for Firebase Hosting.
+- The public Google Sheet is read during the build by `scripts/public-catalog.mjs`. The generated catalog JSON and watch HTML are static. Product fields include `id`, `brand`, `model`, `price`, `image`/`localImage`, and stock. No change to Sheet parsing or synchronization is needed.
+- Firebase is currently Hosting only (`firebase.json`, `.firebaserc`). There is no web app configuration, Authentication, Firestore, staff model, or existing security rules.
+- Product inquiry actions are the desktop and mobile watch detail buttons (`data-inquire`) and the Favorites selected button (`data-inquire-selected`). `handleInquiry` copies product text and then opens Messenger. The footer has a Messenger floating link, and the contact page offers Messenger as a separate channel.
+- Favorites use the `ggm-favorites` local storage key; selected favorites are in memory. Search, filters, product details, theme behavior, and client navigation are in `worker/client.js`.
+- `.github/workflows/firebase-hosting.yml` builds on pushes to `main`, scheduled Sheet checks, and dispatches, then deploys Hosting with a repository secret. A push to `main` would therefore deploy automatically. This work must remain local until explicit production approval. Existing tests cover catalog, browser journeys, search, opening, and history; some inquiry assertions reflect the old Messenger flow and require updates.
+
+Design choice: Add a separate, lazy loaded Firebase chat module and a private admin module. Keep the catalog adapter and Sheet deployment checks unchanged. Use Firestore staff documents as the server enforced role source; an owner created through a privileged one time setup can manage role grants for precreated Firebase Auth users. This avoids Cloud Functions and a billing upgrade.

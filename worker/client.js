@@ -39,7 +39,7 @@ function nav(active) {
   return `<div class="trust-banner" aria-label="Shopping benefits"><div class="container trust-banner-inner"><span>🚚 Cash on Delivery Nationwide</span><span>🔍 Inspect Before Paying</span><span>📍 Physical Store: Forbes Commercial, Sampaloc, Manila</span></div></div><header class="site-header"><div class="nav-wrap container"><a class="brand-mark" href="/" aria-label="Graceful Gifts Manila, home"><span class="brand-symbol">G</span><span class="brand-words">GRACEFUL GIFTS<small>MANILA</small></span></a><nav class="desktop-nav" aria-label="Main navigation">${links.map(([href, label]) => `<a href="${href}" ${active === label ? 'aria-current="page"' : ''}>${label}${label === 'Favorites' ? `<span class="fav-count">${favorites.size || ''}</span>` : ''}</a>`).join('')}</nav><div class="nav-actions"><button class="search-shortcut" data-search-toggle type="button" aria-label="Search watches" aria-controls="header-search-panel" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></button><button class="menu-button" data-menu type="button" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button></div></div><nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">${links.map(([href, label]) => `<a href="${href}">${label}</a>`).join('')}</nav><div class="header-search-panel" id="header-search-panel" hidden><form class="container header-search-form" action="/watches" method="get" role="search"><label class="visually-hidden" for="header-search-input">Search watches</label><input id="header-search-input" name="q" type="search" placeholder="Search brand, model, or Watch ID" value="${esc(filters.query)}" required><button class="header-search-submit" type="submit">Search</button><button class="header-search-close" data-search-close type="button" aria-label="Close search">×</button></form></div></header>`;
 }
 function footer() {
-  return `<footer class="site-footer"><div class="container footer-grid"><div class="footer-about"><a class="footer-logo" href="/">GRACEFUL GIFTS <span>MANILA</span></a><p>Explore the collection online, then visit us to find the watch that feels right for you.</p><a class="footer-visit" href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=14.6084144%2C120.9940068&heading=231.21&pitch=-2.39&fov=75" target="_blank" rel="noopener">Visit our Manila store <span aria-hidden="true">↗</span></a></div><nav class="footer-links" aria-label="Footer navigation"><h3>Explore</h3><a href="/watches">All watches</a><a href="/brands">Shop by brand</a><a href="/favorites">My favorites</a></nav><div class="footer-links"><h3>Connect</h3><a href="${config.facebook}" target="_blank" rel="noopener">Facebook</a><a href="${config.messenger}" target="_blank" rel="noopener">Messenger</a><a href="tel:+639755996605">0975 599 6605</a></div></div><div class="container footer-bottom"><span>© ${new Date().getFullYear()} Graceful Gifts Manila</span><span>Prices and availability are subject to confirmation.</span></div></footer><a class="floating-chat" href="${config.messenger}" target="_blank" rel="noopener" aria-label="Chat with us on Messenger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.4a8 8 0 0 1-8 8 8.8 8.8 0 0 1-3.4-.7L4 20l1.3-4A8 8 0 1 1 20 11.4Z"/><path d="m8 13 3-3 2.2 2 2.8-2"/></svg><span>Chat with us</span></a>`;
+  return `<footer class="site-footer"><div class="container footer-grid"><div class="footer-about"><a class="footer-logo" href="/">GRACEFUL GIFTS <span>MANILA</span></a><p>Explore the collection online, then visit us to find the watch that feels right for you.</p><a class="footer-visit" href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=14.6084144%2C120.9940068&heading=231.21&pitch=-2.39&fov=75" target="_blank" rel="noopener">Visit our Manila store <span aria-hidden="true">↗</span></a></div><nav class="footer-links" aria-label="Footer navigation"><h3>Explore</h3><a href="/watches">All watches</a><a href="/brands">Shop by brand</a><a href="/favorites">My favorites</a></nav><div class="footer-links"><h3>Connect</h3><a href="${config.facebook}" target="_blank" rel="noopener">Facebook</a><a href="${config.messenger}" target="_blank" rel="noopener">Messenger</a><a href="tel:+639755996605">0975 599 6605</a></div></div><div class="container footer-bottom"><span>© ${new Date().getFullYear()} Graceful Gifts Manila</span><span>Prices and availability are subject to confirmation.</span></div></footer><button class="floating-chat" type="button" data-open-chat aria-label="Chat with us"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.4a8 8 0 0 1-8 8 8.8 8.8 0 0 1-3.4-.7L4 20l1.3-4A8 8 0 1 1 20 11.4Z"/><path d="m8 13 3-3 2.2 2 2.8-2"/></svg><span>Chat with us</span><b data-chat-badge hidden></b></button>`;
 }
 function card(watch) {
   const saved = favorites.has(watch.id);
@@ -281,7 +281,7 @@ function detailPage(watch) {
           <div class="detail-price-row"><div class="detail-price">${money(watch.price)}</div><div class="detail-stock ${watch.stock === 0 ? 'soldout' : ''}"><span class="stock-dot"></span>${stockText(watch)}</div></div>
           ${watch.stock === 0 ? `<div class="soldout-notice" role="status"><span class="soldout-notice-icon" aria-hidden="true">!</span><div><strong>This item is currently unavailable.</strong><p>Check back later for restocks or explore more watches from ${esc(watch.brand)} and other brands.</p></div></div>` : ''}
           <div class="detail-actions"><button class="button button-dark inquiry-button" type="button" data-inquire="${esc(watch.id)}">${inquiryLabel} <span>↗</span></button><button class="button button-outline favorite-detail ${favorites.has(watch.id) ? 'saved' : ''}" type="button" data-favorite="${esc(watch.id)}">${favorites.has(watch.id) ? '♥ Saved' : '♡ Favorite'}</button></div>
-          <p class="inquiry-note">Copy details, then open Messenger.</p>
+          <p class="inquiry-note">Ask us here and return to this browser to see our reply.</p>
           <button class="share-link" type="button" data-share="${esc(watch.id)}">Copy link ↗</button>
         </div>
       </div>
@@ -299,7 +299,7 @@ function favoritesPage() {
   afterRender();
 }
 function contactPage() {
-  app.innerHTML = nav('Contact') + `<main><section class="page-heading"><div class="container"><p class="eyebrow">HERE TO HELP</p><h1>Let's talk watches.</h1><p>Questions about a piece? We would love to hear from you.</p></div></section><section class="container contact-page"><div class="contact-intro"><h2>Choose the way that works for you.</h2><p>For the fastest watch inquiry, open a watch page and copy its prepared message before opening Messenger. We will know exactly which piece you mean.</p></div><div class="contact-methods"><a class="contact-method" href="${config.messenger}" target="_blank" rel="noopener"><span class="contact-icon">↗</span><div><small>CHAT WITH US</small><h3>Messenger</h3><p>Send a direct message to Graceful Gifts Manila.</p></div><span>↗</span></a><a class="contact-method" href="tel:+639755996605"><span class="contact-icon">☎</span><div><small>GIVE US A CALL</small><h3>0975 599 6605</h3><p>Call us from your mobile phone.</p></div><span>↗</span></a><a class="contact-method" href="viber://chat?number=%2B639755996605"><span class="contact-icon">✦</span><div><small>MESSAGE ON VIBER</small><h3>0975 599 6605</h3><p>Open a conversation in Viber.</p></div><span>↗</span></a><a class="contact-method" href="${config.facebook}" target="_blank" rel="noopener"><span class="contact-icon">f</span><div><small>FOLLOW THE PAGE</small><h3>Facebook</h3><p>Visit our official Graceful Gifts Manila page.</p></div><span>↗</span></a></div></section></main>` + footer();
+  app.innerHTML = nav('Contact') + `<main><section class="page-heading"><div class="container"><p class="eyebrow">HERE TO HELP</p><h1>Let's talk watches.</h1><p>Questions about a piece? We would love to hear from you.</p></div></section><section class="container contact-page"><div class="contact-intro"><h2>Choose the way that works for you.</h2><p>Open our website chat to ask about a watch. We will reply in the same conversation.</p></div><div class="contact-methods"><a class="contact-method" href="${config.messenger}" target="_blank" rel="noopener"><span class="contact-icon">↗</span><div><small>CHAT WITH US</small><h3>Messenger</h3><p>Send a direct message to Graceful Gifts Manila.</p></div><span>↗</span></a><a class="contact-method" href="tel:+639755996605"><span class="contact-icon">☎</span><div><small>GIVE US A CALL</small><h3>0975 599 6605</h3><p>Call us from your mobile phone.</p></div><span>↗</span></a><a class="contact-method" href="viber://chat?number=%2B639755996605"><span class="contact-icon">✦</span><div><small>MESSAGE ON VIBER</small><h3>0975 599 6605</h3><p>Open a conversation in Viber.</p></div><span>↗</span></a><a class="contact-method" href="${config.facebook}" target="_blank" rel="noopener"><span class="contact-icon">f</span><div><small>FOLLOW THE PAGE</small><h3>Facebook</h3><p>Visit our official Graceful Gifts Manila page.</p></div><span>↗</span></a></div></section></main>` + footer();
   afterRender();
 }
 function notice(message) {
@@ -330,15 +330,14 @@ async function copyText(text) {
   }
 }
 async function handleInquiry(button, watches) {
-  if (button.dataset.copied === 'true') { window.open(config.messenger, '_blank', 'noopener'); return; }
-  if (!watches.length) { notice('Select at least one watch first.'); return; }
-  try {
-    if (!await copyText(inquiryMessage(watches))) throw new Error('Copy failed');
-    button.dataset.copied = 'true'; button.textContent = '✓ Message copied — Open Messenger';
-    button.classList.add('copied'); notice('Message copied. Open Messenger and paste it.');
-  } catch { notice('Could not copy the message. Please check clipboard permission.'); }
+  if (!watches.length && button?.hasAttribute('data-inquire')) { notice('Watch not found.'); return; }
+  if (watches.length > 8) { notice('Select up to 8 watches for one inquiry.'); return; }
+  const products = watches.map((watch) => ({ id: watch.id, name: watchName(watch), brand: watch.brand, price: watch.price, image: watch.localImage || '', url: 'https://graceful-gifts-manila.web.app/watch/' + encodeURIComponent(watch.id) }));
+  try { const { openChat } = await import('/chat.js'); await openChat(products); }
+  catch (error) { notice(error?.message || 'Chat is unavailable right now. Please try again.'); }
 }
 function afterRender() {
+  document.dispatchEvent(new Event('ggm:route'));
   const actions = document.querySelector('.nav-actions');
   if (actions && !actions.querySelector('[data-theme-toggle]')) {
     const toggle = document.createElement('button');
@@ -458,6 +457,7 @@ document.addEventListener('click', async (event) => {
     filters = { query:'', brand:'', size:'', dial:'', movement:'', category:'', availability:'', min:'', max:'', sort:'newest' }; shown = 24; catalogPage(); return;
   }
   if (button.matches('[data-load-more]')) { shown += 24; updateResults(); return; }
+  if (button.matches('[data-open-chat]')) { await handleInquiry(button, []); return; }
   if (button.matches('[data-inquire]')) { const watch = catalog.watches.find((item) => item.id === button.dataset.inquire); await handleInquiry(button, watch ? [watch] : []); return; }
   if (button.matches('[data-inquire-selected]')) { await handleInquiry(button, catalog.watches.filter((watch) => selected.has(watch.id))); return; }
   if (button.matches('[data-select-all]')) { const rows = catalog.watches.filter((watch) => favorites.has(watch.id)); selected = selected.size === rows.length ? new Set() : new Set(rows.map((watch) => watch.id)); favoritesPage(); return; }
@@ -472,6 +472,13 @@ async function init() {
     catalog = await response.json(); if (!Array.isArray(catalog.watches)) throw new Error('Invalid catalog');
     path = decodeURIComponent(location.pathname);
     renderRoute();
+    try {
+      if (localStorage.getItem('ggm-chat-started') === '1') {
+        const resumeChat = () => import('/chat.js').then(({ watchChat }) => watchChat()).catch(() => {});
+        if ('requestIdleCallback' in window) requestIdleCallback(resumeChat);
+        else setTimeout(resumeChat, 500);
+      }
+    } catch {}
     if (location.hash === '#physical-store') requestAnimationFrame(() => document.getElementById('physical-store')?.scrollIntoView());
     startFeedback();
   } catch {

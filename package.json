@@ -12,9 +12,19 @@
     "test:browser": "node scripts/browser-qa.mjs",
     "test:history": "node scripts/history-qa.mjs",
     "test:search": "node scripts/search-qa.mjs",
-    "test:opening": "node scripts/opening-qa.mjs"
+    "test:opening": "node scripts/opening-qa.mjs",
+    "test:chat-rules": "node scripts/chat-rules.mjs",
+    "test:chat-browser": "node scripts/chat-browser-qa.mjs"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
     "playwright-core": "1.64.0"
+  },
+  "dependencies": {
+    "esbuild": "^0.25.12",
+    "firebase": "^11.10.0"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.13.6"
   }
 }

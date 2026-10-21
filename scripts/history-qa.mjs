@@ -22,7 +22,7 @@ try {
   assert.match(new URL(page.url()).pathname, /^\/watch\//);
   assert.equal(await page.locator('.breadcrumbs, .detail-description').count(), 0, 'Watch page should omit repeated navigation and raw description');
   assert.equal(await page.locator('.trust-banner').isVisible(), false, 'Watch page should omit the announcement strip');
-  assert.equal(await page.locator('.floating-chat').isVisible(), false, 'Watch page should have one inquiry action');
+  assert.equal(await page.locator('.floating-chat').isVisible(), true, 'Watch page keeps customer chat accessible');
   assert.equal(await page.locator('.detail-back').isVisible(), true);
   const photoPosition = await page.evaluate(() => ({ scroll: scrollY, photoTop: document.querySelector('.detail-image').getBoundingClientRect().top, headerBottom: document.querySelector('.site-header').getBoundingClientRect().bottom }));
   assert.ok(photoPosition.scroll > 20, `Photo tap should land at the watch photo, not the page top: ${JSON.stringify(photoPosition)}`);

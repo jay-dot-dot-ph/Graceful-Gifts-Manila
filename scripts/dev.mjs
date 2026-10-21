@@ -11,6 +11,7 @@ http.createServer((request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, `http://127.0.0.1:${port}`).pathname);
     let relative = pathname === '/' ? 'index.html' : pathname.slice(1);
     if (/^watch\/[A-Z0-9-]+$/i.test(relative)) relative += '.html';
+    else if (/^admin\/(chat|staff)$/.test(relative)) relative = 'admin.html';
     else if (/^(watches(?:\/[a-z0-9-]+)?|brands|favorites|contact)$/.test(relative)) relative = 'index.html';
     let path = resolve(root, relative);
     if (!path.startsWith(root + sep) || !existsSync(path)) path = resolve(root, '404.html');

@@ -6,7 +6,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = resolve(root, "dist");
 if (!dist.startsWith(root + sep)) throw new Error("Build output escaped the site checkout.");
 const source = readFileSync(join(root, "worker/index.js"), "utf8");
-const styles = readFileSync(join(root, "worker/styles.css"), "utf8");
+const styles = readFileSync(join(root, "worker/styles.css"), "utf8") + '\n' + readFileSync(join(root, "worker/chat.css"), "utf8");
 const openingStyles = readFileSync(join(root, "worker/opening.css"), "utf8");
 const client = readFileSync(join(root, "worker/client.js"), "utf8");
 const openingScript = readFileSync(join(root, "worker/opening.js"), "utf8");

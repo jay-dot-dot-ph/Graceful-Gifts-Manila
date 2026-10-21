@@ -19,7 +19,7 @@ try {
   await page.waitForFunction(() => { const img = document.querySelector('.hero-visual img'); return img && img.complete && img.naturalWidth > 0; }, null, { timeout: 20000 });
   assert.equal(await page.locator('.hero-visual img').evaluate((img) => img.complete && img.naturalWidth > 0), true, 'Hero watch image should load');
   assert.match(await page.locator('.trust-banner').innerText(), /Cash on Delivery Nationwide[\s\S]*Inspect Before Paying[\s\S]*Forbes Commercial/);
-  assert.equal(await page.locator('.floating-chat').getAttribute('href'), 'https://m.me/GracefulGifts.Manila');
+  assert.equal(await page.locator('.floating-chat').getAttribute('data-open-chat'), '');
   assert.equal(await page.locator('.card-inquire, .watch-modal').count(), 0, 'Card inquiry and specs modal are removed');
   await page.screenshot({ path: resolve(output, 'qa-desktop.png') });
   await page.locator('.desktop-nav a[href="/brands"]').click();
@@ -112,16 +112,11 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.locator('.specs-section').screenshot({ path: resolve(output, 'qa-watch-specs.png') });
+  await page.route('**/chat.js', (route) => route.fulfill({ contentType: 'text/javascript', body: 'export async function openChat(products) { window.__chatProducts = products; }' }));
   await page.locator('.inquiry-button').click();
-  await page.locator('.inquiry-button.copied').waitFor({ timeout: 5000 });
-  assert.match(await page.locator('.inquiry-button').innerText(), /MESSAGE COPIED/i);
-  const message = await page.evaluate(() => navigator.clipboard.readText());
-  assert.match(message, /Watch ID: AP-001/);
-  assert.match(message, /₱5,950/);
-  assert.match(message, /\/watch\/AP-001/);
-  await page.evaluate(() => { window.open = (url) => { window.__lastMessengerUrl = url; }; });
-  await page.locator('.inquiry-button').click();
-  assert.equal(await page.evaluate(() => window.__lastMessengerUrl), 'https://m.me/GracefulGifts.Manila');
+  await page.waitForFunction(() => window.__chatProducts?.length === 1);
+  assert.equal(await page.evaluate(() => window.__chatProducts[0].id), 'AP-001');
+  assert.match(await page.evaluate(() => window.__chatProducts[0].url), /\/watch\/AP-001$/);
   await page.locator('.favorite-detail').click();
   await page.goto(base + '/favorites');
   await page.locator('.favorite-row').waitFor({ timeout: 30000 });
@@ -130,15 +125,13 @@ try {
   await page.locator('[data-select]').check();
   assert.equal(await page.locator('[data-inquire-selected]').isEnabled(), true);
   await page.locator('[data-inquire-selected]').click();
-  await page.locator('[data-inquire-selected].copied').waitFor({ timeout: 5000 });
-  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /AP-001/);
+  await page.waitForFunction(() => window.__chatProducts?.some((product) => product.id === 'AP-001'));
   await page.goto(`${base}/watch/${soldOut.id}`);
   await page.locator('.detail-copy h1').waitFor({ timeout: 30000 });
   assert.match(await page.locator('.detail-stock').innerText(), /Sold out/i);
   assert.match(await page.locator('.soldout-notice').innerText(), /This item is currently unavailable/i);
   await page.locator('.inquiry-button').click();
-  await page.locator('.inquiry-button.copied').waitFor({ timeout: 5000 });
-  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /currently sold out/);
+  await page.waitForFunction((id) => window.__chatProducts?.some((product) => product.id === id), soldOut.id);
   await page.goto(base + '/contact');
   await page.locator('.contact-method').first().waitFor({ timeout: 30000 });
   assert.equal(await page.locator('a[href="tel:+639755996605"]').count() > 0, true);

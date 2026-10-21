@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { feedbackAssets } from './feedback-assets.mjs';
 import { loadPublicCatalog } from './public-catalog.mjs';
 import { writeSiteFingerprint } from './site-fingerprint.mjs';
+import { build as bundle } from 'esbuild';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, 'hosting-dist');
@@ -95,6 +96,14 @@ const readRoute = async (path) => {
   return response.text();
 };
 writeFileSync(join(output, 'styles.css'), await readRoute('/styles.css'));
+copyFileSync(join(root, 'worker', 'admin.css'), join(output, 'admin.css'));
+copyFileSync(join(root, 'worker', 'admin.html'), join(output, 'admin.html'));
+await bundle({ entryPoints: [join(root, 'chat', 'customer.js'), join(root, 'chat', 'admin.js')], outdir: output, entryNames: '[name]', bundle: true, format: 'esm', splitting: true, minify: true, target: 'es2022' });
+copyFileSync(join(output, 'customer.js'), join(output, 'chat.js'));
+const localFirebaseConfig = join(root, 'firebase-config.local.json');
+const webConfig = process.env.GGM_FIREBASE_WEB_CONFIG || (existsSync(localFirebaseConfig) ? readFileSync(localFirebaseConfig, 'utf8') : '{}');
+const parsedWebConfig = JSON.parse(webConfig);
+writeFileSync(join(output, 'firebase-config.json'), JSON.stringify(parsedWebConfig));
 const client = await readRoute('/app.js');
 const staticClient = client.replace("fetch('/api/catalog')", "fetch('/api/catalog.json')");
 if (staticClient === client) throw new Error('Catalog URL was not replaced in the browser script.');
