@@ -1,0 +1,19 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signed() { return request.auth != null; }
+    function conversation(id) { return firestore.get(/databases/(default)/documents/conversations/$(id)).data; }
+    function staffProfile() { return firestore.get(/databases/(default)/documents/staff/$(request.auth.uid)).data; }
+    function customer(id) { return signed() && request.auth.token.firebase.sign_in_provider == 'anonymous' && !firestore.exists(/databases/(default)/documents/blockedCustomers/$(id)) && conversation(id).customerUid == request.auth.uid; }
+    function authorizedStaff(id) { return signed() && request.auth.token.firebase.sign_in_provider != 'anonymous' && staffProfile().active == true && staffProfile().role in ['owner','admin','staff'] && (staffProfile().role in ['owner','admin'] || conversation(id).assignedStaffUid == request.auth.uid); }
+    function allowedType() { return (request.resource.contentType in ['image/jpeg','image/png','image/webp','image/gif'] && request.resource.size <= 8000000) || (request.resource.contentType in ['video/mp4','video/webm','video/quicktime'] && request.resource.size <= 30000000); }
+    match /chatMedia/{conversationId}/{messageId}/file {
+      allow get: if signed() && (customer(conversationId) || authorizedStaff(conversationId));
+      allow list: if false;
+      allow create: if resource == null && signed() && messageId.matches('^[A-Za-z0-9]{20}$') && request.resource.size > 0 && allowedType() && request.resource.metadata.uploaderUid == request.auth.uid && (customer(conversationId) || authorizedStaff(conversationId));
+      allow update: if false;
+      allow delete: if signed() && request.auth.token.firebase.sign_in_provider != 'anonymous' && staffProfile().active == true && staffProfile().role == 'owner' && conversation(conversationId).customerUid == conversationId;
+    }
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}

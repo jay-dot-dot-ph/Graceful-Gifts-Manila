@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, getDoc, collection, query, where, orderBy, limit, getDocs, runTransaction, updateDoc, serverTimestamp, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, orderBy, limit, getDocs, runTransaction, writeBatch, updateDoc, serverTimestamp, setDoc, deleteDoc } from 'firebase/firestore';
 import { sendMessage } from '../chat/firebase.js';
 import { acknowledge, receiptRef, olderReceipts } from '../chat/receipts.js';
 
@@ -94,5 +94,36 @@ try {
   await assertFails(setDoc(doc(customer, 'staff', 'owner-uid', 'pushTokens', 'b'.repeat(40)), { token: 't'.repeat(80), createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
   await assertFails(updateDoc(tokenRef, { token: 'replaced' }));
   await assertSucceeds(deleteDoc(tokenRef));
-  console.log('Firestore rules passed: customer isolation, inquiry, assignment, staff scope, role protection, rate limit, revocation, and private push tokens.');
+  const blocked = doc(admin, 'blockedCustomers', 'customer-uid');
+  await assertFails(setDoc(doc(customer, 'blockedCustomers', 'customer-uid'), { blockedAt: serverTimestamp(), blockedBy: 'customer-uid' }));
+  await assertFails(setDoc(doc(otherStaff, 'blockedCustomers', 'customer-uid'), { blockedAt: serverTimestamp(), blockedBy: 'other-staff-uid' }));
+  const blockBatch = writeBatch(admin);
+  blockBatch.set(blocked, { blockedAt: serverTimestamp(), blockedBy: 'admin-uid' });
+  blockBatch.set(doc(collection(admin, 'auditLogs')), { action: 'block', conversationId: 'customer-uid', actorUid: 'admin-uid', createdAt: serverTimestamp() });
+  await assertSucceeds(blockBatch.commit());
+  await assertFails(getDoc(doc(customer, 'conversations', 'customer-uid')));
+  await assertFails(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Blocked visitor message'));
+  await assertFails(sendMessage(owner, 'customer-uid', 'owner-uid', 'owner', 'Blocked staff reply'));
+  const unblockBatch = writeBatch(admin);
+  unblockBatch.delete(blocked);
+  unblockBatch.set(doc(collection(admin, 'auditLogs')), { action: 'unblock', conversationId: 'customer-uid', actorUid: 'admin-uid', createdAt: serverTimestamp() });
+  await assertSucceeds(unblockBatch.commit());
+  await assertSucceeds(getDoc(doc(customer, 'conversations', 'customer-uid')));
+  await assertFails(deleteDoc(doc(admin, 'conversations', 'customer-uid')));
+  await assertFails(deleteDoc(doc(customer, 'conversations', 'customer-uid', 'messages', finalCustomerMessageId)));
+  const ownerConversation = doc(owner, 'conversations', 'customer-uid');
+  for (const name of ['messages', 'receipts']) {
+    const page = await getDocs(collection(owner, 'conversations', 'customer-uid', name));
+    const batch = writeBatch(owner);
+    page.docs.forEach((item) => batch.delete(item.ref));
+    await assertSucceeds(batch.commit());
+  }
+  const deleteBatch = writeBatch(owner);
+  deleteBatch.delete(ownerConversation);
+  deleteBatch.set(doc(collection(owner, 'auditLogs')), { action: 'delete', conversationId: 'customer-uid', actorUid: 'owner-uid', createdAt: serverTimestamp() });
+  await assertSucceeds(deleteBatch.commit());
+  await environment.withSecurityRulesDisabled(async (context) => {
+    assert.equal((await getDoc(doc(context.firestore(), 'conversations', 'customer-uid'))).exists(), false);
+  });
+  console.log('Firestore rules passed: customer isolation, inquiry, assignment, staff scope, role protection, rate limit, revocation, private push tokens, block, and delete.');
 } finally { await environment.cleanup(); }

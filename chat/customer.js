@@ -1,8 +1,9 @@
-import { customerSession, doc, collection, query, orderBy, limit, startAfter, getDocs, onSnapshot, updateDoc, serverTimestamp, sendMessage, newMessageId, displayError, safeProduct } from './firebase.js';
+import { customerSession, firebase, doc, collection, query, orderBy, limit, startAfter, getDocs, onSnapshot, updateDoc, serverTimestamp, sendMessage, newMessageId, displayError, safeProduct } from './firebase.js';
 import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } from './receipts.js';
 import { createNotifier } from './notify.js';
+import { mediaEnabled, checkFile, uploadMedia, mediaMarkup, hydrateMedia } from './media.js';
 
-const state = { open: false, products: [], messages: [], older: [], receipts: new Map(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', name: '', contact: '', error: '', conversation: null, pending: null, sending: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
+const state = { open: false, products: [], messages: [], older: [], receipts: new Map(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', name: '', contact: '', error: '', conversation: null, pending: null, sending: false, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
 const sound = createNotifier('customer', () => renderChrome());
 let connectionPromise, db, uid;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -18,12 +19,13 @@ const allMessages = () => { const all = [...state.older, ...state.messages]; if 
 function ensureRoot() {
   let root = document.getElementById('ggm-chat'); if (root) return root;
   root = document.createElement('aside'); root.id = 'ggm-chat'; root.className = 'ggm-chat'; root.setAttribute('aria-label', 'Graceful Gifts Manila customer support');
-  root.innerHTML = `<div class="ggm-chat-head"><span class="chat-store-avatar" aria-hidden="true">G</span><div class="chat-store-label"><strong>Graceful Gifts Manila</strong><span>Customer Support</span></div><button type="button" class="chat-sound" data-sound aria-label="Mute sounds"></button><button type="button" class="chat-close" data-chat-close aria-label="Close chat">×</button></div><div class="ggm-chat-body" id="ggm-chat-body" role="log" aria-label="Conversation messages"></div><div class="ggm-chat-products"></div><div class="ggm-chat-identity"><label>Your name (optional)<input name="name" maxlength="80" autocomplete="name"></label><label>Email or phone (optional)<input name="contact" maxlength="120" autocomplete="email"></label></div><form id="ggm-chat-form" class="ggm-chat-form"><label for="ggm-chat-message" class="visually-hidden">Your message</label><textarea id="ggm-chat-message" maxlength="2000" rows="2" placeholder="Write your message…" required></textarea><button type="submit">Send</button></form><p class="ggm-chat-error" role="alert" hidden></p>`;
+  root.innerHTML = `<div class="ggm-chat-head"><span class="chat-store-avatar" aria-hidden="true">G</span><div class="chat-store-label"><strong>Graceful Gifts Manila</strong><span>Customer Support</span></div><button type="button" class="chat-sound" data-sound aria-label="Mute sounds"></button><button type="button" class="chat-close" data-chat-close aria-label="Close chat">×</button></div><div class="ggm-chat-body" id="ggm-chat-body" role="log" aria-label="Conversation messages"></div><div class="ggm-chat-products"></div><div class="ggm-chat-identity"><label>Your name (optional)<input name="name" maxlength="80" autocomplete="name"></label><label>Email or phone (optional)<input name="contact" maxlength="120" autocomplete="email"></label></div><div class="chat-attachment-preview" id="ggm-attachment-preview" hidden></div><form id="ggm-chat-form" class="ggm-chat-form"><label class="chat-attach" id="ggm-attach-label" hidden title="Send a message first to start the conversation">＋<span class="visually-hidden">Attach photo or video</span><input id="ggm-chat-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" hidden></label><label for="ggm-chat-message" class="visually-hidden">Your message</label><textarea id="ggm-chat-message" maxlength="2000" rows="2" placeholder="Write your message…"></textarea><button type="submit">Send</button></form><p class="ggm-chat-error" role="alert" hidden></p>`;
   document.body.append(root);
   root.querySelector('[data-chat-close]').onclick = () => { state.open = false; render(); };
   root.querySelector('[data-sound]').onclick = () => sound.toggle();
   root.querySelector('form').onsubmit = submit;
   root.querySelector('textarea').oninput = (event) => { state.draft = event.target.value; };
+  root.querySelector('#ggm-chat-file').onchange = (event) => { try { const file = event.target.files[0]; if (file) { checkFile(file); state.attachment = file; state.error = ''; } } catch (error) { state.error = displayError(error); } event.target.value = ''; renderChrome(); };
   root.querySelector('textarea').onkeydown = (event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); root.querySelector('form').requestSubmit(); } };
   root.querySelector('[name=name]').oninput = (event) => { state.name = event.target.value; };
   root.querySelector('[name=contact]').oninput = (event) => { state.contact = event.target.value; };
@@ -39,6 +41,10 @@ function renderChrome() {
   products.querySelector('[data-chat-clear]')?.addEventListener('click', () => { state.products = []; renderChrome(); });
   const composer = root.querySelector('textarea'); if (composer.value !== state.draft) composer.value = state.draft;
   composer.disabled = state.sending || state.loading;
+  const attach = root.querySelector('#ggm-attach-label'); attach.hidden = !state.mediaAvailable; attach.classList.toggle('is-disabled', state.sending || !state.conversation); attach.title = state.conversation ? 'Attach photo or video' : 'Send a message first to start the conversation';
+  root.querySelector('#ggm-chat-file').disabled = state.sending || !state.conversation;
+  const preview = root.querySelector('#ggm-attachment-preview'); preview.hidden = !state.attachment; preview.innerHTML = state.attachment ? `<span>${esc(state.attachment.name)} · ${(state.attachment.size / 1_000_000).toFixed(1)} MB${state.sending ? ` · ${state.uploadProgress}%` : ''}</span><button type="button" data-remove-attachment ${state.sending ? 'disabled' : ''} aria-label="Remove attachment">×</button>` : '';
+  preview.querySelector('[data-remove-attachment]')?.addEventListener('click', () => { state.attachment = null; renderChrome(); });
   const send = root.querySelector('form button'); send.disabled = composer.disabled; send.textContent = state.sending ? 'Sending…' : 'Send';
   const error = root.querySelector('.ggm-chat-error'); error.hidden = !state.error; error.textContent = state.error;
   const badge = document.querySelector('[data-chat-badge]');
@@ -52,12 +58,13 @@ function renderMessages() {
   body.innerHTML = `${state.loading ? '<p class="ggm-chat-hint">Loading conversation…</p>' : ''}${!all.length && !state.loading ? '<p class="ggm-chat-hint">Hello! Ask us about a watch and we will reply here.</p>' : ''}${state.first ? '<button type="button" class="ggm-chat-more" data-chat-more>Load earlier messages</button>' : ''}${all.map((item) => {
     const outgoing = item.senderUid === uid || item.senderRole === 'customer' && !uid;
     const label = status(item, state.receipts.get(item.id));
-    return `<div class="ggm-chat-bubble ${outgoing ? 'outgoing' : 'incoming'}" data-message-id="${esc(item.id)}"><p>${esc(item.message)}</p>${(item.productReferences || []).map(productCard).join('')}<small>${time(item.createdAt)}</small>${outgoing ? `<span class="chat-receipt" aria-label="Message status: ${label}">${label}${item.failed ? ' <button type="button" data-retry>Retry</button>' : ''}</span>${item.id === latestSeen ? `<span class="chat-seen-avatar" aria-label="Seen by store"><span aria-hidden="true">${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : 'G'}</span>Seen by store</span>` : ''}` : ''}</div>`;
+    return `<div class="ggm-chat-bubble ${outgoing ? 'outgoing' : 'incoming'}" data-message-id="${esc(item.id)}"><p>${esc(item.message)}</p>${item.media ? mediaMarkup(item.media, uid, item.id) : ''}${(item.productReferences || []).map(productCard).join('')}<small>${time(item.createdAt)}</small>${outgoing ? `<span class="chat-receipt" aria-label="Message status: ${label}">${label}${item.failed ? ' <button type="button" data-retry>Retry</button>' : ''}</span>${item.id === latestSeen ? `<span class="chat-seen-avatar" aria-label="Seen by store"><span aria-hidden="true">${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : 'G'}</span>Seen by store</span>` : ''}` : ''}</div>`;
   }).join('')}`;
   body.querySelector('[data-chat-more]')?.addEventListener('click', loadOlder);
   body.querySelector('[data-retry]')?.addEventListener('click', sendPending);
   body.querySelectorAll('.chat-watch-photo img').forEach((img) => img.onerror = () => { img.replaceWith(Object.assign(document.createElement('span'), { textContent: 'G' })); });
   body.querySelectorAll('.chat-seen-avatar img').forEach((img) => img.onerror = () => { img.replaceWith(document.createTextNode('G')); });
+  if (body.querySelector('[data-media-path]')) firebase().then(({ app, config }) => hydrateMedia(body, app, config.emulator)).catch(() => {});
   if (state.open) requestAnimationFrame(() => { body.scrollTop = nearBottom ? body.scrollHeight : top + body.scrollHeight - before; scheduleSeen(); });
 }
 function render() { renderChrome(); renderMessages(); }
@@ -124,16 +131,18 @@ async function sendPending() {
   try {
     await ensureConnected(); if (state.pending.id.startsWith('local-')) state.pending.id = newMessageId(db, uid);
     const pending = state.pending;
-    await sendMessage(db, uid, uid, 'customer', pending.message, pending.productReferences, { name: state.name, contact: state.contact }, pending.id);
+    if (pending.file && !pending.media) { const { app, config } = await firebase(); pending.media = await uploadMedia(app, config.emulator, uid, pending.id, uid, pending.file, (value) => { state.uploadProgress = value; renderChrome(); }); }
+    await sendMessage(db, uid, uid, 'customer', pending.message, pending.productReferences, { name: state.name, contact: state.contact }, pending.id, pending.media);
     try { localStorage.setItem('ggm-chat-started', '1'); } catch {}
-    pending.pending = false; state.products = []; if (state.draft.trim() === pending.message) state.draft = '';
+    pending.pending = false; state.products = []; if (state.draft.trim() === pending.text) state.draft = ''; if (state.attachment === pending.file) state.attachment = null;
   } catch (error) { if (state.pending) { state.pending.pending = false; state.pending.failed = true; } state.error = displayError(error); }
   state.sending = false; render();
 }
 function submit(event) {
-  event.preventDefault(); const text = state.draft.trim(); if (!text || state.sending) return;
+  event.preventDefault(); const text = state.draft.trim(); if ((!text && !state.attachment) || state.sending) return;
+  if (state.attachment && !state.conversation) { state.error = 'Send a message first to start the conversation, then attach a photo or video.'; renderChrome(); return; }
   if (state.pending?.failed) { state.error = 'Retry the failed message first.'; renderChrome(); return; }
-  state.pending = { id: `local-${Date.now()}`, senderUid: uid, senderRole: 'customer', message: text, productReferences: [...state.products], pending: true }; sendPending();
+  state.pending = { id: `local-${Date.now()}`, senderUid: uid, senderRole: 'customer', message: text || (state.attachment?.type.startsWith('image/') ? 'Photo' : 'Video'), text, file: state.attachment, productReferences: [...state.products], pending: true }; sendPending();
 }
 export async function openChat(watches = []) {
   state.products = [...new Map([...state.products, ...watches.map(safeProduct)].map((watch) => [watch.id, watch])).values()].slice(0, 8);
@@ -148,3 +157,4 @@ function sizeChat() { if (!window.visualViewport) return; document.documentEleme
 window.visualViewport?.addEventListener('resize', sizeChat);
 window.visualViewport?.addEventListener('scroll', sizeChat);
 sizeChat();
+mediaEnabled().then((enabled) => { state.mediaAvailable = enabled; if (document.getElementById('ggm-chat')) renderChrome(); });

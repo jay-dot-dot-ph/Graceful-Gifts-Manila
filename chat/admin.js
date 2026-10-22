@@ -1,16 +1,17 @@
-import { firebase, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, updateDoc, setDoc, serverTimestamp, sendMessage, newMessageId, displayError } from './firebase.js';
+import { firebase, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, writeBatch, updateDoc, setDoc, deleteDoc, serverTimestamp, sendMessage, newMessageId, displayError } from './firebase.js';
 import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } from './receipts.js';
 import { createNotifier } from './notify.js';
 import { guestIdentity } from './guest.js';
 import { enablePush, refreshPush, revokePush, pushEnabled, pushAvailable } from './push.js';
+import { mediaEnabled, checkFile, uploadMedia, deleteChatMedia, mediaMarkup, hydrateMedia } from './media.js';
 
 const root = document.getElementById('admin-app');
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const stamp = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Just now';
-const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
+const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, attachment: null, uploadProgress: 0, mediaAvailable: false, blocked: false, moderationBusy: false, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubBlock: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
 const sound = createNotifier('staff', () => updateHeader());
 let noticeTimer, deepLinkHandled = false;
-function cleanup() { if (previewDialog?.open) previewDialog.close(); for (const key of ['unsubInbox', 'unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubProfile', 'unsubStaff', 'unsubActivity', 'unsubSettings']) { state[key]?.(); state[key] = null; } }
+function cleanup() { if (previewDialog?.open) previewDialog.close(); for (const key of ['unsubInbox', 'unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubBlock', 'unsubProfile', 'unsubStaff', 'unsubActivity', 'unsubSettings']) { state[key]?.(); state[key] = null; } }
 function profileName(uid) { return state.staff.find((person) => person.id === uid)?.displayName || (uid ? 'Staff member' : 'Unassigned'); }
 function product(watch) { if (!/^[A-Z0-9-]{2,20}$/.test(watch.id || '')) return ''; const image = /^\/images\/[A-Za-z0-9._-]+$/.test(watch.image || '') ? watch.image : ''; const detail = [watch.id, watch.brand, watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`, watch.size || ''].filter(Boolean).join(' · '); return `<button type="button" class="admin-product" data-preview-product="${esc(watch.id)}" aria-label="Preview ${esc(watch.name || watch.id)}"><span class="chat-watch-photo">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}" loading="lazy">` : '<span aria-hidden="true">G</span>'}</span><span><strong>${esc(watch.name || watch.id)}</strong><small>${esc(detail)}</small></span></button>`; }
 function avatar(identity) { return `<span class="guest-avatar guest-shape-${identity.shape}" style="--guest-color:${identity.color}" aria-hidden="true">${identity.mark}</span>`; }
@@ -58,31 +59,64 @@ function header() {
 }
 function updateHeader() { const link = root.querySelector('.admin-inbox-link'); if (link) { link.setAttribute('aria-label', `Inbox, ${state.unread} unread`); const badge = link.querySelector('b'); badge.hidden = !state.unread; badge.textContent = state.unread > 9 ? '9+' : String(state.unread); } const button = root.querySelector('[data-sound]'); if (button) { button.textContent = sound.label(); button.setAttribute('aria-pressed', String(sound.enabled)); } const push = root.querySelector('[data-push]'); if (push) { push.disabled = !state.pushAvailable; if (state.pushAvailable) push.removeAttribute('title'); push.textContent = state.pushAvailable ? state.pushActive ? 'Disable background alerts' : 'Enable background alerts' : 'Background alerts need setup'; } const notice = root.querySelector('.admin-notice'); if (notice) notice.textContent = state.notice; }
 function renderLogin() { root.innerHTML = `<main class="admin-login"><form id="admin-login-form" class="admin-card"><p class="eyebrow">GRACEFUL GIFTS MANILA</p><h1>Staff sign in</h1><p>Use your individual staff account.</p><label>Email<input type="email" name="email" autocomplete="username" required></label><label>Password<input type="password" name="password" autocomplete="current-password" required></label><button class="admin-primary" type="submit">Sign in</button>${state.error ? `<p class="admin-error" role="alert">${esc(state.error)}</p>` : ''}</form></main>`; root.querySelector('form').onsubmit = login; }
-function row(item) { const unread = item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); return `<button type="button" class="admin-inbox-row ${unread ? 'unread' : ''} ${state.selected === item.id ? 'selected' : ''}" data-select-chat="${esc(item.id)}"><span class="admin-row-top">${customerLabel(item)}<time>${stamp(item.lastMessageAt)}</time></span><span class="admin-row-summary"><span class="admin-row-preview">${esc(item.lastMessage || '')}</span>${unread ? '<b class="admin-row-unread" aria-label="Unread message"></b>' : ''}</span><span class="admin-row-meta"><em>${esc(item.status)}</em><span>${esc(profileName(item.assignedStaffUid))}</span></span></button>`; }
+function row(item) { const unread = item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); return `<button type="button" class="admin-inbox-row ${unread ? 'unread' : ''} ${state.selected === item.id ? 'selected' : ''}" data-select-chat="${esc(item.id)}"><span class="admin-row-top">${customerLabel(item)}<time>${stamp(item.lastMessageAt)}</time></span><span class="admin-row-summary"><span class="admin-row-preview">${esc(item.lastMessage || '')}</span>${unread ? '<b class="admin-row-unread" aria-label="Unread message"></b>' : ''}</span><span class="admin-row-meta">${state.blocked && state.selected === item.id ? '<em>Blocked · </em>' : ''}<span>${esc(profileName(item.assignedStaffUid))}</span></span></button>`; }
+function updateMediaForm() {
+  const form = root.querySelector('#admin-reply'); if (!form) return;
+  const attach = form.querySelector('.chat-attach'); attach.hidden = !state.mediaAvailable; attach.classList.toggle('is-disabled', state.replySending || state.blocked);
+  form.querySelector('#admin-chat-file').disabled = state.replySending || state.blocked;
+  const preview = form.querySelector('.chat-attachment-preview'); preview.hidden = !state.attachment;
+  preview.innerHTML = state.attachment ? `<span>${esc(state.attachment.name)} · ${(state.attachment.size / 1_000_000).toFixed(1)} MB${state.replySending ? ` · ${state.uploadProgress}%` : ''}</span><button type="button" data-remove-attachment ${state.replySending ? 'disabled' : ''} aria-label="Remove attachment">×</button>` : '';
+  preview.querySelector('[data-remove-attachment]')?.addEventListener('click', () => { state.attachment = null; updateMediaForm(); });
+}
+function setupMediaForm() {
+  const form = root.querySelector('#admin-reply'); if (!form) return;
+  form.querySelector('#admin-message').required = false;
+  if (!form.querySelector('#admin-chat-file')) {
+    const attach = document.createElement('label'); attach.className = 'chat-attach'; attach.innerHTML = '＋<span class="visually-hidden">Attach photo or video</span><input id="admin-chat-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" hidden>';
+    form.prepend(attach);
+    const preview = document.createElement('div'); preview.className = 'chat-attachment-preview'; preview.hidden = true; form.prepend(preview);
+  }
+  form.querySelector('#admin-chat-file').onchange = (event) => { try { const file = event.target.files[0]; if (file) { checkFile(file); state.attachment = file; state.error = ''; } } catch (error) { state.error = displayError(error); } event.target.value = ''; updateMediaForm(); };
+  updateMediaForm();
+}
+function renderModerationMenu(selected) {
+  const controls = root.querySelector('.admin-controls');
+  if (!selected || !controls) return;
+  if (state.blocked) { const badge = document.createElement('span'); badge.className = 'admin-blocked-pill'; badge.textContent = 'Blocked'; controls.append(badge); }
+  if (!['owner', 'admin'].includes(state.profile?.role)) return;
+  const menu = document.createElement('details'); menu.className = 'admin-chat-menu';
+  menu.innerHTML = `<summary aria-label="Conversation options" title="Conversation options">⋮</summary><div role="menu"><button type="button" role="menuitem" data-block-user ${state.moderationBusy ? 'disabled' : ''}>${state.blocked ? 'Unblock user' : 'Block user'}</button>${state.profile.role === 'owner' ? `<button type="button" role="menuitem" class="danger" data-delete-chat ${state.moderationBusy ? 'disabled' : ''}>Delete chat</button>` : ''}</div>`;
+  controls.append(menu);
+  menu.querySelector('[data-block-user]').onclick = () => { menu.open = false; toggleBlock(); };
+  menu.querySelector('[data-delete-chat]')?.addEventListener('click', () => { menu.open = false; deleteConversation(); });
+  root.onpointerdown = (event) => { if (!event.target.closest('.admin-chat-menu')) menu.open = false; };
+}
 function renderChat() {
   const matches = state.rows.filter(matchesInbox);
   const selected = state.threadReady && state.rows.find((item) => item.id === state.selected);
   const oldReply = root.dataset.selected === state.selected ? root.querySelector('#admin-reply') : null;
   oldReply?.remove();
   root.innerHTML = header() + `<main class="admin-layout"><aside class="admin-inbox"><div class="admin-inbox-top"><h1>Conversations</h1><p>${state.unread} unread · ${state.rows.length} loaded</p><input id="admin-search" type="search" placeholder="Search loaded conversations" value="${esc(state.search)}"><select id="admin-filter" aria-label="Filter status">${['all','new','open','pending','resolved'].map((status) => `<option value="${status}" ${state.filter === status ? 'selected' : ''}>${status[0].toUpperCase() + status.slice(1)}</option>`).join('')}</select></div><div class="admin-inbox-list">${matches.length ? matches.map(row).join('') : '<p class="admin-empty">No conversations found.</p>'}${state.more ? '<button type="button" class="admin-more" data-more>Load more</button>' : ''}</div></aside><section class="admin-thread">${selected ? `<div class="admin-thread-head"><div><h2>${customerLabel(selected)}</h2><small>${esc(selected.customerContact || 'Anonymous website visitor')} · ${stamp(selected.createdAt)}</small></div><div class="admin-controls"><label>Status<select id="admin-status">${['new','open','pending','resolved'].map((status) => `<option value="${status}" ${selected.status === status ? 'selected' : ''}>${status[0].toUpperCase() + status.slice(1)}</option>`).join('')}</select></label>${state.profile?.role !== 'staff' ? `<label>Assigned<select id="admin-assignee"><option value="">Unassigned</option>${state.staff.filter((person) => person.active).map((person) => `<option value="${esc(person.id)}" ${selected.assignedStaffUid === person.id ? 'selected' : ''}>${esc(person.displayName)}</option>`).join('')}</select></label>` : `<span>Assigned: ${esc(profileName(selected.assignedStaffUid))}</span>`}</div></div><div class="admin-thread-body" id="admin-thread-body">${state.first ? '<button type="button" data-older>Load earlier messages</button>' : ''}${[...state.older, ...state.messages].map((message) => `<div class="admin-message ${message.senderRole === 'customer' ? 'customer' : 'staff'}"><small>${message.senderRole === 'customer' ? 'Customer' : esc(profileName(message.senderUid))} · ${stamp(message.createdAt)}</small><p>${esc(message.message)}</p>${(message.productReferences || []).map(product).join('')}</div>`).join('')}</div>${selected.productReferences?.length ? `<aside class="admin-refs"><strong>Watches discussed</strong>${selected.productReferences.map(product).join('')}</aside>` : ''}<form id="admin-reply"><label class="visually-hidden" for="admin-message">Reply</label><textarea id="admin-message" maxlength="2000" rows="2" placeholder="Write a reply…" required>${esc(state.replyDraft)}</textarea><button class="admin-primary" type="submit">Send reply</button></form>` : '<div class="admin-empty-thread">Select a conversation to read and reply.</div>'}</section></main>${state.error ? `<div class="admin-toast" role="alert">${esc(state.error)}<button type="button" data-clear-error>×</button></div>` : ''}`;
+  root.querySelector('#admin-filter')?.remove();
+  root.querySelector('#admin-status')?.closest('label')?.remove();
+  renderModerationMenu(selected);
   root.dataset.selected = state.selected || '';
   if (oldReply && selected) root.querySelector('#admin-reply')?.replaceWith(oldReply);
+  setupMediaForm();
   root.querySelector('.admin-layout').classList.toggle('thread-open', !!state.mobileThread);
   decorateThread();
   root.querySelector('#admin-search').oninput = (event) => { state.search = event.target.value.toLowerCase(); renderInboxOnly(); };
-  root.querySelector('#admin-filter').onchange = (event) => { state.filter = event.target.value; renderInboxOnly(); };
   bindInboxRows();
   root.querySelector('[data-more]')?.addEventListener('click', loadMore);
   root.querySelector('[data-older]')?.addEventListener('click', loadOlder);
-  root.querySelector('#admin-status')?.addEventListener('change', (event) => changeConversation({ status: event.target.value }));
   root.querySelector('#admin-assignee')?.addEventListener('change', (event) => changeConversation({ assignedStaffUid: event.target.value || null }));
-  const replyForm = root.querySelector('#admin-reply'); if (replyForm) { replyForm.onsubmit = reply; replyForm.querySelector('button').disabled = state.replySending; }
-  const replyBox = root.querySelector('#admin-message'); if (replyBox) { replyBox.oninput = (event) => { state.replyDraft = event.target.value; }; replyBox.onkeydown = (event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); replyForm.requestSubmit(); } }; }
+  const replyForm = root.querySelector('#admin-reply'); if (replyForm) { replyForm.onsubmit = reply; replyForm.querySelector('.admin-primary').disabled = state.replySending || state.blocked; }
+  const replyBox = root.querySelector('#admin-message'); if (replyBox) { replyBox.disabled = state.blocked; replyBox.placeholder = state.blocked ? 'This customer is blocked' : 'Write a reply…'; replyBox.oninput = (event) => { state.replyDraft = event.target.value; }; replyBox.onkeydown = (event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); replyForm.requestSubmit(); } }; }
   root.querySelector('[data-clear-error]')?.addEventListener('click', () => { state.error = ''; render(); });
   bindHeader();
   const body = root.querySelector('#admin-thread-body'); if (body) requestAnimationFrame(() => { body.scrollTop = body.scrollHeight; });
 }
-function matchesInbox(item) { return (state.filter === 'all' || item.status === state.filter) && (!state.search || [item.customerName, guestIdentity(item.id).reference, item.customerContact, item.lastMessage, ...(item.productReferences || []).map((p) => `${p.id} ${p.name}`)].join(' ').toLowerCase().includes(state.search)); }
+function matchesInbox(item) { return !state.search || [item.customerName, guestIdentity(item.id).reference, item.customerContact, item.lastMessage, ...(item.productReferences || []).map((p) => `${p.id} ${p.name}`)].join(' ').toLowerCase().includes(state.search); }
 function bindInboxRows() { root.querySelectorAll('[data-select-chat]').forEach((button) => button.onclick = () => selectConversation(button.dataset.selectChat)); root.querySelector('[data-more]')?.addEventListener('click', loadMore); }
 function renderInboxOnly() {
   const list = root.querySelector('.admin-inbox-list'); if (!list) { updateHeader(); return; }
@@ -98,6 +132,7 @@ function decorateThread() {
   body.querySelectorAll('.admin-message').forEach((bubble, index) => {
     const item = records[index]; if (!item) return;
     bubble.dataset.messageId = item.id;
+    if (item.media && !bubble.querySelector('.chat-media')) bubble.querySelector('p')?.insertAdjacentHTML('afterend', mediaMarkup(item.media, state.selected, item.id));
     if (item.senderUid === state.user.uid) {
       const label = status(item, state.receipts.get(item.id));
       const receipt = document.createElement('span'); receipt.className = 'chat-receipt'; receipt.textContent = label; receipt.setAttribute('aria-label', `Message status: ${label}`); bubble.append(receipt);
@@ -114,6 +149,7 @@ function decorateThread() {
     body.append(bubble);
   }
   body.onscroll = scheduleStaffSeen;
+  if (body.querySelector('[data-media-path]')) firebase().then(({ app, config }) => hydrateMedia(body, app, config.emulator)).catch(() => {});
   const head = root.querySelector('.admin-thread-head');
   if (head && !head.querySelector('.admin-back')) { const back = document.createElement('button'); back.type = 'button'; back.className = 'admin-back'; back.textContent = '← Inbox'; back.onclick = () => { state.mobileThread = false; root.querySelector('.admin-layout')?.classList.remove('thread-open'); }; head.prepend(back); }
 }
@@ -218,7 +254,7 @@ function subscribeInbox(db) {
       }
     }
     state.unread = state.rows.filter((item) => item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis())).length;
-    if (state.selected && !state.rows.some((item) => item.id === state.selected)) { state.selected = null; state.unsubSelected?.(); state.unsubMessages?.(); state.unsubReceipts?.(); renderChat(); }
+    if (state.selected && !state.rows.some((item) => item.id === state.selected)) { clearSelected(); renderChat(); }
     else renderInboxOnly();
   }, (error) => { state.error = displayError(error); render(); });
 }
@@ -226,24 +262,74 @@ async function loadMore() {
   if (!state.cursor) return;
   try { const { db } = await firebase(); const base = collection(db, 'conversations'); const q = state.profile.role === 'staff' ? query(base, where('assignedStaffUid', '==', state.user.uid), orderBy('lastMessageAt', 'desc'), startAfter(state.cursor), limit(50)) : query(base, orderBy('lastMessageAt', 'desc'), startAfter(state.cursor), limit(50)); const snapshot = await getDocs(q); state.rows = [...state.rows, ...snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))]; state.cursor = snapshot.docs.at(-1) || null; state.more = snapshot.docs.length === 50; render(); } catch (error) { state.error = displayError(error); render(); }
 }
+function clearSelected() {
+  for (const key of ['unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubBlock']) { state[key]?.(); state[key] = null; }
+  state.selected = null; state.mobileThread = false; state.threadReady = false; state.threadSynced = false; state.messages = []; state.older = []; state.receipts = new Map(); state.first = null; state.replyDraft = ''; state.attachment = null; state.blocked = false;
+}
 async function selectConversation(id) {
-  const { db } = await firebase(); state.selected = id; state.mobileThread = true; state.threadReady = false; state.threadSynced = false; state.messages = []; state.older = []; state.receipts = new Map(); state.first = null; state.replyDraft = ''; state.unsubSelected?.(); state.unsubMessages?.(); state.unsubReceipts?.();
+  const { db } = await firebase(); clearSelected(); state.selected = id; state.mobileThread = true;
   const ref = doc(db, 'conversations', id);
-  state.unsubSelected = onSnapshot(ref, (snapshot) => { if (!snapshot.exists()) { state.selected = null; render(); } else { state.rows = state.rows.map((item) => item.id === id ? { id, ...snapshot.data() } : item); renderInboxOnly(); } }, (error) => { state.error = displayError(error); render(); });
+  state.unsubSelected = onSnapshot(ref, (snapshot) => { if (state.selected !== id) return; if (!snapshot.exists()) { clearSelected(); render(); } else { state.rows = state.rows.map((item) => item.id === id ? { id, ...snapshot.data() } : item); renderInboxOnly(); } }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
+  state.unsubBlock = onSnapshot(doc(db, 'blockedCustomers', id), (snapshot) => { if (state.selected !== id) return; if (state.blocked !== snapshot.exists()) { state.blocked = snapshot.exists(); renderChat(); } }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
   state.unsubReceipts = subscribeReceipts(db, id, (receipts) => { state.receipts = new Map([...state.receipts, ...receipts]); renderThreadMessages(); const latest = state.rows.find((row) => row.id === id); if (latest?.lastSenderRole === 'customer' && receipts.get(latest.lastMessageId)?.seenAt) advanceStaffRead(db, id, latest.lastMessageId); }, (error) => { state.error = displayError(error); render(); });
   state.unsubMessages = onSnapshot(query(collection(ref, 'messages'), orderBy('createdAt', 'desc'), limit(40)), { includeMetadataChanges: true }, (snapshot) => { state.threadSynced = !snapshot.metadata.fromCache; state.messages = snapshot.docs.map((item) => ({ id: item.id, ...item.data(), metadata: item.metadata })).reverse(); if (state.pendingReply && state.messages.some((item) => item.id === state.pendingReply.id)) state.pendingReply = null; state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; if (!state.threadReady) { state.threadReady = true; renderChat(); } else renderThreadMessages(); acknowledgeThread(db); }, (error) => { state.error = displayError(error); render(); });
   render();
 }
 async function loadOlder() { if (!state.first || !state.selected) return; try { const { db } = await firebase(); const selected = state.selected; const snapshot = await getDocs(query(collection(db, 'conversations', selected, 'messages'), orderBy('createdAt', 'desc'), startAfter(state.first), limit(40))); if (selected !== state.selected) return; const page = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })); state.older = [...page.reverse(), ...state.older]; state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; renderThreadMessages(); const receipts = await olderReceipts(db, selected, page); if (selected !== state.selected) return; state.receipts = new Map([...state.receipts, ...receipts]); renderThreadMessages(); } catch (error) { state.error = displayError(error); render(); } }
 async function retryReply() {
-  const pending = state.pendingReply; if (!pending || state.replySending) return;
+  const pending = state.pendingReply; if (!pending || state.replySending || state.blocked) return;
   state.replySending = true; pending.pending = true; pending.failed = false; state.error = ''; renderThreadMessages();
-  const button = root.querySelector('#admin-reply button'); if (button) button.disabled = true;
-  try { const { db } = await firebase(); if (pending.id.startsWith('local-')) pending.id = newMessageId(db, pending.conversationId); await sendMessage(db, pending.conversationId, state.user.uid, state.profile.role, pending.message, [], {}, pending.id); pending.pending = false; if (state.selected === pending.conversationId && state.replyDraft.trim() === pending.message) { state.replyDraft = ''; const input = root.querySelector('#admin-message'); if (input) input.value = ''; } }
+  const button = root.querySelector('#admin-reply .admin-primary'); if (button) button.disabled = true;
+  try { const { db, app, config } = await firebase(); if (pending.id.startsWith('local-')) pending.id = newMessageId(db, pending.conversationId); if (pending.file && !pending.media) pending.media = await uploadMedia(app, config.emulator, pending.conversationId, pending.id, state.user.uid, pending.file, (value) => { state.uploadProgress = value; updateMediaForm(); }); await sendMessage(db, pending.conversationId, state.user.uid, state.profile.role, pending.message, [], {}, pending.id, pending.media); pending.pending = false; if (state.selected === pending.conversationId) { if (state.replyDraft.trim() === pending.text) { state.replyDraft = ''; const input = root.querySelector('#admin-message'); if (input) input.value = ''; } if (state.attachment === pending.file) state.attachment = null; } }
   catch (error) { pending.pending = false; pending.failed = true; state.error = displayError(error); }
-  finally { state.replySending = false; if (button) button.disabled = false; renderThreadMessages(); }
+  finally { state.replySending = false; if (button) button.disabled = false; updateMediaForm(); renderThreadMessages(); }
 }
-function reply(event) { event.preventDefault(); const text = state.replyDraft.trim(); if (!text || !state.selected || state.replySending) return; if (state.pendingReply?.failed) { state.error = 'Retry the failed reply first.'; render(); return; } state.pendingReply = { id: `local-${Date.now()}`, conversationId: state.selected, senderUid: state.user.uid, senderRole: state.profile.role, message: text, pending: true }; retryReply(); }
+function reply(event) { event.preventDefault(); const text = state.replyDraft.trim(); if ((!text && !state.attachment) || !state.selected || state.replySending || state.blocked) return; if (state.pendingReply?.failed) { state.error = 'Retry the failed reply first.'; render(); return; } state.pendingReply = { id: `local-${Date.now()}`, conversationId: state.selected, senderUid: state.user.uid, senderRole: state.profile.role, message: text || (state.attachment?.type.startsWith('image/') ? 'Photo' : 'Video'), text, file: state.attachment, pending: true }; retryReply(); }
+async function toggleBlock() {
+  if (!state.selected || !['owner', 'admin'].includes(state.profile?.role) || state.moderationBusy) return;
+  const id = state.selected, block = !state.blocked;
+  if (block && !window.confirm('Block this visitor from reading or sending messages in this browser session?')) return;
+  state.moderationBusy = true; state.error = ''; renderChat();
+  try {
+    const { db } = await firebase(); const target = doc(db, 'blockedCustomers', id); const current = await getDoc(target);
+    if (current.exists() === block) throw new Error('The block state changed. Please reopen this chat.');
+    const audit = doc(collection(db, 'auditLogs')); const batch = writeBatch(db);
+    if (block) batch.set(target, { blockedAt: serverTimestamp(), blockedBy: state.user.uid }); else batch.delete(target);
+    batch.set(audit, { action: block ? 'block' : 'unblock', conversationId: id, actorUid: state.user.uid, createdAt: serverTimestamp() });
+    await batch.commit(); state.notice = block ? 'Visitor blocked.' : 'Visitor unblocked.';
+  } catch (error) { state.error = displayError(error); }
+  finally { state.moderationBusy = false; render(); }
+}
+async function deleteConversation() {
+  if (!state.selected || state.profile?.role !== 'owner' || state.moderationBusy || state.replySending) return;
+  const id = state.selected;
+  if (!window.confirm('Permanently delete this chat and all its messages? This cannot be undone. A blocked visitor will remain blocked.')) return;
+  state.moderationBusy = true; state.error = ''; renderChat();
+  try {
+    const { db, app, config } = await firebase();
+    const blockRef = doc(db, 'blockedCustomers', id);
+    const temporaryBlock = !(await getDoc(blockRef)).exists();
+    if (temporaryBlock) await setDoc(blockRef, { blockedAt: serverTimestamp(), blockedBy: state.user.uid });
+    for (const name of ['messages', 'receipts']) {
+      let page;
+      do {
+        page = await getDocs(query(collection(db, 'conversations', id, name), limit(100)));
+        if (!page.empty) {
+          if (name === 'messages') for (const item of page.docs) if (item.data().media) await deleteChatMedia(app, config.emulator, id, item.id, item.data().media);
+          const batch = writeBatch(db); page.docs.forEach((item) => batch.delete(item.ref)); await batch.commit();
+        }
+      } while (page.size === 100);
+    }
+    const audit = doc(collection(db, 'auditLogs')); const batch = writeBatch(db);
+    batch.delete(doc(db, 'conversations', id));
+    if (temporaryBlock) batch.delete(blockRef);
+    batch.set(audit, { action: 'delete', conversationId: id, actorUid: state.user.uid, createdAt: serverTimestamp() });
+    await batch.commit();
+    if (state.selected === id) clearSelected();
+    state.rows = state.rows.filter((item) => item.id !== id); state.notice = 'Chat deleted.';
+  } catch (error) { state.error = `Delete stopped: ${displayError(error)}. The visitor remains blocked until you retry or unblock them.`; }
+  finally { state.moderationBusy = false; render(); }
+}
 async function changeConversation(change) { if (!state.selected) return; try { const { db } = await firebase(); const ref = doc(db, 'conversations', state.selected); const audit = doc(collection(db, 'auditLogs')); const action = 'status' in change ? 'status' : 'assignment'; const field = action === 'status' ? 'status' : 'assignedStaffUid'; const expected = state.rows.find((item) => item.id === state.selected)?.[field]; await runTransaction(db, async (tx) => { const snapshot = await tx.get(ref); if (!snapshot.exists()) throw new Error('Conversation no longer exists.'); if (snapshot.data()[field] !== expected) throw new Error('This conversation changed. Please review it again.'); const now = serverTimestamp(); tx.update(ref, { ...change, updatedAt: now, lastAuditId: audit.id }); tx.set(audit, { action, conversationId: state.selected, actorUid: state.user.uid, oldValue: snapshot.data()[field], newValue: change[field], createdAt: now }); }); } catch (error) { state.error = displayError(error); render(); } }
 async function addStaff(event) { event.preventDefault(); if (state.staffCreating) return; const form = event.currentTarget.closest('form'); if (!form.reportValidity()) return; const field = (name) => form.elements.namedItem(name).value; const uid = field('uid').trim(); if (!/^[A-Za-z0-9_-]{8,128}$/.test(uid)) { state.error = 'Enter a valid Firebase Auth UID.'; render(); return; } const profile = { displayName: field('name').trim(), email: field('email').trim().toLowerCase(), role: field('role'), active: true, createdAt: serverTimestamp(), createdBy: state.user.uid }; state.staffCreating = true; const button = form.querySelector('button'); button.disabled = true; try { const { db } = await firebase(); const ref = doc(db, 'staff', uid); await runTransaction(db, async (tx) => { if ((await tx.get(ref)).exists()) throw new Error('This UID already has a staff profile.'); tx.set(ref, profile); }); form.reset(); } catch (error) { state.error = displayError(error); } finally { state.staffCreating = false; render(); } }
 async function editStaff(uid, change) { try { const { db } = await firebase(); await updateDoc(doc(db, 'staff', uid), change); } catch (error) { state.error = displayError(error); render(); } }
@@ -277,3 +363,4 @@ start();
 function sizeAdmin() { if (!window.visualViewport) return; document.documentElement.style.setProperty('--ggm-viewport-height', `${window.visualViewport.height}px`); }
 window.visualViewport?.addEventListener('resize', sizeAdmin);
 sizeAdmin();
+mediaEnabled().then((enabled) => { state.mediaAvailable = enabled; updateMediaForm(); });

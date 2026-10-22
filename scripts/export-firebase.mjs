@@ -111,6 +111,7 @@ const webConfig = process.env.GGM_FIREBASE_WEB_CONFIG || (existsSync(localFireba
 const parsedWebConfig = JSON.parse(webConfig);
 writeFileSync(join(output, 'firebase-config.json'), JSON.stringify(parsedWebConfig));
 writeFileSync(join(output, 'push-config.json'), JSON.stringify({ vapidKey: process.env.GGM_FCM_VAPID_PUBLIC_KEY || '' }));
+writeFileSync(join(output, 'media-config.json'), JSON.stringify({ enabled: process.env.GGM_CHAT_MEDIA_ENABLED === 'true' }));
 const client = await readRoute('/app.js');
 const staticClient = client.replace("fetch('/api/catalog')", "fetch('/api/catalog.json')");
 if (staticClient === client) throw new Error('Catalog URL was not replaced in the browser script.');

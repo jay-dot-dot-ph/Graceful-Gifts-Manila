@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, connectAuthEmulator, setPersistence, browserLocalPersistence, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, writeBatch, serverTimestamp, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
 let services;
 export async function firebase() {
@@ -23,7 +23,7 @@ export async function firebase() {
     connectFirestoreEmulator(db, '127.0.0.1', 8080);
   }
   await setPersistence(auth, browserLocalPersistence);
-  services = { app, auth, db };
+  services = { app, auth, db, config };
   return services;
 }
 
@@ -35,7 +35,7 @@ export async function customerSession() {
   return { ...services, user: services.auth.currentUser };
 }
 
-export { signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, updateDoc, setDoc, deleteDoc };
+export { signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, writeBatch, serverTimestamp, updateDoc, setDoc, deleteDoc };
 
 export function displayError(error) {
   const code = error?.code || '';
@@ -60,9 +60,10 @@ export const safeProduct = (watch) => ({
 
 export function newMessageId(db, conversationId) { return doc(collection(db, 'conversations', conversationId, 'messages')).id; }
 
-export async function sendMessage(db, conversationId, uid, role, text, products = [], identity = {}, messageId = newMessageId(db, conversationId)) {
+export async function sendMessage(db, conversationId, uid, role, text, products = [], identity = {}, messageId = newMessageId(db, conversationId), media = null) {
   const body = messageText(text);
-  if (!body) throw new Error('Write a message first.');
+  if (!body && !media) throw new Error('Write a message or attach a file first.');
+  const summary = body || (media.kind === 'photo' ? 'Photo' : 'Video');
   const conversation = doc(db, 'conversations', conversationId);
   if (!/^[A-Za-z0-9]{20}$/.test(messageId)) throw new Error('Invalid message ID.');
   const message = doc(collection(conversation, 'messages'), messageId);
@@ -71,13 +72,13 @@ export async function sendMessage(db, conversationId, uid, role, text, products 
     if (snapshot.exists()) {
       const previous = await tx.get(message);
       if (previous.exists()) {
-        if (previous.data().senderUid !== uid || previous.data().message !== body) throw new Error('Message ID already used.');
+        if (previous.data().senderUid !== uid || previous.data().message !== summary) throw new Error('Message ID already used.');
         return;
       }
     }
     const now = serverTimestamp();
     const base = {
-      lastMessage: body, lastMessageAt: now, lastMessageId: message.id,
+      lastMessage: summary, lastMessageAt: now, lastMessageId: message.id,
       lastSenderUid: uid, lastSenderRole: role, updatedAt: now
     };
     if (!snapshot.exists()) {
@@ -97,7 +98,7 @@ export async function sendMessage(db, conversationId, uid, role, text, products 
         ...(role === 'customer' ? { productReferences: unique, customerReadAt: now } : { staffReadAt: now })
       });
     }
-    tx.set(message, { senderUid: uid, senderRole: role, message: body, createdAt: now, productReferences: products.slice(0, 8).map(safeProduct) });
+    tx.set(message, { senderUid: uid, senderRole: role, message: summary, createdAt: now, productReferences: products.slice(0, 8).map(safeProduct), ...(media ? { media } : {}) });
   });
   return message.id;
 }

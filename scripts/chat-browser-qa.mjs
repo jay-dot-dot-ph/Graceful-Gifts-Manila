@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, collection } from 'firebase/firestore';
 
 const projectId = 'demo-graceful-gifts-manila';
 const base = 'http://127.0.0.1:4173';
@@ -190,8 +190,10 @@ try {
   const admin = await adminContext.newPage(); admin.on('pageerror', (error) => errors.push(error.message));
   await login(admin, adminEmail);
   await admin.locator('.admin-inbox-row').first().click();
-  await admin.locator('#admin-status').selectOption('pending');
-  await admin.waitForFunction(() => document.querySelector('#admin-status')?.value === 'pending');
+  assert.equal(await admin.locator('#admin-status, #admin-filter').count(), 0);
+  await admin.locator('.admin-chat-menu summary').click();
+  assert.equal(await admin.locator('[data-block-user]').count(), 1);
+  assert.equal(await admin.locator('[data-delete-chat]').count(), 0);
   await admin.goto(base + '/admin/staff');
   await admin.locator('.admin-inbox').waitFor();
   assert.equal(await admin.locator('#staff-form').count(), 0);
@@ -213,6 +215,29 @@ try {
   await owner.waitForFunction((uid) => document.querySelector(`[data-toggle-staff="${uid}"]`)?.textContent === 'Enable', staffUid);
   await staff.reload();
   await staff.getByText(/no active staff access|Access denied/i).waitFor();
+  await owner.goto(base + '/admin/chat');
+  await owner.locator(`[data-select-chat="${linkedConversation}"]`).click();
+  assert.equal(await owner.locator('#admin-status, #admin-filter').count(), 0);
+  await owner.locator('.admin-chat-menu summary').click();
+  assert.equal(await owner.locator('[data-delete-chat]').count(), 1);
+  owner.on('dialog', (dialog) => dialog.accept());
+  await owner.locator('[data-block-user]').click();
+  await owner.locator('.admin-blocked-pill').waitFor();
+  assert.equal(await owner.locator('#admin-message').isDisabled(), true);
+  await owner.waitForFunction(() => !document.querySelector('[data-block-user]')?.disabled);
+  await owner.locator('.admin-chat-menu summary').click();
+  await owner.locator('[data-block-user]').click();
+  await owner.locator('.admin-blocked-pill').waitFor({ state: 'detached' });
+  await owner.waitForFunction(() => !document.querySelector('[data-block-user]')?.disabled);
+  await owner.locator('.admin-chat-menu summary').click();
+  await owner.locator('[data-delete-chat]').click();
+  await owner.locator(`[data-select-chat="${linkedConversation}"]`).waitFor({ state: 'detached' });
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    assert.equal((await getDoc(doc(db, 'conversations', linkedConversation))).exists(), false);
+    assert.equal((await getDocs(collection(db, 'conversations', linkedConversation, 'messages'))).size, 0);
+    assert.equal((await getDocs(collection(db, 'conversations', linkedConversation, 'receipts'))).size, 0);
+  });
   assert.deepEqual(errors, []);
-  console.log('Chat browser QA passed: cross-client Sent/Delivered/Seen, hidden-tab delivery guard, repeated unread alerts, staff-page badge, sound unlock, mobile customer/admin layout, product and Favorites inquiries, history, owner/staff replies, assignment, and revocation.');
+  console.log('Chat browser QA passed: cross-client receipts, unread alerts, mobile layout, inquiries, replies, assignment, revocation, block/unblock, and delete.');
 } finally { await browser.close(); await environment.cleanup(); }

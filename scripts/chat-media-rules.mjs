@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getBytes, deleteObject } from 'firebase/storage';
+import { sendMessage } from '../chat/firebase.js';
+import { newMessageId } from '../chat/firebase.js';
+
+const projectId = 'demo-graceful-gifts-manila';
+const environment = await initializeTestEnvironment({ projectId, firestore: { host: '127.0.0.1', port: 8080, rules: readFileSync('firestore.rules', 'utf8') }, storage: { host: '127.0.0.1', port: 9199, rules: readFileSync('storage.rules', 'utf8') } });
+const context = (uid, provider = 'password') => environment.authenticatedContext(uid, { firebase: { sign_in_provider: provider } });
+const customer = context('media-customer', 'anonymous');
+const stranger = context('media-stranger', 'anonymous');
+const owner = context('media-owner');
+const staff = context('media-staff');
+const path = `chatMedia/media-customer/${randomBytes(10).toString('hex')}/file`;
+const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+const metadata = (uid, contentType = 'image/jpeg') => ({ contentType, customMetadata: { uploaderUid: uid } });
+const object = (actor, at = path) => ref(actor.storage(), at);
+try {
+  await environment.clearFirestore(); await environment.clearStorage();
+  await environment.withSecurityRulesDisabled(async (actor) => {
+    for (const [uid, role] of [['media-owner','owner'],['media-staff','staff']]) await setDoc(doc(actor.firestore(), 'staff', uid), { active: true, role });
+  });
+  await assertSucceeds(sendMessage(customer.firestore(), 'media-customer', 'media-customer', 'customer', 'Hello'));
+  await assertFails(uploadBytes(object(stranger), bytes, metadata('media-stranger')));
+  await assertFails(uploadBytes(object(staff), bytes, metadata('media-staff')));
+  await assertFails(uploadBytes(object(customer), bytes, metadata('someone-else')));
+  await assertFails(uploadBytes(object(customer), bytes, metadata('media-customer', 'image/svg+xml')));
+  await assertFails(uploadBytes(object(customer, `chatMedia/media-customer/${randomBytes(10).toString('hex')}/file`), new Uint8Array(8_000_001), metadata('media-customer')));
+  await assertSucceeds(uploadBytes(object(customer), bytes, metadata('media-customer')));
+  assert.deepEqual(new Uint8Array(await assertSucceeds(getBytes(object(customer)))), bytes);
+  await assertSucceeds(getBytes(object(owner)));
+  await assertFails(getBytes(object(stranger)));
+  await assertFails(getBytes(object(staff)));
+  await assertFails(uploadBytes(object(customer), bytes, metadata('media-customer')));
+  await environment.withSecurityRulesDisabled(async (actor) => { await updateDoc(doc(actor.firestore(), 'conversations', 'media-customer'), { assignedStaffUid: 'media-staff' }); });
+  await assertSucceeds(getBytes(object(staff)));
+  await environment.withSecurityRulesDisabled(async (actor) => { await updateDoc(doc(actor.firestore(), 'staff', 'media-staff'), { active: false }); });
+  await assertFails(getBytes(object(staff)));
+  await assertFails(deleteObject(object(customer)));
+  await environment.withSecurityRulesDisabled(async (actor) => { await setDoc(doc(actor.firestore(), 'blockedCustomers', 'media-customer'), { blockedAt: new Date(), blockedBy: 'media-owner' }); });
+  await assertFails(getBytes(object(customer)));
+  await assertSucceeds(deleteObject(object(owner)));
+  const metadataCustomer = context('media-metadata-customer', 'anonymous');
+  const messageId = newMessageId(metadataCustomer.firestore(), 'media-metadata-customer');
+  const validMedia = { kind: 'photo', contentType: 'image/jpeg', size: 4, path: `chatMedia/media-metadata-customer/${messageId}/file` };
+  await assertFails(sendMessage(metadataCustomer.firestore(), 'media-metadata-customer', 'media-metadata-customer', 'customer', 'Photo', [], {}, messageId, { ...validMedia, path: path }));
+  await assertSucceeds(sendMessage(metadataCustomer.firestore(), 'media-metadata-customer', 'media-metadata-customer', 'customer', 'Photo', [], {}, messageId, validMedia));
+  console.log('Media rules passed: private upload, type validation, immutable object, customer isolation, assignment, staff revocation, customer blocking, and owner deletion.');
+} finally { await environment.cleanup(); }

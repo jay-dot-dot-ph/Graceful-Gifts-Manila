@@ -21,6 +21,7 @@
       { "source": "/admin.html", "headers": [{ "key": "Cache-Control", "value": "private, no-store" }] },
       { "source": "/firebase-config.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] },
       { "source": "/push-config.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] },
+      { "source": "/media-config.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] },
       { "source": "/firebase-messaging-sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }, { "key": "Service-Worker-Allowed", "value": "/" }] },
       { "source": "/styles.css", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
@@ -35,9 +36,11 @@
     ]
   },
   "firestore": { "rules": "firestore.rules", "indexes": "firestore.indexes.json" },
+  "storage": { "rules": "storage.rules" },
   "emulators": {
     "auth": { "host": "127.0.0.1", "port": 9099 },
     "firestore": { "host": "127.0.0.1", "port": 8080 },
+    "storage": { "host": "127.0.0.1", "port": 9199 },
     "ui": { "enabled": false }
   }
 }
