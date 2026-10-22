@@ -153,6 +153,16 @@ html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
   box-shadow: var(--admin-shadow);
   font-size: .82rem;
 }
+.admin-notice.is-centered:not(:empty) {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  text-align: center;
+  font-weight: 700;
+  box-shadow: 0 14px 40px #101d3940;
+}
 
 .admin-layout {
   flex: 1;
@@ -413,6 +423,7 @@ html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
 #admin-reply .admin-primary { min-width: 104px; }
 #admin-reply{flex-wrap:wrap}#admin-reply .chat-attachment-preview{width:100%;color:var(--admin-ink)}#admin-reply .chat-attach{align-self:end;display:grid;place-items:center;width:48px;height:58px;flex:none;border:1px solid var(--admin-line);border-radius:10px;background:var(--admin-surface);color:var(--admin-ink);font-size:1.45rem;cursor:pointer}#admin-reply .chat-attach[hidden],#admin-reply .chat-attachment-preview[hidden]{display:none!important}#admin-reply .chat-attach.is-disabled{opacity:.45;pointer-events:none}.admin-message .chat-media img,.admin-message .chat-media video{display:block;max-width:100%;max-height:300px;border-radius:8px;object-fit:contain}.admin-message .chat-media a{color:inherit;text-decoration:underline;font-size:.75rem}
 .admin-empty-thread { margin: auto; padding: 28px; color: var(--admin-muted); text-align: center; }
+.admin-delete-progress { margin: auto; padding: 28px; color: var(--admin-muted); text-align: center; font-weight: 700; }
 .admin-back { display: none; border: 0; background: transparent; color: var(--admin-accent); font: inherit; font-weight: 700; cursor: pointer; }
 .admin-toast {
   position: fixed;

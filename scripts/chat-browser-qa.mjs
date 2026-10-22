@@ -231,8 +231,20 @@ try {
   await owner.locator('.admin-blocked-pill').waitFor({ state: 'detached' });
   await owner.waitForFunction(() => !document.querySelector('[data-block-user]')?.disabled);
   await owner.locator('.admin-chat-menu summary').click();
+  await owner.evaluate(() => {
+    window.__blockedDuringDelete = false;
+    const app = document.querySelector('#admin-app');
+    window.__deleteObserver = new MutationObserver(() => {
+      if (app.querySelector('.admin-blocked-pill, .admin-inbox-row.selected .admin-row-meta em') || app.querySelector('#admin-message')?.placeholder === 'This customer is blocked') window.__blockedDuringDelete = true;
+    });
+    window.__deleteObserver.observe(app, { childList: true, subtree: true, attributes: true });
+  });
   await owner.locator('[data-delete-chat]').click();
   await owner.locator(`[data-select-chat="${linkedConversation}"]`).waitFor({ state: 'detached' });
+  await owner.locator('.admin-notice.is-centered').getByText('Chat deleted.').waitFor();
+  const noticeBox = await owner.locator('.admin-notice.is-centered').boundingBox();
+  assert.ok(Math.abs(noticeBox.x + noticeBox.width / 2 - 640) < 3 && Math.abs(noticeBox.y + noticeBox.height / 2 - 360) < 3, 'Delete success toast is centered in the viewport');
+  assert.equal(await owner.evaluate(() => { window.__deleteObserver.disconnect(); return window.__blockedDuringDelete; }), false, 'Temporary delete protection does not flash Blocked in the UI');
   await environment.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
     assert.equal((await getDoc(doc(db, 'conversations', linkedConversation))).exists(), false);
