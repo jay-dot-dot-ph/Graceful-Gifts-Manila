@@ -3,7 +3,7 @@ import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } 
 import { createNotifier } from './notify.js';
 import { mediaEnabled, checkFile, uploadMedia, mediaMarkup, hydrateMedia } from './media.js';
 
-const state = { open: false, scrollToLatest: false, products: [], messages: [], older: [], receipts: new Map(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', generatedDraft: '', focusComposer: false, name: '', contact: '', error: '', conversation: null, pending: null, sending: false, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
+const state = { open: false, scrollToLatest: false, products: [], messages: [], older: [], receipts: new Map(), expandedTimes: new Set(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', generatedDraft: '', focusComposer: false, name: '', contact: '', error: '', conversation: null, pending: null, sending: false, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
 const sound = createNotifier('customer', () => renderChrome());
 let connectionPromise, db, uid;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -23,6 +23,15 @@ const productCard = (watch) => {
   return `<a class="chat-product" href="/watch/${encodeURIComponent(watch.id)}" target="_blank" rel="noopener"><span class="chat-watch-photo">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}" loading="lazy">` : '<span aria-hidden="true">G</span>'}</span><span class="chat-product-info"><strong>${esc(watch.name || watch.id)}</strong><span class="chat-product-meta">${esc(identity)}</span><span class="chat-product-price">${esc(price)}</span>${watch.size || availability ? `<span class="chat-product-meta">${[watch.size, availability].filter(Boolean).map(esc).join(' · ')}</span>` : ''}</span></a>`;
 };
 const allMessages = () => { const all = [...state.older, ...state.messages]; if (state.pending && !all.some((item) => item.id === state.pending.id)) all.push(state.pending); return all; };
+function toggleMessageTime(bubble) {
+  const id = bubble?.dataset.messageId, label = bubble?.querySelector('.chat-message-time');
+  if (!id || !label) return;
+  const show = !state.expandedTimes.has(id);
+  if (show) state.expandedTimes.add(id); else state.expandedTimes.delete(id);
+  label.hidden = !show;
+  bubble.setAttribute('aria-expanded', String(show));
+  bubble.title = show ? 'Click to hide date and time' : 'Click to show date and time';
+}
 
 function ensureRoot() {
   let root = document.getElementById('ggm-chat'); if (root) return root;
@@ -38,6 +47,8 @@ function ensureRoot() {
   root.querySelector('[name=name]').oninput = (event) => { state.name = event.target.value; };
   root.querySelector('[name=contact]').oninput = (event) => { state.contact = event.target.value; };
   root.querySelector('#ggm-chat-body').onscroll = scheduleSeen;
+  root.querySelector('#ggm-chat-body').onclick = (event) => { if (!event.target.closest('a, button')) toggleMessageTime(event.target.closest('.ggm-chat-bubble')); };
+  root.querySelector('#ggm-chat-body').onkeydown = (event) => { if (event.target.matches('.ggm-chat-bubble') && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleMessageTime(event.target); } };
   return root;
 }
 function renderChrome() {
@@ -67,7 +78,8 @@ function renderMessages() {
   body.innerHTML = `${state.loading ? '<p class="ggm-chat-hint">Loading conversation…</p>' : ''}${!all.length && !state.loading ? '<p class="ggm-chat-hint">Hello! Ask us about a watch and we will reply here.</p>' : ''}${state.first ? '<button type="button" class="ggm-chat-more" data-chat-more>Load earlier messages</button>' : ''}${all.map((item) => {
     const outgoing = item.senderUid === uid || item.senderRole === 'customer' && !uid;
     const label = status(item, state.receipts.get(item.id));
-    return `<div class="ggm-chat-bubble ${outgoing ? 'outgoing' : 'incoming'} ${(item.productReferences || []).length ? 'has-product' : ''}" data-message-id="${esc(item.id)}"><p>${esc(item.message)}</p>${item.media ? mediaMarkup(item.media, uid, item.id) : ''}${(item.productReferences || []).map(productCard).join('')}<small>${time(item.createdAt)}</small>${outgoing ? `${label === 'Seen' ? '' : `<span class="chat-receipt" aria-label="Message status: ${label}">${label}${item.failed ? ' <button type="button" data-retry>Retry</button>' : ''}</span>`}${item.id === latestSeen ? `<span class="chat-seen-avatar" aria-label="Seen by store"><span aria-hidden="true">${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : 'G'}</span>Seen by store</span>` : ''}` : ''}</div>`;
+    const showTime = state.expandedTimes.has(item.id);
+    return `<div class="ggm-chat-bubble ${outgoing ? 'outgoing' : 'incoming'} ${(item.productReferences || []).length ? 'has-product' : ''}" data-message-id="${esc(item.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time"><p>${esc(item.message)}</p>${item.media ? mediaMarkup(item.media, uid, item.id) : ''}${(item.productReferences || []).map(productCard).join('')}<small class="chat-message-time" ${showTime ? '' : 'hidden'}>${time(item.createdAt)}</small>${outgoing ? `${label === 'Seen' ? '' : `<span class="chat-receipt" aria-label="Message status: ${label}">${label}${item.failed ? ' <button type="button" data-retry>Retry</button>' : ''}</span>`}${item.id === latestSeen ? `<span class="chat-seen-avatar" aria-label="Seen by store"><span aria-hidden="true">${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : 'G'}</span>Seen by store</span>` : ''}` : ''}</div>`;
   }).join('')}`;
   body.querySelector('[data-chat-more]')?.addEventListener('click', loadOlder);
   body.querySelector('[data-retry]')?.addEventListener('click', sendPending);

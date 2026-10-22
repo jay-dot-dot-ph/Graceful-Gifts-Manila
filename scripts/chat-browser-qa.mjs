@@ -87,7 +87,20 @@ try {
   const sentWatch = customer.locator('.ggm-chat-bubble.outgoing .chat-product').first();
   await sentWatch.waitFor();
   assert.ok((await sentWatch.locator('.chat-watch-photo').boundingBox()).height >= 145, 'Inquiry watch photo is large enough to inspect');
+  await customer.waitForFunction(() => {
+    const frame = document.querySelector('.ggm-chat-bubble.outgoing .chat-product .chat-watch-photo');
+    const image = frame?.querySelector('img');
+    if (!image?.complete || !image.naturalWidth) return false;
+    const box = frame.getBoundingClientRect(), imageBox = image.getBoundingClientRect();
+    return imageBox.width <= box.width + 1 && imageBox.height <= box.height + 1;
+  });
   assert.match(await sentWatch.locator('.chat-product-info').innerText(), /AP-001[\s\S]*₱/);
+  const customerTime = customer.locator('.ggm-chat-bubble.outgoing').first().locator('.chat-message-time');
+  assert.equal(await customerTime.isHidden(), true, 'Customer message time starts hidden');
+  await customer.locator('.ggm-chat-bubble.outgoing').first().locator('p').click();
+  assert.equal(await customerTime.isVisible(), true, 'Clicking a customer message reveals its time');
+  await customer.locator('.ggm-chat-bubble.outgoing').first().locator('p').click();
+  assert.equal(await customerTime.isHidden(), true, 'Clicking again hides the customer message time');
   try { await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').last().getByText('Sent').waitFor({ timeout: 10000 }); }
   catch (error) { console.error('Initial inquiry diagnosis:', await customer.locator('.ggm-chat').innerText()); throw error; }
   await customer.locator('.ggm-chat-form button:not([disabled])').waitFor();
@@ -112,6 +125,7 @@ try {
   await customer.locator('[data-select-all]').click();
   await customer.locator('[data-inquire-selected]').click();
   assert.equal(await customer.locator('.ggm-chat-products').count(), 0, 'Favorites do not show a pending watch panel');
+  await customer.waitForFunction(() => document.querySelector('#ggm-chat-message')?.value.includes('AP-002'));
   assert.match(await customer.locator('#ggm-chat-message').inputValue(), /Which of these watches are available\?[\s\S]*AP-001[\s\S]*AP-002/);
   await customer.waitForTimeout(3100);
   await customer.locator('#ggm-chat-message').fill('Are these favorites available?');
@@ -137,9 +151,27 @@ try {
   const adminWatch = owner.locator('.admin-message.customer.has-product .admin-product').first();
   await adminWatch.waitFor();
   assert.ok((await adminWatch.locator('.chat-watch-photo').boundingBox()).height >= 200, 'Admin message shows a large watch photo');
+  await owner.waitForFunction(() => {
+    const frame = document.querySelector('.admin-message.customer.has-product .admin-product .chat-watch-photo');
+    const image = frame?.querySelector('img');
+    if (!image?.complete || !image.naturalWidth) return false;
+    const box = frame.getBoundingClientRect(), imageBox = image.getBoundingClientRect();
+    return imageBox.width <= box.width + 1 && imageBox.height <= box.height + 1;
+  });
   assert.ok((await owner.locator('.admin-refs .chat-watch-photo').first().boundingBox()).height <= 60, 'Sidebar watch reference stays compact');
+  const adminBubble = owner.locator('.admin-message.customer.has-product').first();
+  const adminTime = adminBubble.locator('.admin-message-time');
+  assert.equal(await adminBubble.locator(':scope > small:not(.admin-message-time)').count(), 0, 'Admin message has no Customer or staff author label');
+  assert.equal(await adminTime.isHidden(), true, 'Admin message time starts hidden');
+  await adminBubble.locator('p').click();
+  assert.equal(await adminTime.isVisible(), true, 'Clicking an admin message reveals its time');
+  await adminBubble.locator('p').click();
+  assert.equal(await adminTime.isHidden(), true, 'Clicking again hides the admin message time');
   await owner.locator('.admin-inbox-link[aria-label="Inbox, 1 unread"]').waitFor();
-  await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').last().getByText('Delivered').waitFor();
+  await customer.waitForFunction(() => {
+    const bubble = [...document.querySelectorAll('.ggm-chat-bubble.outgoing')].at(-1);
+    return bubble?.querySelector('.chat-receipt')?.textContent?.includes('Delivered') || !!bubble?.querySelector('.chat-seen-avatar');
+  });
   assert.equal(await owner.locator('[data-sound]').getAttribute('aria-pressed'), 'true', 'Staff sound defaults on');
   await customer.waitForTimeout(3100);
   await customer.locator('#ggm-chat-message').fill('A second question while this inbox is unread.');
