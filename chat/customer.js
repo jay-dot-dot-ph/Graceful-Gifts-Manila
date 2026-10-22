@@ -27,7 +27,7 @@ const allMessages = () => { const all = [...state.older, ...state.messages]; if 
 function ensureRoot() {
   let root = document.getElementById('ggm-chat'); if (root) return root;
   root = document.createElement('aside'); root.id = 'ggm-chat'; root.className = 'ggm-chat'; root.setAttribute('aria-label', 'Graceful Gifts Manila customer support');
-  root.innerHTML = `<div class="ggm-chat-head"><span class="chat-store-avatar" aria-hidden="true">G</span><div class="chat-store-label"><strong>Graceful Gifts Manila</strong><span>Customer Support</span></div><button type="button" class="chat-sound" data-sound aria-label="Mute sounds"></button><button type="button" class="chat-close" data-chat-close aria-label="Close chat">×</button></div><div class="ggm-chat-body" id="ggm-chat-body" role="log" aria-label="Conversation messages"></div><div class="ggm-chat-products"></div><div class="ggm-chat-identity"><label>Your name (optional)<input name="name" maxlength="80" autocomplete="name"></label><label>Email or phone (optional)<input name="contact" maxlength="120" autocomplete="email"></label></div><div class="chat-attachment-preview" id="ggm-attachment-preview" hidden></div><form id="ggm-chat-form" class="ggm-chat-form"><label class="chat-attach" id="ggm-attach-label" hidden title="Send a message first to start the conversation">＋<span class="visually-hidden">Attach photo or video</span><input id="ggm-chat-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" hidden></label><label for="ggm-chat-message" class="visually-hidden">Your message</label><textarea id="ggm-chat-message" maxlength="2000" rows="2" placeholder="Write your message…"></textarea><button type="submit">Send</button></form><p class="ggm-chat-error" role="alert" hidden></p>`;
+  root.innerHTML = `<div class="ggm-chat-head"><span class="chat-store-avatar" aria-hidden="true">G</span><div class="chat-store-label"><strong>Graceful Gifts Manila</strong><span>Customer Support</span></div><button type="button" class="chat-sound" data-sound aria-label="Mute sounds"></button><button type="button" class="chat-close" data-chat-close aria-label="Close chat">×</button></div><div class="ggm-chat-body" id="ggm-chat-body" role="log" aria-label="Conversation messages"></div><div class="ggm-chat-identity"><label>Your name (optional)<input name="name" maxlength="80" autocomplete="name"></label><label>Email or phone (optional)<input name="contact" maxlength="120" autocomplete="email"></label></div><div class="chat-attachment-preview" id="ggm-attachment-preview" hidden></div><form id="ggm-chat-form" class="ggm-chat-form"><label class="chat-attach" id="ggm-attach-label" hidden title="Send a message first to start the conversation">＋<span class="visually-hidden">Attach photo or video</span><input id="ggm-chat-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" hidden></label><label for="ggm-chat-message" class="visually-hidden">Your message</label><textarea id="ggm-chat-message" maxlength="2000" rows="2" placeholder="Write your message…"></textarea><button type="submit">Send</button></form><p class="ggm-chat-error" role="alert" hidden></p>`;
   document.body.append(root);
   root.querySelector('[data-chat-close]').onclick = () => { state.open = false; render(); };
   root.querySelector('[data-sound]').onclick = () => sound.toggle();
@@ -44,9 +44,6 @@ function renderChrome() {
   const root = ensureRoot(); root.classList.toggle('is-open', state.open);
   const soundButton = root.querySelector('[data-sound]'); soundButton.textContent = sound.label(); soundButton.setAttribute('aria-label', sound.label()); soundButton.setAttribute('aria-pressed', String(sound.enabled));
   root.querySelector('.ggm-chat-identity').hidden = !!state.conversation;
-  const products = root.querySelector('.ggm-chat-products'); products.hidden = !state.products.length;
-  products.innerHTML = state.products.length ? `<div><strong>Selected watches</strong><button type="button" data-chat-clear>Clear</button></div>${state.products.map(productCard).join('')}` : '';
-  products.querySelector('[data-chat-clear]')?.addEventListener('click', () => { state.products = []; renderChrome(); });
   const composer = root.querySelector('textarea'); if (composer.value !== state.draft) composer.value = state.draft;
   composer.disabled = state.sending || state.loading;
   if (state.open && state.focusComposer && !composer.disabled) {
@@ -159,13 +156,14 @@ function submit(event) {
   sendPending();
 }
 export async function openChat(watches = [], { prefillInquiry = false } = {}) {
-  state.products = [...new Map([...state.products, ...watches.map(safeProduct)].map((watch) => [watch.id, watch])).values()].slice(0, 8);
+  state.products = [...new Map(watches.map(safeProduct).map((watch) => [watch.id, watch])).values()].slice(0, 8);
   if (prefillInquiry && state.products.length) {
-    if (!state.draft.trim() || state.draft === state.generatedDraft) {
-      state.draft = suggestedInquiry(state.products);
-      state.generatedDraft = state.draft;
-    }
+    state.draft = suggestedInquiry(state.products);
+    state.generatedDraft = state.draft;
     state.focusComposer = true;
+  } else if (state.draft === state.generatedDraft) {
+    state.draft = '';
+    state.generatedDraft = '';
   }
   if (!state.open) state.scrollToLatest = true;
   state.open = true; state.error = '';
