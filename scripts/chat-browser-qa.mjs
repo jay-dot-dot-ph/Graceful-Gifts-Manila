@@ -71,6 +71,8 @@ try {
   await customer.locator('.ggm-chat-identity [name=name]').fill('Test customer');
   await customer.locator('.ggm-chat-identity [name=contact]').fill('customer@example.com');
   await customer.locator('.ggm-chat-form button').click();
+  assert.equal(await customer.locator('.ggm-chat-products').isHidden(), true, 'Selected watches panel hides when the inquiry is sent');
+  assert.equal(await customer.locator('#ggm-chat-message').inputValue(), '', 'Sent inquiry clears the composer');
   await customer.getByText(initialInquiry).waitFor();
   const sentWatch = customer.locator('.ggm-chat-bubble.outgoing .chat-product').first();
   await sentWatch.waitFor();
@@ -105,6 +107,7 @@ try {
   await customer.waitForTimeout(3100);
   await customer.locator('#ggm-chat-message').fill('Are these favorites available?');
   await customer.locator('.ggm-chat-form button').click();
+  assert.equal(await customer.locator('.ggm-chat-products').isHidden(), true, 'Favorites selection hides after sending');
   await customer.getByText('Are these favorites available?').waitFor();
 
   const ownerContext = await browser.newContext();

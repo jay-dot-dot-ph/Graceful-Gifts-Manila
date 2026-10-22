@@ -145,7 +145,7 @@ async function sendPending() {
     if (pending.file && !pending.media) { const { app, config } = await firebase(); pending.media = await uploadMedia(app, config.emulator, uid, pending.id, uid, pending.file, (value) => { state.uploadProgress = value; renderChrome(); }); }
     await sendMessage(db, uid, uid, 'customer', pending.message, pending.productReferences, { name: state.name, contact: state.contact }, pending.id, pending.media);
     try { localStorage.setItem('ggm-chat-started', '1'); } catch {}
-    pending.pending = false; state.products = []; if (state.draft.trim() === pending.text) { state.draft = ''; state.generatedDraft = ''; } if (state.attachment === pending.file) state.attachment = null;
+    pending.pending = false; if (state.attachment === pending.file) state.attachment = null;
   } catch (error) { if (state.pending) { state.pending.pending = false; state.pending.failed = true; } state.error = displayError(error); }
   state.sending = false; render();
 }
@@ -153,7 +153,9 @@ function submit(event) {
   event.preventDefault(); const text = state.draft.trim(); if ((!text && !state.attachment) || state.sending) return;
   if (state.attachment && !state.conversation) { state.error = 'Send a message first to start the conversation, then attach a photo or video.'; renderChrome(); return; }
   if (state.pending?.failed) { state.error = 'Retry the failed message first.'; renderChrome(); return; }
-  state.pending = { id: `local-${Date.now()}`, senderUid: uid, senderRole: 'customer', message: text || (state.attachment?.type.startsWith('image/') ? 'Photo' : 'Video'), text, file: state.attachment, productReferences: [...state.products], pending: true }; sendPending();
+  state.pending = { id: `local-${Date.now()}`, senderUid: uid, senderRole: 'customer', message: text || (state.attachment?.type.startsWith('image/') ? 'Photo' : 'Video'), text, file: state.attachment, productReferences: [...state.products], pending: true };
+  state.products = []; state.draft = ''; state.generatedDraft = '';
+  sendPending();
 }
 export async function openChat(watches = [], { prefillInquiry = false } = {}) {
   state.products = [...new Map([...state.products, ...watches.map(safeProduct)].map((watch) => [watch.id, watch])).values()].slice(0, 8);
