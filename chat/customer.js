@@ -8,11 +8,12 @@ const sound = createNotifier('customer', () => renderChrome());
 let connectionPromise, db, uid;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const time = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Now';
+const watchLabel = (watch) => `${watch.name || watch.brand || 'Watch'} (ID ${watch.id})`;
 const suggestedInquiry = (watches) => watches.length > 1
-  ? 'Hello! I would like to inquire about these watches. Which are available?'
+  ? `Hello! Which of these watches are available?\n${watches.map((watch, index) => `${index + 1}. ${watchLabel(watch)}`).join('\n')}`
   : watches[0]?.stock === 0
-    ? 'Hello! Is another unit of this watch or a similar model available?'
-    : 'Hello! Is this watch still available?';
+    ? `Hello! Do you have another unit of ${watchLabel(watches[0])} or a similar watch?`
+    : `Hello! Is ${watchLabel(watches[0])} still available?`;
 const productCard = (watch) => {
   if (!/^[A-Z0-9-]{2,20}$/.test(watch.id || '')) return '';
   const image = /^\/images\/[A-Za-z0-9._-]+$/.test(watch.image || '') ? watch.image : '';

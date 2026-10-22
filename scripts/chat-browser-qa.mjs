@@ -66,7 +66,8 @@ try {
   assert.equal(await customer.locator('.ggm-chat [data-sound]').getAttribute('aria-pressed'), 'false', 'Customer can mute');
   await customer.locator('.ggm-chat [data-sound]').click();
   assert.match(await customer.locator('.ggm-chat-products').innerText(), /AP-001/);
-  const initialInquiry = 'Hello! Is this watch still available?';
+  const selectedWatchName = await customer.locator('.ggm-chat-products .chat-product-info strong').first().innerText();
+  const initialInquiry = `Hello! Is ${selectedWatchName} (ID AP-001) still available?`;
   assert.equal(await customer.locator('#ggm-chat-message').inputValue(), initialInquiry, 'Watch inquiry is ready to send');
   await customer.locator('.ggm-chat-identity [name=name]').fill('Test customer');
   await customer.locator('.ggm-chat-identity [name=contact]').fill('customer@example.com');
@@ -103,7 +104,7 @@ try {
   await customer.locator('[data-inquire-selected]').click();
   await customer.locator('.ggm-chat-products .chat-product').first().waitFor();
   assert.equal(await customer.locator('.ggm-chat-products .chat-product').count(), 2);
-  assert.match(await customer.locator('#ggm-chat-message').inputValue(), /these watches/);
+  assert.match(await customer.locator('#ggm-chat-message').inputValue(), /Which of these watches are available\?[\s\S]*AP-001[\s\S]*AP-002/);
   await customer.waitForTimeout(3100);
   await customer.locator('#ggm-chat-message').fill('Are these favorites available?');
   await customer.locator('.ggm-chat-form button').click();
@@ -122,6 +123,7 @@ try {
   const linkedConversation = await owner.locator('.admin-inbox-row').first().getAttribute('data-select-chat');
   await owner.goto(`${base}/admin/chat?conversation=${linkedConversation}`);
   await owner.locator(`.admin-inbox-row.selected[data-select-chat="${linkedConversation}"]`).waitFor();
+  await owner.locator('.admin-message.customer').first().getByText(initialInquiry).waitFor();
   await owner.getByText('Are these favorites available?').first().waitFor();
   await owner.locator('.admin-inbox-link[aria-label="Inbox, 1 unread"]').waitFor();
   await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').last().getByText('Delivered').waitFor();
