@@ -23,7 +23,12 @@ try {
   await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').getByText('Sent').waitFor();
   await customer.locator('#ggm-attach-label').waitFor({ state: 'visible' });
   await customer.waitForTimeout(3100);
-  await customer.locator('#ggm-chat-file').setInputFiles({ name: 'watch.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLk7wAAAABJRU5ErkJggg==', 'base64') });
+  await customer.locator('#ggm-chat').evaluate((root) => {
+    const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLk7wAAAABJRU5ErkJggg=='), (char) => char.charCodeAt(0));
+    const data = new DataTransfer(); data.items.add(new File([bytes], 'watch.png', { type: 'image/png' }));
+    root.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data }));
+    root.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: data }));
+  });
   await customer.locator('#ggm-attachment-preview').getByText('watch.png', { exact: false }).waitFor();
   assert.equal(await customer.locator('#ggm-chat-message').inputValue(), '', 'A photo can be sent without a caption');
   assert.ok(await customer.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Customer attachment composer fits phone viewport');
@@ -36,7 +41,11 @@ try {
   await owner.locator('#admin-login-form button').click();
   await owner.locator('.admin-inbox-row').first().click();
   await owner.locator('.admin-message.customer .chat-media img').waitFor({ timeout: 20000 });
-  await owner.locator('#admin-chat-file').setInputFiles({ name: 'clip.webm', mimeType: 'video/webm', buffer: Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x00, 0x00, 0x00, 0x00]) });
+  await owner.locator('.admin-thread').evaluate((thread) => {
+    const data = new DataTransfer(); data.items.add(new File([new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0])], 'clip.webm', { type: 'video/webm' }));
+    thread.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data }));
+    thread.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: data }));
+  });
   await owner.locator('#admin-reply .chat-attachment-preview').getByText('clip.webm', { exact: false }).waitFor();
   await owner.setViewportSize({ width: 390, height: 844 });
   assert.ok(await owner.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Staff attachment composer fits phone viewport');

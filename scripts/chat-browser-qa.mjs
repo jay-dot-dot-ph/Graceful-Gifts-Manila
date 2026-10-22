@@ -100,7 +100,7 @@ try {
   await customer.locator('.ggm-chat-bubble.outgoing').first().locator('p').click();
   assert.equal(await customerTime.isVisible(), true, 'Clicking a customer message reveals its time');
   await customer.locator('.ggm-chat-bubble.outgoing').first().locator('p').click();
-  assert.equal(await customerTime.isHidden(), true, 'Clicking again hides the customer message time');
+  await customerTime.waitFor({ state: 'hidden' });
   try { await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').last().getByText('Sent').waitFor({ timeout: 10000 }); }
   catch (error) { console.error('Initial inquiry diagnosis:', await customer.locator('.ggm-chat').innerText()); throw error; }
   await customer.locator('.ggm-chat-form button:not([disabled])').waitFor();
@@ -209,12 +209,19 @@ try {
   await owner.locator('#admin-reply button').click();
   try { await owner.locator('#admin-thread-body').getByText('Yes, AP-001 is available.').waitFor({ timeout: 5000 }); }
   catch (error) { let saved = []; await environment.withSecurityRulesDisabled(async (context) => { const conversation = (await getDocs(collection(context.firestore(), 'conversations'))).docs[0]; if (conversation) saved = (await getDocs(collection(context.firestore(), 'conversations', conversation.id, 'messages'))).docs.map((item) => item.data().message); }); console.error('Owner reply diagnosis:', await owner.locator('.admin-thread').innerText(), await owner.locator('.admin-toast').allInnerTexts(), 'draft:', await owner.locator('#admin-message').inputValue(), 'disabled:', await owner.locator('#admin-reply button').isDisabled(), 'saved:', saved); throw error; }
+  assert.ok(await owner.locator('.admin-message.staff').last().evaluate((bubble) => bubble.getBoundingClientRect().width < bubble.parentElement.getBoundingClientRect().width * .5), 'Short admin message fits its text');
   await owner.locator('.admin-message.staff .chat-receipt').last().getByText('Sent').waitFor();
   await customer.evaluate(() => { delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange')); });
   await owner.locator('.admin-message.staff .chat-receipt').last().getByText('Delivered').waitFor();
   await customer.locator('[data-open-chat]').click();
   await customer.getByText('Yes, AP-001 is available.').waitFor();
-  await owner.locator('.admin-message.staff .chat-receipt').last().getByText('Seen').waitFor();
+  assert.ok(await customer.locator('.ggm-chat-bubble.incoming').last().evaluate((bubble) => bubble.getBoundingClientRect().width < bubble.parentElement.getBoundingClientRect().width * .8), 'Short customer chat bubble fits its text');
+  assert.equal(await owner.locator('.admin-message.staff .chat-receipt').filter({ hasText: 'Seen' }).count(), 0, 'Admin has no duplicate Seen receipt');
+  const seenBubble = owner.locator('.admin-message.staff').last();
+  await seenBubble.locator('.chat-seen-avatar').waitFor({ state: 'attached' });
+  assert.equal(await seenBubble.locator('.chat-seen-avatar').isVisible(), false, 'Seen stays hidden until the message is opened');
+  await seenBubble.click();
+  assert.equal(await seenBubble.locator('.chat-seen-avatar').isVisible(), true, 'Seen appears when the message is opened');
   await customer.locator('[data-chat-close]').click();
   await owner.locator('#admin-message').fill('We can also show similar watches.');
   await owner.locator('#admin-reply button').click();

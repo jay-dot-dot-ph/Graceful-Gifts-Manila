@@ -1,4 +1,9 @@
 // Each browser/device must unlock Web Audio from its own user gesture.
+export function soundIcon(enabled) {
+  return enabled
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M17 9a5 5 0 0 1 0 6M19.5 6a9 9 0 0 1 0 12"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="m17 9 5 6m0-6-5 6"/></svg>';
+}
 export function createNotifier(kind, changed = () => {}) {
   const key = `ggm-chat-sound-${kind}`;
   let preferred = true;

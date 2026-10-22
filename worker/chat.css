@@ -28,3 +28,8 @@
 .ggm-chat-bubble.has-product .chat-watch-photo{display:flex;align-items:center;justify-content:center}
 .ggm-chat-bubble.has-product .chat-watch-photo img{display:block;width:auto;height:auto;max-width:100%;max-height:100%;min-width:0;min-height:0;object-fit:contain}
 @media(max-width:390px){.ggm-chat-bubble.has-product .chat-watch-photo{height:150px}}
+.ggm-chat-bubble{align-self:flex-start;width:fit-content;min-width:0}
+.ggm-chat-bubble.outgoing{align-self:flex-end}
+.ggm-chat-head .chat-sound{width:40px;height:40px;min-width:40px;min-height:40px;padding:0;display:grid;place-items:center}
+.ggm-chat-head .chat-sound svg{width:19px;height:19px}
+.ggm-chat-form .chat-attach.is-disabled{pointer-events:auto;cursor:not-allowed}

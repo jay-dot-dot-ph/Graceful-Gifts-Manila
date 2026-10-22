@@ -1,6 +1,6 @@
 import { customerSession, firebase, doc, collection, query, orderBy, limit, startAfter, getDocs, onSnapshot, updateDoc, serverTimestamp, sendMessage, newMessageId, displayError, safeProduct } from './firebase.js';
 import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } from './receipts.js';
-import { createNotifier } from './notify.js';
+import { createNotifier, soundIcon } from './notify.js';
 import { mediaEnabled, checkFile, uploadMedia, mediaMarkup, hydrateMedia } from './media.js';
 
 const state = { open: false, scrollToLatest: false, products: [], messages: [], older: [], receipts: new Map(), expandedTimes: new Set(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', generatedDraft: '', focusComposer: false, name: '', contact: '', error: '', conversation: null, pending: null, sending: false, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
@@ -42,7 +42,24 @@ function ensureRoot() {
   root.querySelector('[data-sound]').onclick = () => sound.toggle();
   root.querySelector('form').onsubmit = submit;
   root.querySelector('textarea').oninput = (event) => { state.draft = event.target.value; if (state.draft !== state.generatedDraft) state.generatedDraft = ''; };
-  root.querySelector('#ggm-chat-file').onchange = (event) => { try { const file = event.target.files[0]; if (file) { checkFile(file); state.attachment = file; state.error = ''; } } catch (error) { state.error = displayError(error); } event.target.value = ''; renderChrome(); };
+  const selectAttachment = (file) => {
+    try {
+      if (!state.mediaAvailable) throw new Error('Photo and video sharing needs store setup.');
+      if (!state.conversation) throw new Error('Send a message first to start the conversation, then attach a photo or video.');
+      if (state.sending) return;
+      checkFile(file); state.attachment = file; state.error = '';
+    } catch (error) { state.error = displayError(error); }
+    renderChrome();
+  };
+  root.querySelector('#ggm-chat-file').onchange = (event) => { if (event.target.files[0]) selectAttachment(event.target.files[0]); event.target.value = ''; };
+  root.querySelector('#ggm-attach-label').onclick = (event) => {
+    if (state.mediaAvailable && state.conversation && !state.sending) return;
+    event.preventDefault();
+    state.error = state.mediaAvailable ? 'Send a message first to start the conversation, then attach a photo or video.' : 'Photo and video sharing needs store setup.';
+    renderChrome();
+  };
+  root.addEventListener('dragover', (event) => { if (!event.dataTransfer?.types.includes('Files')) return; event.preventDefault(); event.dataTransfer.dropEffect = state.mediaAvailable && state.conversation ? 'copy' : 'none'; });
+  root.addEventListener('drop', (event) => { if (!event.dataTransfer?.files.length) return; event.preventDefault(); selectAttachment(event.dataTransfer.files[0]); });
   root.querySelector('textarea').onkeydown = (event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); root.querySelector('form').requestSubmit(); } };
   root.querySelector('[name=name]').oninput = (event) => { state.name = event.target.value; };
   root.querySelector('[name=contact]').oninput = (event) => { state.contact = event.target.value; };
@@ -53,7 +70,7 @@ function ensureRoot() {
 }
 function renderChrome() {
   const root = ensureRoot(); root.classList.toggle('is-open', state.open);
-  const soundButton = root.querySelector('[data-sound]'); soundButton.textContent = sound.label(); soundButton.setAttribute('aria-label', sound.label()); soundButton.setAttribute('aria-pressed', String(sound.enabled));
+  const soundButton = root.querySelector('[data-sound]'); soundButton.innerHTML = soundIcon(sound.enabled); soundButton.setAttribute('aria-label', sound.label()); soundButton.title = sound.label(); soundButton.setAttribute('aria-pressed', String(sound.enabled));
   root.querySelector('.ggm-chat-identity').hidden = !!state.conversation;
   const composer = root.querySelector('textarea'); if (composer.value !== state.draft) composer.value = state.draft;
   composer.disabled = state.sending || state.loading;
@@ -61,8 +78,8 @@ function renderChrome() {
     state.focusComposer = false;
     requestAnimationFrame(() => { if (state.open && !composer.disabled) { composer.focus({ preventScroll: true }); composer.setSelectionRange(composer.value.length, composer.value.length); } });
   }
-  const attach = root.querySelector('#ggm-attach-label'); attach.hidden = !state.mediaAvailable; attach.classList.toggle('is-disabled', state.sending || !state.conversation); attach.title = state.conversation ? 'Attach photo or video' : 'Send a message first to start the conversation';
-  root.querySelector('#ggm-chat-file').disabled = state.sending || !state.conversation;
+  const attach = root.querySelector('#ggm-attach-label'); attach.hidden = false; attach.classList.toggle('is-disabled', state.sending || !state.conversation || !state.mediaAvailable); attach.title = !state.mediaAvailable ? 'Photo and video sharing needs store setup' : state.conversation ? 'Attach photo or video' : 'Send a message first to start the conversation';
+  root.querySelector('#ggm-chat-file').disabled = state.sending || !state.conversation || !state.mediaAvailable;
   const preview = root.querySelector('#ggm-attachment-preview'); preview.hidden = !state.attachment; preview.innerHTML = state.attachment ? `<span>${esc(state.attachment.name)} · ${(state.attachment.size / 1_000_000).toFixed(1)} MB${state.sending ? ` · ${state.uploadProgress}%` : ''}</span><button type="button" data-remove-attachment ${state.sending ? 'disabled' : ''} aria-label="Remove attachment">×</button>` : '';
   preview.querySelector('[data-remove-attachment]')?.addEventListener('click', () => { state.attachment = null; renderChrome(); });
   const send = root.querySelector('form button'); send.disabled = composer.disabled; send.textContent = state.sending ? 'Sending…' : 'Send';

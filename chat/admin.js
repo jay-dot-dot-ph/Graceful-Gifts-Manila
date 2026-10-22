@@ -1,6 +1,6 @@
 import { firebase, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, writeBatch, updateDoc, setDoc, deleteDoc, serverTimestamp, sendMessage, newMessageId, displayError } from './firebase.js';
 import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } from './receipts.js';
-import { createNotifier } from './notify.js';
+import { createNotifier, soundIcon } from './notify.js';
 import { guestIdentity } from './guest.js';
 import { enablePush, refreshPush, revokePush, pushEnabled, pushAvailable } from './push.js';
 import { mediaEnabled, checkFile, uploadMedia, deleteChatMedia, mediaMarkup, hydrateMedia } from './media.js';
@@ -24,6 +24,7 @@ function toggleAdminMessageTime(bubble) {
   const key = `${state.selected}/${id}`, show = !state.expandedTimes.has(key);
   if (show) state.expandedTimes.add(key); else state.expandedTimes.delete(key);
   label.hidden = !show;
+  const seen = bubble.querySelector('.chat-seen-avatar'); if (seen) seen.hidden = !show;
   bubble.setAttribute('aria-expanded', String(show));
   bubble.title = show ? 'Click to hide date and time' : 'Click to show date and time';
 }
@@ -71,18 +72,18 @@ function header() {
   return `<header class="admin-header">
     <a href="/" class="admin-brand" aria-label="Graceful Gifts Manila home"><img src="/favicon.svg" alt="" width="48" height="48"><span><strong>GRACEFUL GIFTS MANILA</strong><small>Store Admin</small></span></a>
     <nav aria-label="Admin navigation"><a href="/admin/chat" class="admin-inbox-link" aria-label="Inbox, ${count} unread" ${state.page === 'chat' ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 5h18v13H3zM3 6l9 7 9-7"/></svg><b class="admin-unread-badge" ${count ? '' : 'hidden'}>${count > 9 ? '9+' : count}</b></a>${state.profile?.role === 'owner' ? `<a href="/admin/staff" ${state.page === 'staff' ? 'aria-current="page"' : ''}>Staff</a>` : ''}</nav>
-    <div class="admin-header-actions"><button type="button" class="admin-push" data-push ${state.pushAvailable ? '' : 'disabled title="Web Push public key or browser support is unavailable"'}>${state.pushAvailable ? state.pushActive ? 'Disable background alerts' : 'Enable background alerts' : 'Background alerts need setup'}</button><button type="button" class="admin-sound" data-sound aria-pressed="${sound.enabled}">${sound.label()}</button><span class="admin-user">${esc(state.profile?.displayName || state.user?.email || '')} <span>· ${esc(state.profile?.role || '')}</span></span><button type="button" class="admin-logout" data-logout>Sign out</button></div>
+    <div class="admin-header-actions"><button type="button" class="admin-push" data-push ${state.pushAvailable ? '' : 'disabled title="Web Push public key or browser support is unavailable"'}>${state.pushAvailable ? state.pushActive ? 'Disable background alerts' : 'Enable background alerts' : 'Background alerts need setup'}</button><button type="button" class="admin-sound" data-sound aria-pressed="${sound.enabled}" aria-label="${sound.label()}" title="${sound.label()}">${soundIcon(sound.enabled)}</button><span class="admin-user">${esc(state.profile?.displayName || state.user?.email || '')} <span>· ${esc(state.profile?.role || '')}</span></span><button type="button" class="admin-logout" data-logout>Sign out</button></div>
     <span class="admin-notice${state.noticeCentered ? ' is-centered' : ''}" role="status">${esc(state.notice)}</span>
   </header>`;
 }
-function updateHeader() { const link = root.querySelector('.admin-inbox-link'); if (link) { link.setAttribute('aria-label', `Inbox, ${state.unread} unread`); const badge = link.querySelector('b'); badge.hidden = !state.unread; badge.textContent = state.unread > 9 ? '9+' : String(state.unread); } const button = root.querySelector('[data-sound]'); if (button) { button.textContent = sound.label(); button.setAttribute('aria-pressed', String(sound.enabled)); } const push = root.querySelector('[data-push]'); if (push) { push.disabled = !state.pushAvailable; if (state.pushAvailable) push.removeAttribute('title'); push.textContent = state.pushAvailable ? state.pushActive ? 'Disable background alerts' : 'Enable background alerts' : 'Background alerts need setup'; } const notice = root.querySelector('.admin-notice'); if (notice) { notice.textContent = state.notice; notice.classList.toggle('is-centered', state.noticeCentered); } }
+function updateHeader() { const link = root.querySelector('.admin-inbox-link'); if (link) { link.setAttribute('aria-label', `Inbox, ${state.unread} unread`); const badge = link.querySelector('b'); badge.hidden = !state.unread; badge.textContent = state.unread > 9 ? '9+' : String(state.unread); } const button = root.querySelector('[data-sound]'); if (button) { button.innerHTML = soundIcon(sound.enabled); button.setAttribute('aria-label', sound.label()); button.title = sound.label(); button.setAttribute('aria-pressed', String(sound.enabled)); } const push = root.querySelector('[data-push]'); if (push) { push.disabled = !state.pushAvailable; if (state.pushAvailable) push.removeAttribute('title'); push.textContent = state.pushAvailable ? state.pushActive ? 'Disable background alerts' : 'Enable background alerts' : 'Background alerts need setup'; } const notice = root.querySelector('.admin-notice'); if (notice) { notice.textContent = state.notice; notice.classList.toggle('is-centered', state.noticeCentered); } }
 function showNotice(message, centered = false, duration = 5000) { clearTimeout(noticeTimer); state.notice = message; state.noticeCentered = centered; updateHeader(); noticeTimer = setTimeout(() => { state.notice = ''; state.noticeCentered = false; updateHeader(); }, duration); }
 function renderLogin() { root.innerHTML = `<main class="admin-login"><form id="admin-login-form" class="admin-card"><p class="eyebrow">GRACEFUL GIFTS MANILA</p><h1>Staff sign in</h1><p>Use your individual staff account.</p><label>Email<input type="email" name="email" autocomplete="username" required></label><label>Password<input type="password" name="password" autocomplete="current-password" required></label><button class="admin-primary" type="submit">Sign in</button>${state.error ? `<p class="admin-error" role="alert">${esc(state.error)}</p>` : ''}</form></main>`; root.querySelector('form').onsubmit = login; }
 function row(item) { const unread = item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); return `<button type="button" class="admin-inbox-row ${unread ? 'unread' : ''} ${state.selected === item.id ? 'selected' : ''}" data-select-chat="${esc(item.id)}"><span class="admin-row-top">${customerLabel(item)}<time>${stamp(item.lastMessageAt)}</time></span><span class="admin-row-summary"><span class="admin-row-preview">${esc(item.lastMessage || '')}</span>${unread ? '<b class="admin-row-unread" aria-label="Unread message"></b>' : ''}</span><span class="admin-row-meta">${state.blocked && state.selected === item.id && state.deletingId !== item.id ? '<em>Blocked · </em>' : ''}<span>${esc(profileName(item.assignedStaffUid))}</span></span></button>`; }
 function updateMediaForm() {
   const form = root.querySelector('#admin-reply'); if (!form) return;
-  const attach = form.querySelector('.chat-attach'); attach.hidden = !state.mediaAvailable; attach.classList.toggle('is-disabled', state.replySending || state.blocked);
-  form.querySelector('#admin-chat-file').disabled = state.replySending || state.blocked;
+  const attach = form.querySelector('.chat-attach'); attach.classList.toggle('is-disabled', !state.mediaAvailable || state.replySending || state.blocked); attach.title = state.mediaAvailable ? 'Attach photo or video' : 'Photo and video sharing needs store setup';
+  form.querySelector('#admin-chat-file').disabled = !state.mediaAvailable || state.replySending || state.blocked;
   const preview = form.querySelector('.chat-attachment-preview'); preview.hidden = !state.attachment;
   preview.innerHTML = state.attachment ? `<span>${esc(state.attachment.name)} · ${(state.attachment.size / 1_000_000).toFixed(1)} MB${state.replySending ? ` · ${state.uploadProgress}%` : ''}</span><button type="button" data-remove-attachment ${state.replySending ? 'disabled' : ''} aria-label="Remove attachment">×</button>` : '';
   preview.querySelector('[data-remove-attachment]')?.addEventListener('click', () => { state.attachment = null; updateMediaForm(); });
@@ -95,8 +96,21 @@ function setupMediaForm() {
     form.prepend(attach);
     const preview = document.createElement('div'); preview.className = 'chat-attachment-preview'; preview.hidden = true; form.prepend(preview);
   }
-  form.querySelector('#admin-chat-file').onchange = (event) => { try { const file = event.target.files[0]; if (file) { checkFile(file); state.attachment = file; state.error = ''; } } catch (error) { state.error = displayError(error); } event.target.value = ''; updateMediaForm(); };
+  form.querySelector('#admin-chat-file').onchange = (event) => { if (event.target.files[0]) selectAdminAttachment(event.target.files[0]); event.target.value = ''; };
+  form.querySelector('.chat-attach').onclick = (event) => { if (state.mediaAvailable && !state.replySending && !state.blocked) return; event.preventDefault(); showNotice(state.mediaAvailable ? 'Attachments are unavailable for this chat.' : 'Photo and video sharing needs store setup.', true); };
+  const thread = root.querySelector('.admin-thread');
+  thread.ondragover = (event) => { if (!event.dataTransfer?.types.includes('Files')) return; event.preventDefault(); event.dataTransfer.dropEffect = state.mediaAvailable && !state.blocked ? 'copy' : 'none'; };
+  thread.ondrop = (event) => { if (!event.dataTransfer?.files.length) return; event.preventDefault(); selectAdminAttachment(event.dataTransfer.files[0]); };
   updateMediaForm();
+}
+function selectAdminAttachment(file) {
+  try {
+    if (!state.mediaAvailable) throw new Error('Photo and video sharing needs store setup.');
+    if (state.blocked || state.replySending) throw new Error('Attachments are unavailable for this chat.');
+    checkFile(file); state.attachment = file; state.error = '';
+  } catch (error) { state.error = displayError(error); }
+  updateMediaForm();
+  if (state.error) showNotice(state.error, true);
 }
 function renderModerationMenu(selected) {
   const controls = root.querySelector('.admin-controls');
@@ -155,8 +169,8 @@ function decorateThread() {
     if (item.media && !bubble.querySelector('.chat-media')) bubble.querySelector('p')?.insertAdjacentHTML('afterend', mediaMarkup(item.media, state.selected, item.id));
     if (item.senderUid === state.user.uid) {
       const label = status(item, state.receipts.get(item.id));
-      const receipt = document.createElement('span'); receipt.className = 'chat-receipt'; receipt.textContent = label; receipt.setAttribute('aria-label', `Message status: ${label}`); bubble.append(receipt);
-      if (item.id === lastSeen) { const avatar = document.createElement('span'); avatar.className = 'chat-seen-avatar'; avatar.setAttribute('aria-label', 'Seen by customer'); avatar.innerHTML = '<span aria-hidden="true">C</span>Seen'; bubble.append(avatar); }
+      if (label !== 'Seen') { const receipt = document.createElement('span'); receipt.className = 'chat-receipt'; receipt.textContent = label; receipt.setAttribute('aria-label', `Message status: ${label}`); bubble.append(receipt); }
+      if (item.id === lastSeen) { const avatar = document.createElement('span'); avatar.className = 'chat-seen-avatar'; avatar.setAttribute('aria-label', 'Seen by customer'); avatar.innerHTML = '<span aria-hidden="true">C</span>Seen'; avatar.hidden = !state.expandedTimes.has(`${state.selected}/${item.id}`); bubble.append(avatar); }
     }
     bubble.querySelectorAll('.chat-watch-photo img').forEach((img) => img.onerror = () => { img.replaceWith(Object.assign(document.createElement('span'), { textContent: 'G' })); });
   });

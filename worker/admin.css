@@ -424,6 +424,12 @@ html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
 .admin-message.has-product .admin-product strong, .admin-message.has-product .admin-product small { overflow: visible; text-overflow: clip; white-space: normal; }
 .admin-message.has-product .admin-product strong { font-size: .88rem; }
 .admin-message.has-product .admin-product small { font-size: .75rem; line-height: 1.4; }
+.admin-message{align-self:flex-start;width:fit-content;min-width:0}
+.admin-message.staff{align-self:flex-end}
+.admin-message .chat-seen-avatar[hidden]{display:none!important}
+.admin-header .admin-sound{width:42px;min-width:42px;height:42px;padding:0;display:grid;place-items:center}
+.admin-header .admin-sound svg{width:20px;height:20px}
+#admin-reply .chat-attach.is-disabled{pointer-events:auto;cursor:not-allowed}
 #admin-reply {
   flex: none;
   display: flex;
