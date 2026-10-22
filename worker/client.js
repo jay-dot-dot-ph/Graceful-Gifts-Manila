@@ -316,13 +316,6 @@ function updateFavorite(id) {
   else if (path.startsWith('/watch/')) detailPage(catalog.watches.find((watch) => watch.id === path.split('/')[2].toUpperCase()));
   else if (path === '/') home(); else if (path.startsWith('/watches')) catalogPage();
 }
-function inquiryMessage(watches) {
-  if (watches.length === 1) {
-    const watch = watches[0];
-    return `Hello Graceful Gifts Manila!\n\nI saw this watch on your website:\n${watchName(watch)}\nWatch ID: ${watch.id}\nPrice: ${money(watch.price)}\nWatch link: ${watchUrl(watch)}\n\n${watch.stock === 0 ? 'I noticed it is currently sold out. Do you have another unit or a similar model available?' : 'Is this still available?'}`;
-  }
-  return `Hello Graceful Gifts Manila!\n\nI'm interested in these watches:\n\n${watches.map((watch, index) => `${index + 1}. ${watchName(watch)}\n   Watch ID: ${watch.id}\n   ${money(watch.price)}\n   ${watchUrl(watch)}`).join('\n\n')}\n\nWhich of these are currently available?`;
-}
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); return true; }
   catch {
@@ -334,7 +327,7 @@ async function handleInquiry(button, watches) {
   if (!watches.length && button?.hasAttribute('data-inquire')) { notice('Watch not found.'); return; }
   if (watches.length > 8) { notice('Select up to 8 watches for one inquiry.'); return; }
   const products = watches.map((watch) => ({ id: watch.id, name: watchName(watch), brand: watch.brand, price: watch.price, image: watch.localImage || '', url: 'https://graceful-gifts-manila.web.app/watch/' + encodeURIComponent(watch.id), ...(watch.size ? { size: watch.size } : {}), ...(Number.isInteger(watch.stock) && watch.stock >= 0 ? { stock: watch.stock } : {}) }));
-  try { const { openChat } = await import('/chat.js'); await openChat(products); }
+  try { const { openChat } = await import('/chat.js'); await openChat(products, { prefillInquiry: watches.length > 0 }); }
   catch (error) { notice(error?.message || 'Chat is unavailable right now. Please try again.'); }
 }
 function afterRender() {

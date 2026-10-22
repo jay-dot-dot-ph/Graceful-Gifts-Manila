@@ -49,6 +49,7 @@ try {
   assert.ok(relatedHeart && relatedHeart.width >= 44 && Math.abs(relatedImage.x + relatedImage.width - relatedHeart.x - relatedHeart.width - 12) < 2, 'Related watch heart stays anchored to the image corner');
   await customer.locator('.mobile-inquiry-bar [data-inquire]').click();
   await customer.locator('.ggm-chat.is-open').waitFor();
+  await customer.waitForFunction(() => document.activeElement?.id === 'ggm-chat-message');
   const storeLabel = await customer.locator('.chat-store-label').boundingBox();
   const soundToggle = await customer.locator('.ggm-chat [data-sound]').boundingBox();
   const closeButton = await customer.locator('.ggm-chat [data-chat-close]').boundingBox();
@@ -65,23 +66,28 @@ try {
   assert.equal(await customer.locator('.ggm-chat [data-sound]').getAttribute('aria-pressed'), 'false', 'Customer can mute');
   await customer.locator('.ggm-chat [data-sound]').click();
   assert.match(await customer.locator('.ggm-chat-products').innerText(), /AP-001/);
+  const initialInquiry = 'Hello! Is this watch still available?';
+  assert.equal(await customer.locator('#ggm-chat-message').inputValue(), initialInquiry, 'Watch inquiry is ready to send');
   await customer.locator('.ggm-chat-identity [name=name]').fill('Test customer');
   await customer.locator('.ggm-chat-identity [name=contact]').fill('customer@example.com');
-  await customer.locator('#ggm-chat-message').fill('Is AP-001 available?');
   await customer.locator('.ggm-chat-form button').click();
-  await customer.getByText('Is AP-001 available?').waitFor();
+  await customer.getByText(initialInquiry).waitFor();
+  const sentWatch = customer.locator('.ggm-chat-bubble.outgoing .chat-product').first();
+  await sentWatch.waitFor();
+  assert.ok((await sentWatch.locator('.chat-watch-photo').boundingBox()).height >= 145, 'Inquiry watch photo is large enough to inspect');
+  assert.match(await sentWatch.locator('.chat-product-info').innerText(), /AP-001[\s\S]*₱/);
   try { await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').last().getByText('Sent').waitFor({ timeout: 10000 }); }
   catch (error) { console.error('Initial inquiry diagnosis:', await customer.locator('.ggm-chat').innerText()); throw error; }
   await customer.locator('.ggm-chat-form button:not([disabled])').waitFor();
   let persisted = false;
   for (let attempt = 0; attempt < 30 && !persisted; attempt++) {
-    await environment.withSecurityRulesDisabled(async (context) => { persisted = (await getDocs(collection(context.firestore(), 'conversations'))).docs.some((item) => item.data().customerName === 'Test customer' && item.data().lastMessage === 'Is AP-001 available?'); });
+    await environment.withSecurityRulesDisabled(async (context) => { persisted = (await getDocs(collection(context.firestore(), 'conversations'))).docs.some((item) => item.data().customerName === 'Test customer' && item.data().lastMessage === initialInquiry); });
     if (!persisted) await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.equal(persisted, true, 'The first inquiry must be committed before refresh');
   await customer.reload();
   await customer.locator('.mobile-inquiry-bar [data-inquire]').click();
-  await customer.getByText('Is AP-001 available?').waitFor();
+  await customer.getByText(initialInquiry).waitFor();
   await customer.setViewportSize({ width: 390, height: 844 });
   const mobileChat = await customer.locator('.ggm-chat.is-open').boundingBox();
   assert.ok(mobileChat.width <= 390 && mobileChat.x >= 0 && mobileChat.y >= 0, 'Chat fits the mobile viewport');
@@ -95,6 +101,7 @@ try {
   await customer.locator('[data-inquire-selected]').click();
   await customer.locator('.ggm-chat-products .chat-product').first().waitFor();
   assert.equal(await customer.locator('.ggm-chat-products .chat-product').count(), 2);
+  assert.match(await customer.locator('#ggm-chat-message').inputValue(), /these watches/);
   await customer.waitForTimeout(3100);
   await customer.locator('#ggm-chat-message').fill('Are these favorites available?');
   await customer.locator('.ggm-chat-form button').click();

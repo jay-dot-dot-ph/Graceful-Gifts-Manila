@@ -3,16 +3,23 @@ import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } 
 import { createNotifier } from './notify.js';
 import { mediaEnabled, checkFile, uploadMedia, mediaMarkup, hydrateMedia } from './media.js';
 
-const state = { open: false, products: [], messages: [], older: [], receipts: new Map(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', name: '', contact: '', error: '', conversation: null, pending: null, sending: false, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
+const state = { open: false, scrollToLatest: false, products: [], messages: [], older: [], receipts: new Map(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', generatedDraft: '', focusComposer: false, name: '', contact: '', error: '', conversation: null, pending: null, sending: false, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
 const sound = createNotifier('customer', () => renderChrome());
 let connectionPromise, db, uid;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const time = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Now';
+const suggestedInquiry = (watches) => watches.length > 1
+  ? 'Hello! I would like to inquire about these watches. Which are available?'
+  : watches[0]?.stock === 0
+    ? 'Hello! Is another unit of this watch or a similar model available?'
+    : 'Hello! Is this watch still available?';
 const productCard = (watch) => {
   if (!/^[A-Z0-9-]{2,20}$/.test(watch.id || '')) return '';
   const image = /^\/images\/[A-Za-z0-9._-]+$/.test(watch.image || '') ? watch.image : '';
-  const details = [watch.brand, `ID ${watch.id}`, watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`, watch.size || ''].filter(Boolean).join(' · ');
-  return `<a class="chat-product" href="/watch/${encodeURIComponent(watch.id)}" target="_blank" rel="noopener"><span class="chat-watch-photo">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}" loading="lazy">` : '<span aria-hidden="true">G</span>'}</span><span><strong>${esc(watch.name || watch.id)}</strong><small>${esc(details)}</small></span></a>`;
+  const price = watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`;
+  const availability = Number.isInteger(watch.stock) ? watch.stock === 0 ? 'Sold out' : `${watch.stock} available` : '';
+  const identity = [watch.brand, `ID ${watch.id}`].filter(Boolean).join(' · ');
+  return `<a class="chat-product" href="/watch/${encodeURIComponent(watch.id)}" target="_blank" rel="noopener"><span class="chat-watch-photo">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}" loading="lazy">` : '<span aria-hidden="true">G</span>'}</span><span class="chat-product-info"><strong>${esc(watch.name || watch.id)}</strong><span class="chat-product-meta">${esc(identity)}</span><span class="chat-product-price">${esc(price)}</span>${watch.size || availability ? `<span class="chat-product-meta">${[watch.size, availability].filter(Boolean).map(esc).join(' · ')}</span>` : ''}</span></a>`;
 };
 const allMessages = () => { const all = [...state.older, ...state.messages]; if (state.pending && !all.some((item) => item.id === state.pending.id)) all.push(state.pending); return all; };
 
@@ -24,7 +31,7 @@ function ensureRoot() {
   root.querySelector('[data-chat-close]').onclick = () => { state.open = false; render(); };
   root.querySelector('[data-sound]').onclick = () => sound.toggle();
   root.querySelector('form').onsubmit = submit;
-  root.querySelector('textarea').oninput = (event) => { state.draft = event.target.value; };
+  root.querySelector('textarea').oninput = (event) => { state.draft = event.target.value; if (state.draft !== state.generatedDraft) state.generatedDraft = ''; };
   root.querySelector('#ggm-chat-file').onchange = (event) => { try { const file = event.target.files[0]; if (file) { checkFile(file); state.attachment = file; state.error = ''; } } catch (error) { state.error = displayError(error); } event.target.value = ''; renderChrome(); };
   root.querySelector('textarea').onkeydown = (event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); root.querySelector('form').requestSubmit(); } };
   root.querySelector('[name=name]').oninput = (event) => { state.name = event.target.value; };
@@ -41,6 +48,10 @@ function renderChrome() {
   products.querySelector('[data-chat-clear]')?.addEventListener('click', () => { state.products = []; renderChrome(); });
   const composer = root.querySelector('textarea'); if (composer.value !== state.draft) composer.value = state.draft;
   composer.disabled = state.sending || state.loading;
+  if (state.open && state.focusComposer && !composer.disabled) {
+    state.focusComposer = false;
+    requestAnimationFrame(() => { if (state.open && !composer.disabled) { composer.focus({ preventScroll: true }); composer.setSelectionRange(composer.value.length, composer.value.length); } });
+  }
   const attach = root.querySelector('#ggm-attach-label'); attach.hidden = !state.mediaAvailable; attach.classList.toggle('is-disabled', state.sending || !state.conversation); attach.title = state.conversation ? 'Attach photo or video' : 'Send a message first to start the conversation';
   root.querySelector('#ggm-chat-file').disabled = state.sending || !state.conversation;
   const preview = root.querySelector('#ggm-attachment-preview'); preview.hidden = !state.attachment; preview.innerHTML = state.attachment ? `<span>${esc(state.attachment.name)} · ${(state.attachment.size / 1_000_000).toFixed(1)} MB${state.sending ? ` · ${state.uploadProgress}%` : ''}</span><button type="button" data-remove-attachment ${state.sending ? 'disabled' : ''} aria-label="Remove attachment">×</button>` : '';
@@ -58,14 +69,14 @@ function renderMessages() {
   body.innerHTML = `${state.loading ? '<p class="ggm-chat-hint">Loading conversation…</p>' : ''}${!all.length && !state.loading ? '<p class="ggm-chat-hint">Hello! Ask us about a watch and we will reply here.</p>' : ''}${state.first ? '<button type="button" class="ggm-chat-more" data-chat-more>Load earlier messages</button>' : ''}${all.map((item) => {
     const outgoing = item.senderUid === uid || item.senderRole === 'customer' && !uid;
     const label = status(item, state.receipts.get(item.id));
-    return `<div class="ggm-chat-bubble ${outgoing ? 'outgoing' : 'incoming'}" data-message-id="${esc(item.id)}"><p>${esc(item.message)}</p>${item.media ? mediaMarkup(item.media, uid, item.id) : ''}${(item.productReferences || []).map(productCard).join('')}<small>${time(item.createdAt)}</small>${outgoing ? `${label === 'Seen' ? '' : `<span class="chat-receipt" aria-label="Message status: ${label}">${label}${item.failed ? ' <button type="button" data-retry>Retry</button>' : ''}</span>`}${item.id === latestSeen ? `<span class="chat-seen-avatar" aria-label="Seen by store"><span aria-hidden="true">${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : 'G'}</span>Seen by store</span>` : ''}` : ''}</div>`;
+    return `<div class="ggm-chat-bubble ${outgoing ? 'outgoing' : 'incoming'} ${(item.productReferences || []).length ? 'has-product' : ''}" data-message-id="${esc(item.id)}"><p>${esc(item.message)}</p>${item.media ? mediaMarkup(item.media, uid, item.id) : ''}${(item.productReferences || []).map(productCard).join('')}<small>${time(item.createdAt)}</small>${outgoing ? `${label === 'Seen' ? '' : `<span class="chat-receipt" aria-label="Message status: ${label}">${label}${item.failed ? ' <button type="button" data-retry>Retry</button>' : ''}</span>`}${item.id === latestSeen ? `<span class="chat-seen-avatar" aria-label="Seen by store"><span aria-hidden="true">${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : 'G'}</span>Seen by store</span>` : ''}` : ''}</div>`;
   }).join('')}`;
   body.querySelector('[data-chat-more]')?.addEventListener('click', loadOlder);
   body.querySelector('[data-retry]')?.addEventListener('click', sendPending);
   body.querySelectorAll('.chat-watch-photo img').forEach((img) => img.onerror = () => { img.replaceWith(Object.assign(document.createElement('span'), { textContent: 'G' })); });
   body.querySelectorAll('.chat-seen-avatar img').forEach((img) => img.onerror = () => { img.replaceWith(document.createTextNode('G')); });
   if (body.querySelector('[data-media-path]')) firebase().then(({ app, config }) => hydrateMedia(body, app, config.emulator)).catch(() => {});
-  if (state.open) requestAnimationFrame(() => { body.scrollTop = nearBottom ? body.scrollHeight : top + body.scrollHeight - before; scheduleSeen(); });
+  if (state.open) requestAnimationFrame(() => { body.scrollTop = state.scrollToLatest || nearBottom ? body.scrollHeight : top + body.scrollHeight - before; if (!state.loading) state.scrollToLatest = false; scheduleSeen(); });
 }
 function render() { renderChrome(); renderMessages(); }
 function showNotice() {
@@ -134,7 +145,7 @@ async function sendPending() {
     if (pending.file && !pending.media) { const { app, config } = await firebase(); pending.media = await uploadMedia(app, config.emulator, uid, pending.id, uid, pending.file, (value) => { state.uploadProgress = value; renderChrome(); }); }
     await sendMessage(db, uid, uid, 'customer', pending.message, pending.productReferences, { name: state.name, contact: state.contact }, pending.id, pending.media);
     try { localStorage.setItem('ggm-chat-started', '1'); } catch {}
-    pending.pending = false; state.products = []; if (state.draft.trim() === pending.text) state.draft = ''; if (state.attachment === pending.file) state.attachment = null;
+    pending.pending = false; state.products = []; if (state.draft.trim() === pending.text) { state.draft = ''; state.generatedDraft = ''; } if (state.attachment === pending.file) state.attachment = null;
   } catch (error) { if (state.pending) { state.pending.pending = false; state.pending.failed = true; } state.error = displayError(error); }
   state.sending = false; render();
 }
@@ -144,8 +155,16 @@ function submit(event) {
   if (state.pending?.failed) { state.error = 'Retry the failed message first.'; renderChrome(); return; }
   state.pending = { id: `local-${Date.now()}`, senderUid: uid, senderRole: 'customer', message: text || (state.attachment?.type.startsWith('image/') ? 'Photo' : 'Video'), text, file: state.attachment, productReferences: [...state.products], pending: true }; sendPending();
 }
-export async function openChat(watches = []) {
+export async function openChat(watches = [], { prefillInquiry = false } = {}) {
   state.products = [...new Map([...state.products, ...watches.map(safeProduct)].map((watch) => [watch.id, watch])).values()].slice(0, 8);
+  if (prefillInquiry && state.products.length) {
+    if (!state.draft.trim() || state.draft === state.generatedDraft) {
+      state.draft = suggestedInquiry(state.products);
+      state.generatedDraft = state.draft;
+    }
+    state.focusComposer = true;
+  }
+  if (!state.open) state.scrollToLatest = true;
   state.open = true; state.error = '';
   if (!state.unsubConversation) { state.loading = true; render(); try { await ensureConnected(); } catch (error) { state.loading = false; state.error = displayError(error); render(); } } else render();
 }
