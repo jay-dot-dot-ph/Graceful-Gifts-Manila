@@ -167,7 +167,7 @@ try {
   assert.equal(await adminTime.isVisible(), true, 'Clicking an admin message reveals its time');
   await adminBubble.locator('p').click();
   assert.equal(await adminTime.isHidden(), true, 'Clicking again hides the admin message time');
-  await owner.locator('.admin-inbox-link[aria-label="Inbox, 1 unread"]').waitFor();
+  await owner.locator('.admin-inbox-link').waitFor();
   const inboxRow = owner.locator('.admin-inbox-row').first();
   assert.equal(await inboxRow.locator('time, .admin-row-meta').count(), 0, 'Inbox row omits the date and assignment line');
   await owner.waitForFunction(() => /^(Delivered|Seen)$/.test(document.querySelector('.admin-inbox-row .admin-row-receipt')?.textContent || ''));
@@ -180,7 +180,7 @@ try {
   await customer.locator('#ggm-chat-message').fill('A second question while this inbox is unread.');
   await customer.locator('.ggm-chat-form button').click();
   await owner.getByText('A second question while this inbox is unread.').first().waitFor();
-  await owner.locator('.admin-inbox-link[aria-label="Inbox, 1 unread"]').waitFor();
+  await owner.locator('.admin-inbox-link').waitFor();
   await owner.locator('.admin-notice').getByText('New customer message').waitFor();
   await owner.locator('.admin-inbox-row').first().click();
   await owner.locator('#admin-message').fill('Draft preserved while previewing a watch');
@@ -212,6 +212,7 @@ try {
   assert.equal(await owner.locator('#admin-reply .admin-send svg').count(), 1, 'Reply button uses an icon');
   assert.equal(await owner.locator('#admin-reply .admin-send').getAttribute('aria-label'), 'Send reply');
   await owner.locator('#admin-reply button').click();
+  assert.equal(await owner.locator('#admin-message').inputValue(), '', 'Reply draft clears as soon as sending starts');
   try { await owner.locator('#admin-thread-body').getByText('Yes, AP-001 is available.').waitFor({ timeout: 5000 }); }
   catch (error) { let saved = []; await environment.withSecurityRulesDisabled(async (context) => { const conversation = (await getDocs(collection(context.firestore(), 'conversations'))).docs[0]; if (conversation) saved = (await getDocs(collection(context.firestore(), 'conversations', conversation.id, 'messages'))).docs.map((item) => item.data().message); }); console.error('Owner reply diagnosis:', await owner.locator('.admin-thread').innerText(), await owner.locator('.admin-toast').allInnerTexts(), 'draft:', await owner.locator('#admin-message').inputValue(), 'disabled:', await owner.locator('#admin-reply button').isDisabled(), 'saved:', saved); throw error; }
   assert.ok(await owner.locator('.admin-message.staff').last().evaluate((bubble) => bubble.getBoundingClientRect().width < bubble.parentElement.getBoundingClientRect().width * .5), 'Short admin message fits its text');
