@@ -79,7 +79,9 @@ function renderChrome() {
     requestAnimationFrame(() => { if (state.open && !composer.disabled) { composer.focus({ preventScroll: true }); composer.setSelectionRange(composer.value.length, composer.value.length); } });
   }
   const attach = root.querySelector('#ggm-attach-label'); attach.hidden = false; attach.classList.toggle('is-disabled', state.sending || !state.conversation || !state.mediaAvailable); attach.title = !state.mediaAvailable ? 'Photo and video sharing needs store setup' : state.conversation ? 'Attach photo or video' : 'Send a message first to start the conversation';
-  root.querySelector('#ggm-chat-file').disabled = state.sending || !state.conversation || !state.mediaAvailable;
+  // Keep the label clickable so it can explain why uploads are unavailable.
+  // The click handler and selectAttachment still reject files until setup is complete.
+  root.querySelector('#ggm-chat-file').disabled = state.sending;
   const preview = root.querySelector('#ggm-attachment-preview'); preview.hidden = !state.attachment; preview.innerHTML = state.attachment ? `<span>${esc(state.attachment.name)} · ${(state.attachment.size / 1_000_000).toFixed(1)} MB${state.sending ? ` · ${state.uploadProgress}%` : ''}</span><button type="button" data-remove-attachment ${state.sending ? 'disabled' : ''} aria-label="Remove attachment">×</button>` : '';
   preview.querySelector('[data-remove-attachment]')?.addEventListener('click', () => { state.attachment = null; renderChrome(); });
   const send = root.querySelector('form button'); send.disabled = composer.disabled; send.textContent = state.sending ? 'Sending…' : 'Send';

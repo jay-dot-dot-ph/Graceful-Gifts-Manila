@@ -83,7 +83,9 @@ function row(item) { const unread = item.lastSenderRole === 'customer' && (!item
 function updateMediaForm() {
   const form = root.querySelector('#admin-reply'); if (!form) return;
   const attach = form.querySelector('.chat-attach'); attach.classList.toggle('is-disabled', !state.mediaAvailable || state.replySending || state.blocked); attach.title = state.mediaAvailable ? 'Attach photo or video' : 'Photo and video sharing needs store setup';
-  form.querySelector('#admin-chat-file').disabled = !state.mediaAvailable || state.replySending || state.blocked;
+  // Leave the picker enabled while setup is pending so the label can show guidance.
+  // selectAdminAttachment rejects files whenever media is disabled.
+  form.querySelector('#admin-chat-file').disabled = state.replySending || state.blocked;
   const preview = form.querySelector('.chat-attachment-preview'); preview.hidden = !state.attachment;
   preview.innerHTML = state.attachment ? `<span>${esc(state.attachment.name)} · ${(state.attachment.size / 1_000_000).toFixed(1)} MB${state.replySending ? ` · ${state.uploadProgress}%` : ''}</span><button type="button" data-remove-attachment ${state.replySending ? 'disabled' : ''} aria-label="Remove attachment">×</button>` : '';
   preview.querySelector('[data-remove-attachment]')?.addEventListener('click', () => { state.attachment = null; updateMediaForm(); });
