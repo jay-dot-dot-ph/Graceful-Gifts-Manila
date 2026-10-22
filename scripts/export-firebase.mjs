@@ -113,7 +113,11 @@ writeFileSync(join(output, 'firebase-config.json'), JSON.stringify(parsedWebConf
 writeFileSync(join(output, 'push-config.json'), JSON.stringify({ vapidKey: process.env.GGM_FCM_VAPID_PUBLIC_KEY || '' }));
 writeFileSync(join(output, 'media-config.json'), JSON.stringify({ enabled: process.env.GGM_CHAT_MEDIA_ENABLED === 'true' }));
 const client = await readRoute('/app.js');
-const staticClient = client.replace("fetch('/api/catalog')", "fetch('/api/catalog.json')");
+const chatImport = "import('/chat.js')";
+if (!client.includes(chatImport)) throw new Error('Customer chat import was not found in the browser script.');
+const chatVersion = createHash('sha256').update(readFileSync(join(output, 'chat.js'))).digest('hex').slice(0, 12);
+const staticClient = client.replace("fetch('/api/catalog')", "fetch('/api/catalog.json')")
+  .replaceAll(chatImport, `import('/chat.js?v=${chatVersion}')`);
 if (staticClient === client) throw new Error('Catalog URL was not replaced in the browser script.');
 writeFileSync(join(output, 'app.js'), staticClient);
 const versionedClient = `app-${createHash('sha256').update(staticClient).digest('hex').slice(0, 12)}.js`;
