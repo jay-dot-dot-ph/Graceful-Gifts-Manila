@@ -135,8 +135,9 @@ try {
   assert.equal(await owner.locator('#admin-thread-body').evaluate((body) => body.scrollTop), threadScroll, 'Preview keeps conversation scroll position');
   assert.equal(await owner.locator('#admin-message').inputValue(), 'Draft preserved while previewing a watch');
   await owner.locator('#admin-message').fill('');
-  await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').last().getByText('Seen').waitFor();
   await customer.locator('.chat-seen-avatar').last().waitFor();
+  assert.equal(await customer.locator('.chat-seen-avatar').count(), 1, 'Only the latest seen customer message shows the store marker');
+  assert.equal(await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').filter({ hasText: 'Seen' }).count(), 0, 'Seen is not repeated above the store marker');
   await owner.locator('.admin-inbox-link[aria-label="Inbox, 0 unread"]').waitFor();
   await owner.setViewportSize({ width: 390, height: 844 });
   assert.ok(await owner.locator('.admin-thread').isVisible(), 'Mobile thread is visible after selection');
