@@ -168,6 +168,9 @@ try {
   await adminBubble.locator('p').click();
   assert.equal(await adminTime.isHidden(), true, 'Clicking again hides the admin message time');
   await owner.locator('.admin-inbox-link[aria-label="Inbox, 1 unread"]').waitFor();
+  const inboxRow = owner.locator('.admin-inbox-row').first();
+  assert.equal(await inboxRow.locator('time, .admin-row-meta').count(), 0, 'Inbox row omits the date and assignment line');
+  await owner.waitForFunction(() => /^(Delivered|Seen)$/.test(document.querySelector('.admin-inbox-row .admin-row-receipt')?.textContent || ''));
   await customer.waitForFunction(() => {
     const bubble = [...document.querySelectorAll('.ggm-chat-bubble.outgoing')].at(-1);
     return bubble?.querySelector('.chat-receipt')?.textContent?.includes('Delivered') || !!bubble?.querySelector('.chat-seen-avatar');
@@ -206,6 +209,8 @@ try {
   await customer.locator('[data-chat-close]').click();
   await customer.evaluate(() => Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }));
   await owner.locator('#admin-message').fill('Yes, AP-001 is available.');
+  assert.equal(await owner.locator('#admin-reply .admin-send svg').count(), 1, 'Reply button uses an icon');
+  assert.equal(await owner.locator('#admin-reply .admin-send').getAttribute('aria-label'), 'Send reply');
   await owner.locator('#admin-reply button').click();
   try { await owner.locator('#admin-thread-body').getByText('Yes, AP-001 is available.').waitFor({ timeout: 5000 }); }
   catch (error) { let saved = []; await environment.withSecurityRulesDisabled(async (context) => { const conversation = (await getDocs(collection(context.firestore(), 'conversations'))).docs[0]; if (conversation) saved = (await getDocs(collection(context.firestore(), 'conversations', conversation.id, 'messages'))).docs.map((item) => item.data().message); }); console.error('Owner reply diagnosis:', await owner.locator('.admin-thread').innerText(), await owner.locator('.admin-toast').allInnerTexts(), 'draft:', await owner.locator('#admin-message').inputValue(), 'disabled:', await owner.locator('#admin-reply button').isDisabled(), 'saved:', saved); throw error; }
@@ -218,10 +223,9 @@ try {
   assert.ok(await customer.locator('.ggm-chat-bubble.incoming').last().evaluate((bubble) => bubble.getBoundingClientRect().width < bubble.parentElement.getBoundingClientRect().width * .8), 'Short customer chat bubble fits its text');
   assert.equal(await owner.locator('.admin-message.staff .chat-receipt').filter({ hasText: 'Seen' }).count(), 0, 'Admin has no duplicate Seen receipt');
   const seenBubble = owner.locator('.admin-message.staff').last();
-  await seenBubble.locator('.chat-seen-avatar').waitFor({ state: 'attached' });
-  assert.equal(await seenBubble.locator('.chat-seen-avatar').isVisible(), false, 'Seen stays hidden until the message is opened');
-  await seenBubble.click();
-  assert.equal(await seenBubble.locator('.chat-seen-avatar').isVisible(), true, 'Seen appears when the message is opened');
+  await seenBubble.locator('.chat-seen-avatar').waitFor({ state: 'visible' });
+  await owner.waitForFunction(() => document.querySelector('.admin-inbox-row.selected .admin-row-receipt')?.textContent === 'Seen');
+  assert.equal(await seenBubble.locator('.chat-seen-avatar').isVisible(), true, 'Latest Seen marker is visible without opening the message');
   await customer.locator('[data-chat-close]').click();
   await owner.locator('#admin-message').fill('We can also show similar watches.');
   await owner.locator('#admin-reply button').click();

@@ -8,10 +8,10 @@ import { mediaEnabled, checkFile, uploadMedia, deleteChatMedia, mediaMarkup, hyd
 const root = document.getElementById('admin-app');
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const stamp = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Just now';
-const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), expandedTimes: new Set(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', noticeCentered: false, deletingId: null, loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, attachment: null, uploadProgress: 0, mediaAvailable: false, blocked: false, moderationBusy: false, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubBlock: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
+const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), inboxReceipts: new Map(), inboxReceiptListeners: new Map(), expandedTimes: new Set(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', noticeCentered: false, deletingId: null, loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, attachment: null, uploadProgress: 0, mediaAvailable: false, blocked: false, moderationBusy: false, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubBlock: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
 const sound = createNotifier('staff', () => updateHeader());
 let noticeTimer, deepLinkHandled = false;
-function cleanup() { if (previewDialog?.open) previewDialog.close(); for (const key of ['unsubInbox', 'unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubBlock', 'unsubProfile', 'unsubStaff', 'unsubActivity', 'unsubSettings']) { state[key]?.(); state[key] = null; } }
+function cleanup() { if (previewDialog?.open) previewDialog.close(); for (const listener of state.inboxReceiptListeners.values()) listener.unsubscribe(); state.inboxReceiptListeners.clear(); state.inboxReceipts.clear(); for (const key of ['unsubInbox', 'unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubBlock', 'unsubProfile', 'unsubStaff', 'unsubActivity', 'unsubSettings']) { state[key]?.(); state[key] = null; } }
 function profileName(uid) { return state.staff.find((person) => person.id === uid)?.displayName || (uid ? 'Staff member' : 'Unassigned'); }
 function product(watch) { if (!/^[A-Z0-9-]{2,20}$/.test(watch.id || '')) return ''; const image = /^\/images\/[A-Za-z0-9._-]+$/.test(watch.image || '') ? watch.image : ''; const detail = [watch.id, watch.brand, watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`, watch.size || ''].filter(Boolean).join(' · '); return `<button type="button" class="admin-product" data-preview-product="${esc(watch.id)}" aria-label="Preview ${esc(watch.name || watch.id)}"><span class="chat-watch-photo">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}" loading="lazy">` : '<span aria-hidden="true">G</span>'}</span><span><strong>${esc(watch.name || watch.id)}</strong><small>${esc(detail)}</small></span></button>`; }
 function adminMessage(message) {
@@ -24,7 +24,6 @@ function toggleAdminMessageTime(bubble) {
   const key = `${state.selected}/${id}`, show = !state.expandedTimes.has(key);
   if (show) state.expandedTimes.add(key); else state.expandedTimes.delete(key);
   label.hidden = !show;
-  const seen = bubble.querySelector('.chat-seen-avatar'); if (seen) seen.hidden = !show;
   bubble.setAttribute('aria-expanded', String(show));
   bubble.title = show ? 'Click to hide date and time' : 'Click to show date and time';
 }
@@ -79,7 +78,26 @@ function header() {
 function updateHeader() { const link = root.querySelector('.admin-inbox-link'); if (link) { link.setAttribute('aria-label', `Inbox, ${state.unread} unread`); const badge = link.querySelector('b'); badge.hidden = !state.unread; badge.textContent = state.unread > 9 ? '9+' : String(state.unread); } const button = root.querySelector('[data-sound]'); if (button) { button.innerHTML = soundIcon(sound.enabled); button.setAttribute('aria-label', sound.label()); button.title = sound.label(); button.setAttribute('aria-pressed', String(sound.enabled)); } const push = root.querySelector('[data-push]'); if (push) { push.disabled = !state.pushAvailable; if (state.pushAvailable) push.removeAttribute('title'); push.textContent = state.pushAvailable ? state.pushActive ? 'Disable background alerts' : 'Enable background alerts' : 'Background alerts need setup'; } const notice = root.querySelector('.admin-notice'); if (notice) { notice.textContent = state.notice; notice.classList.toggle('is-centered', state.noticeCentered); } }
 function showNotice(message, centered = false, duration = 5000) { clearTimeout(noticeTimer); state.notice = message; state.noticeCentered = centered; updateHeader(); noticeTimer = setTimeout(() => { state.notice = ''; state.noticeCentered = false; updateHeader(); }, duration); }
 function renderLogin() { root.innerHTML = `<main class="admin-login"><form id="admin-login-form" class="admin-card"><p class="eyebrow">GRACEFUL GIFTS MANILA</p><h1>Staff sign in</h1><p>Use your individual staff account.</p><label>Email<input type="email" name="email" autocomplete="username" required></label><label>Password<input type="password" name="password" autocomplete="current-password" required></label><button class="admin-primary" type="submit">Sign in</button>${state.error ? `<p class="admin-error" role="alert">${esc(state.error)}</p>` : ''}</form></main>`; root.querySelector('form').onsubmit = login; }
-function row(item) { const unread = item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); return `<button type="button" class="admin-inbox-row ${unread ? 'unread' : ''} ${state.selected === item.id ? 'selected' : ''}" data-select-chat="${esc(item.id)}"><span class="admin-row-top">${customerLabel(item)}<time>${stamp(item.lastMessageAt)}</time></span><span class="admin-row-summary"><span class="admin-row-preview">${esc(item.lastMessage || '')}</span>${unread ? '<b class="admin-row-unread" aria-label="Unread message"></b>' : ''}</span><span class="admin-row-meta">${state.blocked && state.selected === item.id && state.deletingId !== item.id ? '<em>Blocked · </em>' : ''}<span>${esc(profileName(item.assignedStaffUid))}</span></span></button>`; }
+function inboxStatus(item) { const saved = state.inboxReceipts.get(item.id); return status({ id: item.lastMessageId }, saved?.messageId === item.lastMessageId ? saved.data : null); }
+function reconcileInboxReceipts(db) {
+  const current = new Map(state.rows.filter((item) => /^[A-Za-z0-9]{20}$/.test(item.lastMessageId || '')).map((item) => [item.id, item.lastMessageId]));
+  for (const [id, listener] of state.inboxReceiptListeners) {
+    if (current.get(id) === listener.messageId) continue;
+    listener.unsubscribe(); state.inboxReceiptListeners.delete(id); state.inboxReceipts.delete(id);
+  }
+  for (const [id, messageId] of current) {
+    if (state.inboxReceiptListeners.has(id)) continue;
+    const unsubscribe = onSnapshot(doc(db, 'conversations', id, 'receipts', messageId), (snapshot) => {
+      if (state.inboxReceiptListeners.get(id)?.messageId !== messageId) return;
+      state.inboxReceipts.set(id, { messageId, data: snapshot.exists() ? snapshot.data() : null });
+      const button = [...root.querySelectorAll('[data-select-chat]')].find((node) => node.dataset.selectChat === id);
+      const indicator = button?.querySelector('.admin-row-receipt');
+      if (indicator) { const label = inboxStatus({ id, lastMessageId: messageId }); indicator.textContent = label; indicator.setAttribute('aria-label', `Latest message: ${label}`); }
+    }, (error) => console.warn('Inbox receipt unavailable:', error?.code || error?.message));
+    state.inboxReceiptListeners.set(id, { messageId, unsubscribe });
+  }
+}
+function row(item) { const unread = item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); const receipt = inboxStatus(item); return `<button type="button" class="admin-inbox-row ${unread ? 'unread' : ''} ${state.selected === item.id ? 'selected' : ''}" data-select-chat="${esc(item.id)}"><span class="admin-row-top">${customerLabel(item)}<span class="admin-row-receipt" aria-label="Latest message: ${receipt}">${receipt}</span></span><span class="admin-row-summary"><span class="admin-row-preview">${esc(item.lastMessage || '')}</span>${unread ? '<b class="admin-row-unread" aria-label="Unread message"></b>' : ''}</span>${state.blocked && state.selected === item.id && state.deletingId !== item.id ? '<span class="admin-row-meta"><em>Blocked</em></span>' : ''}</button>`; }
 function updateMediaForm() {
   const form = root.querySelector('#admin-reply'); if (!form) return;
   const attach = form.querySelector('.chat-attach'); attach.classList.toggle('is-disabled', !state.mediaAvailable || state.replySending || state.blocked); attach.title = state.mediaAvailable ? 'Attach photo or video' : 'Photo and video sharing needs store setup';
@@ -146,7 +164,14 @@ function renderChat() {
   root.querySelector('[data-more]')?.addEventListener('click', loadMore);
   root.querySelector('[data-older]')?.addEventListener('click', loadOlder);
   root.querySelector('#admin-assignee')?.addEventListener('change', (event) => changeConversation({ assignedStaffUid: event.target.value || null }));
-  const replyForm = root.querySelector('#admin-reply'); if (replyForm) { replyForm.onsubmit = reply; replyForm.querySelector('.admin-primary').disabled = state.replySending || state.blocked; }
+  const replyForm = root.querySelector('#admin-reply'); if (replyForm) {
+    replyForm.onsubmit = reply;
+    const sendButton = replyForm.querySelector('.admin-primary');
+    sendButton.classList.add('admin-send');
+    sendButton.setAttribute('aria-label', 'Send reply'); sendButton.title = 'Send reply';
+    sendButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 3-8.5 18-2.2-7.3L3 11.5 21 3Z"/><path d="M10.3 13.7 21 3"/></svg>';
+    sendButton.disabled = state.replySending || state.blocked;
+  }
   const replyBox = root.querySelector('#admin-message'); if (replyBox) { replyBox.disabled = state.blocked; replyBox.placeholder = state.blocked ? 'This customer is blocked' : 'Write a reply…'; replyBox.oninput = (event) => { state.replyDraft = event.target.value; }; replyBox.onkeydown = (event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); replyForm.requestSubmit(); } }; }
   root.querySelector('[data-clear-error]')?.addEventListener('click', () => { state.error = ''; render(); });
   bindHeader();
@@ -172,7 +197,7 @@ function decorateThread() {
     if (item.senderUid === state.user.uid) {
       const label = status(item, state.receipts.get(item.id));
       if (label !== 'Seen') { const receipt = document.createElement('span'); receipt.className = 'chat-receipt'; receipt.textContent = label; receipt.setAttribute('aria-label', `Message status: ${label}`); bubble.append(receipt); }
-      if (item.id === lastSeen) { const avatar = document.createElement('span'); avatar.className = 'chat-seen-avatar'; avatar.setAttribute('aria-label', 'Seen by customer'); avatar.innerHTML = '<span aria-hidden="true">C</span>Seen'; avatar.hidden = !state.expandedTimes.has(`${state.selected}/${item.id}`); bubble.append(avatar); }
+      if (item.id === lastSeen) { const avatar = document.createElement('span'); avatar.className = 'chat-seen-avatar'; avatar.setAttribute('aria-label', 'Seen by customer'); avatar.innerHTML = '<span aria-hidden="true">C</span>Seen'; bubble.append(avatar); }
     }
     bubble.querySelectorAll('.chat-watch-photo img').forEach((img) => img.onerror = () => { img.replaceWith(Object.assign(document.createElement('span'), { textContent: 'G' })); });
   });
@@ -264,6 +289,8 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 window.addEventListener('focus', scheduleStaffSeen);
 function subscribeInbox(db) {
   state.unsubInbox?.();
+  for (const listener of state.inboxReceiptListeners.values()) listener.unsubscribe();
+  state.inboxReceiptListeners.clear(); state.inboxReceipts.clear();
   state.inboxInitialized = false; state.knownInbox = new Map();
   const base = collection(db, 'conversations');
   const inbox = state.profile.role === 'staff' ? query(base, where('assignedStaffUid', '==', state.user.uid), orderBy('lastMessageAt', 'desc'), limit(50)) : query(base, orderBy('lastMessageAt', 'desc'), limit(50));
@@ -284,19 +311,21 @@ function subscribeInbox(db) {
           getDoc(doc(db, 'conversations', id)).then((record) => {
             if (!record.exists() || !state.profile?.active) return;
             if (!state.rows.some((item) => item.id === id)) state.rows.push({ id, ...record.data() });
+            reconcileInboxReceipts(db);
             selectConversation(id);
           }).catch(() => showNotice('This conversation is unavailable to your account.'));
         }
       }
     }
     state.unread = state.rows.filter((item) => item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis())).length;
+    reconcileInboxReceipts(db);
     if (state.selected && !state.rows.some((item) => item.id === state.selected)) { clearSelected(); renderChat(); }
     else renderInboxOnly();
   }, (error) => { state.error = displayError(error); render(); });
 }
 async function loadMore() {
   if (!state.cursor) return;
-  try { const { db } = await firebase(); const base = collection(db, 'conversations'); const q = state.profile.role === 'staff' ? query(base, where('assignedStaffUid', '==', state.user.uid), orderBy('lastMessageAt', 'desc'), startAfter(state.cursor), limit(50)) : query(base, orderBy('lastMessageAt', 'desc'), startAfter(state.cursor), limit(50)); const snapshot = await getDocs(q); state.rows = [...state.rows, ...snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))]; state.cursor = snapshot.docs.at(-1) || null; state.more = snapshot.docs.length === 50; render(); } catch (error) { state.error = displayError(error); render(); }
+  try { const { db } = await firebase(); const base = collection(db, 'conversations'); const q = state.profile.role === 'staff' ? query(base, where('assignedStaffUid', '==', state.user.uid), orderBy('lastMessageAt', 'desc'), startAfter(state.cursor), limit(50)) : query(base, orderBy('lastMessageAt', 'desc'), startAfter(state.cursor), limit(50)); const snapshot = await getDocs(q); state.rows = [...state.rows, ...snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))]; state.cursor = snapshot.docs.at(-1) || null; state.more = snapshot.docs.length === 50; reconcileInboxReceipts(db); render(); } catch (error) { state.error = displayError(error); render(); }
 }
 function clearSelected() {
   for (const key of ['unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubBlock']) { state[key]?.(); state[key] = null; }
@@ -305,7 +334,7 @@ function clearSelected() {
 async function selectConversation(id) {
   const { db } = await firebase(); clearSelected(); state.selected = id; state.mobileThread = true;
   const ref = doc(db, 'conversations', id);
-  state.unsubSelected = onSnapshot(ref, (snapshot) => { if (state.selected !== id) return; if (!snapshot.exists()) { clearSelected(); render(); } else { state.rows = state.rows.map((item) => item.id === id ? { id, ...snapshot.data() } : item); renderInboxOnly(); } }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
+  state.unsubSelected = onSnapshot(ref, (snapshot) => { if (state.selected !== id) return; if (!snapshot.exists()) { clearSelected(); render(); } else { state.rows = state.rows.map((item) => item.id === id ? { id, ...snapshot.data() } : item); reconcileInboxReceipts(db); renderInboxOnly(); } }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
   state.unsubBlock = onSnapshot(doc(db, 'blockedCustomers', id), (snapshot) => { if (state.selected !== id) return; if (state.blocked !== snapshot.exists()) { state.blocked = snapshot.exists(); renderChat(); } }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
   state.unsubReceipts = subscribeReceipts(db, id, (receipts) => { state.receipts = new Map([...state.receipts, ...receipts]); renderThreadMessages(); const latest = state.rows.find((row) => row.id === id); if (latest?.lastSenderRole === 'customer' && receipts.get(latest.lastMessageId)?.seenAt) advanceStaffRead(db, id, latest.lastMessageId); }, (error) => { state.error = displayError(error); render(); });
   state.unsubMessages = onSnapshot(query(collection(ref, 'messages'), orderBy('createdAt', 'desc'), limit(40)), { includeMetadataChanges: true }, (snapshot) => { state.threadSynced = !snapshot.metadata.fromCache; state.messages = snapshot.docs.map((item) => ({ id: item.id, ...item.data(), metadata: item.metadata })).reverse(); if (state.pendingReply && state.messages.some((item) => item.id === state.pendingReply.id)) state.pendingReply = null; state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; if (!state.threadReady) { state.threadReady = true; renderChat(); } else renderThreadMessages(); acknowledgeThread(db); }, (error) => { state.error = displayError(error); render(); });
