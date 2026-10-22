@@ -3,6 +3,12 @@ import { parseCsv, normalizeRows, getCatalog, setCatalogForBuild } from '../work
 import { extractSheetImages, getPublicSourceFingerprint, loadPublicCatalog, SHEET_ID, BRAND_TABS } from './public-catalog.mjs';
 import { extractWorkbookImages } from './xlsx-images.mjs';
 import { guestIdentity } from '../chat/guest.js';
+import { displayMessage } from '../chat/message-text.js';
+
+assert.equal(displayMessage('<3'), '❤️');
+assert.equal(displayMessage('I <3 watches'), 'I ❤️ watches');
+assert.equal(displayMessage('Price <3,000'), 'Price <3,000');
+assert.equal(displayMessage('<script>alert(1)</script>'), '<script>alert(1)</script>');
 
 assert.deepEqual(guestIdentity('anonymous-customer-123'), guestIdentity('anonymous-customer-123'));
 assert.notEqual(guestIdentity('anonymous-customer-123').reference, guestIdentity('another-customer-456').reference);

@@ -2,6 +2,7 @@ import { customerSession, firebase, doc, collection, query, orderBy, limit, star
 import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } from './receipts.js';
 import { createNotifier, soundIcon } from './notify.js';
 import { mediaEnabled, checkFile, uploadMedia, mediaMarkup, hydrateMedia } from './media.js';
+import { displayMessage } from './message-text.js';
 
 const state = { open: false, scrollToLatest: false, products: [], messages: [], older: [], receipts: new Map(), expandedTimes: new Set(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', generatedDraft: '', focusComposer: false, name: '', contact: '', error: '', conversation: null, pending: null, sending: false, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
 const sound = createNotifier('customer', () => renderChrome());
@@ -98,7 +99,7 @@ function renderMessages() {
     const outgoing = item.senderUid === uid || item.senderRole === 'customer' && !uid;
     const label = status(item, state.receipts.get(item.id));
     const showTime = state.expandedTimes.has(item.id);
-    return `<div class="ggm-chat-bubble ${outgoing ? 'outgoing' : 'incoming'} ${(item.productReferences || []).length ? 'has-product' : ''}" data-message-id="${esc(item.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time"><p>${esc(item.message)}</p>${item.media ? mediaMarkup(item.media, uid, item.id) : ''}${(item.productReferences || []).map(productCard).join('')}<small class="chat-message-time" ${showTime ? '' : 'hidden'}>${time(item.createdAt)}</small>${outgoing ? `${label === 'Seen' ? '' : `<span class="chat-receipt" aria-label="Message status: ${label}">${label}${item.failed ? ' <button type="button" data-retry>Retry</button>' : ''}</span>`}${item.id === latestSeen ? `<span class="chat-seen-avatar" aria-label="Seen by store"><span aria-hidden="true">${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : 'G'}</span>Seen by store</span>` : ''}` : ''}</div>`;
+    return `<div class="ggm-chat-bubble ${outgoing ? 'outgoing' : 'incoming'} ${(item.productReferences || []).length ? 'has-product' : ''}" data-message-id="${esc(item.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time"><p>${esc(displayMessage(item.message))}</p>${item.media ? mediaMarkup(item.media, uid, item.id) : ''}${(item.productReferences || []).map(productCard).join('')}<small class="chat-message-time" ${showTime ? '' : 'hidden'}>${time(item.createdAt)}</small>${outgoing ? `${label === 'Seen' ? '' : `<span class="chat-receipt" aria-label="Message status: ${label}">${label}${item.failed ? ' <button type="button" data-retry>Retry</button>' : ''}</span>`}${item.id === latestSeen ? `<span class="chat-seen-avatar" aria-label="Seen by store"><span aria-hidden="true">${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : 'G'}</span>Seen by store</span>` : ''}` : ''}</div>`;
   }).join('')}`;
   body.querySelector('[data-chat-more]')?.addEventListener('click', loadOlder);
   body.querySelector('[data-retry]')?.addEventListener('click', sendPending);

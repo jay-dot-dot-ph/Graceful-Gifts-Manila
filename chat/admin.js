@@ -2,6 +2,7 @@ import { firebase, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc,
 import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } from './receipts.js';
 import { createNotifier, soundIcon } from './notify.js';
 import { guestIdentity } from './guest.js';
+import { displayMessage } from './message-text.js';
 import { enablePush, refreshPush, revokePush, pushEnabled, pushAvailable } from './push.js';
 import { mediaEnabled, checkFile, uploadMedia, deleteChatMedia, mediaMarkup, hydrateMedia } from './media.js';
 
@@ -16,7 +17,7 @@ function profileName(uid) { return state.staff.find((person) => person.id === ui
 function product(watch) { if (!/^[A-Z0-9-]{2,20}$/.test(watch.id || '')) return ''; const image = /^\/images\/[A-Za-z0-9._-]+$/.test(watch.image || '') ? watch.image : ''; const detail = [watch.id, watch.brand, watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`, watch.size || ''].filter(Boolean).join(' · '); return `<button type="button" class="admin-product" data-preview-product="${esc(watch.id)}" aria-label="Preview ${esc(watch.name || watch.id)}"><span class="chat-watch-photo">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}" loading="lazy">` : '<span aria-hidden="true">G</span>'}</span><span><strong>${esc(watch.name || watch.id)}</strong><small>${esc(detail)}</small></span></button>`; }
 function adminMessage(message) {
   const showTime = state.expandedTimes.has(`${state.selected}/${message.id}`);
-  return `<div class="admin-message ${message.senderRole === 'customer' ? 'customer' : 'staff'}${message.productReferences?.length ? ' has-product' : ''}" data-message-id="${esc(message.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time"><p>${esc(message.message)}</p>${(message.productReferences || []).map(product).join('')}<small class="admin-message-time" ${showTime ? '' : 'hidden'}>${stamp(message.createdAt)}</small></div>`;
+  return `<div class="admin-message ${message.senderRole === 'customer' ? 'customer' : 'staff'}${message.productReferences?.length ? ' has-product' : ''}" data-message-id="${esc(message.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time"><p>${esc(displayMessage(message.message))}</p>${(message.productReferences || []).map(product).join('')}<small class="admin-message-time" ${showTime ? '' : 'hidden'}>${stamp(message.createdAt)}</small></div>`;
 }
 function toggleAdminMessageTime(bubble) {
   const id = bubble?.dataset.messageId, label = bubble?.querySelector('.admin-message-time');
@@ -97,7 +98,7 @@ function reconcileInboxReceipts(db) {
     state.inboxReceiptListeners.set(id, { messageId, unsubscribe });
   }
 }
-function row(item) { const unread = item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); const receipt = inboxStatus(item); return `<button type="button" class="admin-inbox-row ${unread ? 'unread' : ''} ${state.selected === item.id ? 'selected' : ''}" data-select-chat="${esc(item.id)}"><span class="admin-row-top">${customerLabel(item)}<span class="admin-row-receipt" aria-label="Latest message: ${receipt}">${receipt}</span></span><span class="admin-row-summary"><span class="admin-row-preview">${esc(item.lastMessage || '')}</span>${unread ? '<b class="admin-row-unread" aria-label="Unread message"></b>' : ''}</span>${state.blocked && state.selected === item.id && state.deletingId !== item.id ? '<span class="admin-row-meta"><em>Blocked</em></span>' : ''}</button>`; }
+function row(item) { const unread = item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); const receipt = inboxStatus(item); return `<button type="button" class="admin-inbox-row ${unread ? 'unread' : ''} ${state.selected === item.id ? 'selected' : ''}" data-select-chat="${esc(item.id)}"><span class="admin-row-top">${customerLabel(item)}<span class="admin-row-receipt" aria-label="Latest message: ${receipt}">${receipt}</span></span><span class="admin-row-summary"><span class="admin-row-preview">${esc(displayMessage(item.lastMessage || ''))}</span>${unread ? '<b class="admin-row-unread" aria-label="Unread message"></b>' : ''}</span>${state.blocked && state.selected === item.id && state.deletingId !== item.id ? '<span class="admin-row-meta"><em>Blocked</em></span>' : ''}</button>`; }
 function updateMediaForm() {
   const form = root.querySelector('#admin-reply'); if (!form) return;
   const attach = form.querySelector('.chat-attach'); attach.classList.toggle('is-disabled', !state.mediaAvailable || state.replySending || state.blocked); attach.title = state.mediaAvailable ? 'Attach photo or video' : 'Photo and video sharing needs store setup';
@@ -204,7 +205,7 @@ function decorateThread() {
   const pending = state.pendingReply;
   if (pending?.conversationId === state.selected && !records.some((item) => item.id === pending.id)) {
     const bubble = document.createElement('div'); bubble.className = 'admin-message staff'; bubble.dataset.messageId = pending.id;
-    const message = document.createElement('p'); message.textContent = pending.message; bubble.append(message);
+    const message = document.createElement('p'); message.textContent = displayMessage(pending.message); bubble.append(message);
     const receipt = document.createElement('span'); receipt.className = 'chat-receipt'; receipt.textContent = status(pending); bubble.append(receipt);
     if (pending.failed) { const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = 'Retry'; retry.onclick = retryReply; receipt.append(' ', retry); }
     body.append(bubble);
