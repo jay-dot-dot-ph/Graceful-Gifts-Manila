@@ -411,6 +411,13 @@ html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
 .admin-product > span:last-child { display: grid; gap: 3px; min-width: 0; }
 .admin-product strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .79rem; }
 .admin-product small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--admin-muted); font-size: .7rem; }
+.admin-message.has-product { box-sizing: border-box; width: min(68%, 540px); }
+.admin-message.has-product .admin-product { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 9px; padding: 9px; }
+.admin-message.has-product .admin-product .chat-watch-photo { width: 100%; height: 220px; }
+.admin-message.has-product .admin-product > span:last-child { gap: 5px; }
+.admin-message.has-product .admin-product strong, .admin-message.has-product .admin-product small { overflow: visible; text-overflow: clip; white-space: normal; }
+.admin-message.has-product .admin-product strong { font-size: .88rem; }
+.admin-message.has-product .admin-product small { font-size: .75rem; line-height: 1.4; }
 #admin-reply {
   flex: none;
   display: flex;
@@ -527,6 +534,8 @@ html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
   .admin-controls label { flex: 1; }
   .admin-thread-body { padding: 12px; }
   .admin-message { max-width: 88%; }
+  .admin-message.has-product { width: 88%; }
+  .admin-message.has-product .admin-product .chat-watch-photo { height: 185px; }
   .admin-refs { max-height: 130px; padding: 7px 12px; }
   #admin-reply { gap: 8px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
   #admin-reply textarea { min-height: 46px; max-height: 100px; }

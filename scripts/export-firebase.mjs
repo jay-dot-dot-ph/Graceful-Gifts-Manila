@@ -106,6 +106,17 @@ copyFileSync(join(root, 'worker', 'admin.html'), join(output, 'admin.html'));
 await bundle({ entryPoints: [join(root, 'chat', 'customer.js'), join(root, 'chat', 'admin.js')], outdir: output, entryNames: '[name]', bundle: true, format: 'esm', splitting: true, minify: true, target: 'es2022' });
 await bundle({ entryPoints: [join(root, 'chat', 'messaging-sw.js')], outfile: join(output, 'firebase-messaging-sw.js'), bundle: true, format: 'iife', minify: true, target: 'es2022' });
 copyFileSync(join(output, 'customer.js'), join(output, 'chat.js'));
+const adminVersion = createHash('sha256')
+  .update(readFileSync(join(output, 'admin.js')))
+  .update(readFileSync(join(output, 'admin.css')))
+  .digest('hex').slice(0, 12);
+const adminPage = readFileSync(join(output, 'admin.html'), 'utf8');
+if (!adminPage.includes('href="/admin.css"') || !adminPage.includes('src="/admin.js"')) {
+  throw new Error('Admin page is missing its expected stylesheet or script.');
+}
+writeFileSync(join(output, 'admin.html'), adminPage
+  .replace('href="/admin.css"', `href="/admin.css?v=${adminVersion}"`)
+  .replace('src="/admin.js"', `src="/admin.js?v=${adminVersion}"`));
 const localFirebaseConfig = join(root, 'firebase-config.local.json');
 const webConfig = process.env.GGM_FIREBASE_WEB_CONFIG || (existsSync(localFirebaseConfig) ? readFileSync(localFirebaseConfig, 'utf8') : '{}');
 const parsedWebConfig = JSON.parse(webConfig);

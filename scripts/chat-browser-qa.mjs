@@ -134,6 +134,10 @@ try {
   await owner.locator(`.admin-inbox-row.selected[data-select-chat="${linkedConversation}"]`).waitFor();
   await owner.locator('.admin-message.customer').first().getByText(initialInquiry).waitFor();
   await owner.getByText('Are these favorites available?').first().waitFor();
+  const adminWatch = owner.locator('.admin-message.customer.has-product .admin-product').first();
+  await adminWatch.waitFor();
+  assert.ok((await adminWatch.locator('.chat-watch-photo').boundingBox()).height >= 200, 'Admin message shows a large watch photo');
+  assert.ok((await owner.locator('.admin-refs .chat-watch-photo').first().boundingBox()).height <= 60, 'Sidebar watch reference stays compact');
   await owner.locator('.admin-inbox-link[aria-label="Inbox, 1 unread"]').waitFor();
   await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').last().getByText('Delivered').waitFor();
   assert.equal(await owner.locator('[data-sound]').getAttribute('aria-pressed'), 'true', 'Staff sound defaults on');
@@ -162,6 +166,7 @@ try {
   await owner.locator('.admin-inbox-link[aria-label="Inbox, 0 unread"]').waitFor();
   await owner.setViewportSize({ width: 390, height: 844 });
   assert.ok(await owner.locator('.admin-thread').isVisible(), 'Mobile thread is visible after selection');
+  assert.ok((await adminWatch.locator('.chat-watch-photo').boundingBox()).height >= 180, 'Admin watch photo remains large on mobile');
   assert.ok(await owner.locator('#admin-message').evaluate((node) => parseFloat(getComputedStyle(node).fontSize) >= 16), 'Mobile staff composer avoids focus zoom');
   const mobileThread = await owner.locator('.admin-thread').boundingBox();
   assert.ok(mobileThread.width <= 390 && mobileThread.x >= 0, 'Mobile admin thread fits viewport');
