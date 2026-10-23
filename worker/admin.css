@@ -503,8 +503,16 @@ html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
 .admin-product-dialog::backdrop { background: #101e3999; }
 .admin-preview-panel { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: center; padding: 32px; }
 .admin-preview-close { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border: 0; background: transparent; color: var(--admin-ink); font-size: 1.6rem; cursor: pointer; }
-.admin-preview-image { min-height: 240px; display: grid; place-items: center; border-radius: 11px; background: var(--admin-soft); color: var(--admin-muted); }
+.admin-preview-image { min-height: 240px; display: grid; place-items: center; overflow: hidden; border-radius: 11px; background: var(--admin-soft); color: var(--admin-muted); }
 .admin-preview-image img { width: 100%; height: 300px; object-fit: contain; }
+@media (hover: hover) and (pointer: fine) {
+  .admin-preview-image:has(img) { cursor: zoom-in; }
+  .admin-preview-image img { transform-origin: var(--preview-zoom-x, 50%) var(--preview-zoom-y, 50%); transition: transform .18s ease-out; }
+  .admin-preview-image:hover img { transform: scale(2.25); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-preview-image img { transition: none; }
+}
 .admin-preview-panel h2 { font: 800 1.6rem var(--sans); }
 .admin-preview-panel dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--admin-line); font-size: .8rem; }
 .admin-preview-panel dt { color: var(--admin-muted); }

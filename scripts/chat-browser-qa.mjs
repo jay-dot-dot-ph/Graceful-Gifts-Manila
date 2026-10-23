@@ -193,6 +193,11 @@ try {
   await owner.locator('.admin-product-dialog[open]').waitFor();
   await owner.locator('.admin-product-dialog').getByText('Dial color').waitFor();
   assert.equal(ownerContext.pages().length, openPages, 'Watch preview stays in the dashboard');
+  const previewImage = owner.locator('.admin-preview-image');
+  await previewImage.hover();
+  await owner.waitForFunction(() => getComputedStyle(document.querySelector('.admin-preview-image img')).transform !== 'none');
+  await owner.mouse.move(10, 10);
+  await owner.waitForFunction(() => getComputedStyle(document.querySelector('.admin-preview-image img')).transform === 'none');
   const threadScroll = await owner.locator('#admin-thread-body').evaluate((body) => body.scrollTop);
   await owner.keyboard.press('Escape');
   await owner.waitForFunction(() => document.activeElement?.matches('.admin-product'));

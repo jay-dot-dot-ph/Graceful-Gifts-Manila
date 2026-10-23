@@ -44,6 +44,15 @@ function openProductPreview(id, opener) {
   const facts = [['Brand', watch.brand], ['Watch ID', watch.id], ['Price', watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`], ['Size', watch.size]].filter(([, value]) => value);
   previewDialog.dataset.watchId = id;
   previewDialog.innerHTML = `<div class="admin-preview-panel"><button type="button" class="admin-preview-close" aria-label="Close watch preview">×</button><div class="admin-preview-image">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}">` : '<span aria-hidden="true">GGM</span>'}</div><div><p class="eyebrow">WATCH INQUIRY</p><h2>${esc(watch.name || watch.id)}</h2><dl>${facts.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl><section class="admin-catalog-details" data-catalog-details hidden></section></div></div>`;
+  const previewImage = previewDialog.querySelector('.admin-preview-image');
+  if (image) {
+    previewImage.addEventListener('pointermove', (event) => {
+      if (event.pointerType !== 'mouse') return;
+      const bounds = previewImage.getBoundingClientRect();
+      previewImage.style.setProperty('--preview-zoom-x', `${Math.max(0, Math.min(100, (event.clientX - bounds.left) / bounds.width * 100))}%`);
+      previewImage.style.setProperty('--preview-zoom-y', `${Math.max(0, Math.min(100, (event.clientY - bounds.top) / bounds.height * 100))}%`);
+    });
+  }
   previewDialog.querySelector('.admin-preview-close').onclick = () => previewDialog.close();
   previewDialog.querySelector('img')?.addEventListener('error', (event) => { event.target.replaceWith(Object.assign(document.createElement('span'), { textContent: 'Image unavailable' })); });
   previewDialog.addEventListener('close', () => {
