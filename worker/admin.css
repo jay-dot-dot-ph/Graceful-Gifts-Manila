@@ -35,6 +35,8 @@ html[data-admin-palette="plum"] { --admin-bg: #f5eff7; --admin-line: #e3d4e7; --
 html[data-theme="dark"][data-admin-palette="gold"] { --admin-bg: #201b15; --admin-surface: #2c261f; --admin-line: #514330; --admin-soft: #352d23; --admin-selected: #483721; --admin-accent: #e6bd73; --admin-button: #79521d; --admin-header-start: #2b251e; --admin-header-end: #3a2d1e; }
 html[data-theme="dark"][data-admin-palette="forest"] { --admin-bg: #111f19; --admin-surface: #1a2d24; --admin-line: #355444; --admin-soft: #21392d; --admin-selected: #2a4836; --admin-accent: #9bd8af; --admin-button: #286449; --admin-header-start: #1a2b22; --admin-header-end: #243e2f; }
 html[data-theme="dark"][data-admin-palette="plum"] { --admin-bg: #1e1722; --admin-surface: #2c2231; --admin-line: #513d58; --admin-soft: #382b3d; --admin-selected: #4a3353; --admin-accent: #e1aee1; --admin-button: #704473; --admin-header-start: #2a2030; --admin-header-end: #39283e; }
+html[data-admin-palette="custom"] { --admin-bg: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 9%, white); --admin-line: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 25%, white); --admin-soft: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 5%, white); --admin-selected: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 16%, white); --admin-accent: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 62%, black); --admin-button: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 35%, black); --admin-header-start: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 4%, white); --admin-header-end: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 18%, white); }
+html[data-theme="dark"][data-admin-palette="custom"] { --admin-bg: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 10%, #10151c); --admin-surface: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 12%, #1a222c); --admin-line: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 28%, #34404b); --admin-soft: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 18%, #24303b); --admin-selected: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 31%, #26313d); --admin-accent: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 60%, white); --admin-button: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 35%, black); --admin-header-start: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 13%, #1a222c); --admin-header-end: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 24%, #202936); }
 body { background: var(--admin-bg); color: var(--admin-ink); }
 #admin-app:has(.admin-layout) {
   height: var(--ggm-viewport-height, 100dvh);
@@ -142,6 +144,9 @@ body { background: var(--admin-bg); color: var(--admin-ink); }
 .admin-palette-gold { background: #a77a36; }
 .admin-palette-forest { background: #347655; }
 .admin-palette-plum { background: #8b5592; }
+.admin-custom-palette { display: flex; align-items: center; justify-content: space-between; min-height: 40px; margin-top: 9px; padding: 5px 9px; border: 1px solid var(--admin-line); border-radius: 9px; background: var(--admin-soft); color: var(--admin-ink); font-size: .76rem; font-weight: 700; cursor: pointer; }
+.admin-custom-palette[data-active="true"] { border-color: var(--admin-accent); background: var(--admin-selected); box-shadow: inset 0 0 0 1px var(--admin-accent); }
+.admin-custom-palette input { width: 45px; height: 30px; padding: 1px; border: 0; background: transparent; cursor: pointer; }
 .admin-appearance-panel small { display: block; margin-top: 13px; color: var(--admin-muted); font-size: .67rem; }
 .admin-login-appearance { position: absolute; top: 20px; right: 20px; z-index: 2; }
 .admin-sound, .admin-push {

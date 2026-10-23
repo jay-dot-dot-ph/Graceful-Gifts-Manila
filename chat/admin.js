@@ -87,22 +87,29 @@ const adminPalettes = [['navy', 'Navy'], ['gold', 'Gold'], ['forest', 'Forest'],
 function appearanceMarkup() {
   const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
   const palette = document.documentElement.dataset.adminPalette || 'navy';
-  return `<details class="admin-appearance"><summary aria-label="Appearance settings" title="Appearance settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="9" r="1"/><circle cx="14" cy="7" r="1"/><circle cx="17" cy="12" r="1"/><path d="M12 21c-1.5-1.4-1.6-3.1-.3-4.2 1.2-1 2.9-.7 4.1-1.1"/></svg></summary><div class="admin-appearance-panel"><strong>Appearance</strong><span class="admin-appearance-label">Mode</span><div class="admin-theme-options" role="group" aria-label="Display mode"><button type="button" data-admin-theme="light" aria-pressed="${theme === 'light'}">☀ Light</button><button type="button" data-admin-theme="dark" aria-pressed="${theme === 'dark'}">☾ Dark</button></div><span class="admin-appearance-label">Color palette</span><div class="admin-palette-options" role="group" aria-label="Color palette">${adminPalettes.map(([id, name]) => `<button type="button" data-admin-palette="${id}" aria-pressed="${palette === id}"><i class="admin-palette-dot admin-palette-${id}" aria-hidden="true"></i>${name}</button>`).join('')}</div><small>Saved on this browser</small></div></details>`;
+  return `<details class="admin-appearance"><summary aria-label="Appearance settings" title="Appearance settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="9" r="1"/><circle cx="14" cy="7" r="1"/><path d="M12 21c-1.5-1.4-1.6-3.1-.3-4.2 1.2-1 2.9-.7 4.1-1.1"/></svg></summary><div class="admin-appearance-panel"><strong>Appearance</strong><span class="admin-appearance-label">Mode</span><div class="admin-theme-options" role="group" aria-label="Display mode"><button type="button" data-admin-theme="light" aria-pressed="${theme === 'light'}">☀ Light</button><button type="button" data-admin-theme="dark" aria-pressed="${theme === 'dark'}">☾ Dark</button></div><span class="admin-appearance-label">Color palette</span><div class="admin-palette-options" role="group" aria-label="Color palette">${adminPalettes.map(([id, name]) => `<button type="button" data-admin-palette="${id}" aria-pressed="${palette === id}"><i class="admin-palette-dot admin-palette-${id}" aria-hidden="true"></i>${name}</button>`).join('')}</div><label class="admin-custom-palette" data-custom-palette data-active="${palette === 'custom'}">Custom color<input type="color" data-admin-color aria-label="Choose a custom admin color" value="${document.documentElement.style.getPropertyValue('--admin-custom-color') || '#3a67ad'}"></label><small>Saved on this browser</small></div></details>`;
 }
 function setAdminAppearance(kind, value) {
   if (kind === 'theme' && ['light', 'dark'].includes(value)) {
     document.documentElement.dataset.theme = value;
     try { localStorage.setItem('ggm-admin-theme', value); } catch {}
-  } else if (kind === 'palette' && adminPalettes.some(([id]) => id === value)) {
+  } else if (kind === 'palette' && (value === 'custom' || adminPalettes.some(([id]) => id === value))) {
     document.documentElement.dataset.adminPalette = value;
     try { localStorage.setItem('ggm-admin-palette', value); } catch {}
   }
   root.querySelectorAll('[data-admin-theme]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.adminTheme === document.documentElement.dataset.theme)));
   root.querySelectorAll('[data-admin-palette]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.adminPalette === document.documentElement.dataset.adminPalette)));
+  root.querySelectorAll('[data-custom-palette]').forEach((label) => label.dataset.active = String(document.documentElement.dataset.adminPalette === 'custom'));
 }
 function bindAppearance() {
   root.querySelectorAll('[data-admin-theme]').forEach((button) => button.onclick = () => setAdminAppearance('theme', button.dataset.adminTheme));
   root.querySelectorAll('[data-admin-palette]').forEach((button) => button.onclick = () => setAdminAppearance('palette', button.dataset.adminPalette));
+  root.querySelectorAll('[data-admin-color]').forEach((input) => input.oninput = () => {
+    if (!/^#[0-9a-f]{6}$/i.test(input.value)) return;
+    document.documentElement.style.setProperty('--admin-custom-color', input.value);
+    try { localStorage.setItem('ggm-admin-custom-color', input.value); } catch {}
+    setAdminAppearance('palette', 'custom');
+  });
 }
 function header() {
   const count = state.unread;

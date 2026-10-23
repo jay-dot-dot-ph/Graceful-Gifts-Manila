@@ -151,6 +151,12 @@ try {
   await owner.locator('.admin-header .admin-appearance summary').click();
   await owner.locator('[data-admin-palette="forest"]').click();
   assert.equal(await owner.evaluate(() => document.documentElement.dataset.adminPalette), 'forest', 'Staff can change the admin palette');
+  await owner.locator('[data-admin-color]').fill('#b64268');
+  assert.equal(await owner.evaluate(() => document.documentElement.dataset.adminPalette), 'custom', 'Custom color activates the custom palette');
+  assert.equal(await owner.evaluate(() => localStorage.getItem('ggm-admin-custom-color')), '#b64268', 'Custom color is saved');
+  await owner.reload();
+  assert.equal(await owner.evaluate(() => document.documentElement.style.getPropertyValue('--admin-custom-color')), '#b64268', 'Custom color survives reload');
+  await owner.locator('.admin-header .admin-appearance summary').click();
   await owner.locator('[data-admin-theme="light"]').click();
   await owner.locator('[data-admin-palette="navy"]').click();
   assert.equal(await owner.evaluate(() => document.documentElement.dataset.theme), 'light', 'Staff can return to light mode');
