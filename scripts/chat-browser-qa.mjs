@@ -65,19 +65,20 @@ try {
   await customer.locator('.ggm-chat [data-sound]').click();
   assert.equal(await customer.locator('.ggm-chat [data-sound]').getAttribute('aria-pressed'), 'false', 'Customer can mute');
   await customer.locator('.ggm-chat [data-sound]').click();
-  assert.match(await customer.locator('#ggm-chat-message').inputValue(), /AP-001/, 'The selected watch is named in the draft');
+  assert.match(await customer.locator('#ggm-chat-message').inputValue(), /Royal Oak/, 'The selected watch is named in the draft');
   await customer.evaluate(async () => {
     const { openChat } = await import('/chat.js');
     await openChat([{ id: 'AP-002', name: 'Another watch', brand: 'Audemars Piguet', price: 5950 }], { prefillInquiry: true });
   });
-  assert.match(await customer.locator('#ggm-chat-message').inputValue(), /AP-002/, 'Selecting another watch updates the draft');
-  assert.doesNotMatch(await customer.locator('#ggm-chat-message').inputValue(), /AP-001/, 'The old watch is removed from the draft');
+  assert.match(await customer.locator('#ggm-chat-message').inputValue(), /Another watch/, 'Selecting another watch updates the draft');
+  assert.doesNotMatch(await customer.locator('#ggm-chat-message').inputValue(), /Royal Oak/, 'The old watch is removed from the draft');
   assert.equal(await customer.locator('.ggm-chat-products').count(), 0, 'Changing watches does not show a pending card');
   await customer.locator('.ggm-chat [data-chat-close]').click();
   await customer.locator('.mobile-inquiry-bar [data-inquire]').click();
-  await customer.waitForFunction(() => document.querySelector('#ggm-chat-message')?.value.includes('AP-001'));
+  await customer.waitForFunction(() => document.querySelector('#ggm-chat-message')?.value.includes('Royal Oak'));
   const initialInquiry = await customer.locator('#ggm-chat-message').inputValue();
-  assert.match(initialInquiry, /^Hello! Is .+ \(ID AP-001\) still available\?$/, 'Watch inquiry is ready to send');
+  assert.match(initialInquiry, /^Hello! Is .+Royal Oak.* still available\?$/, 'Watch inquiry is ready to send without its ID');
+  assert.doesNotMatch(initialInquiry, /\bID AP-001\b/);
   await customer.locator('.ggm-chat-identity [name=name]').fill('Test customer');
   await customer.locator('.ggm-chat-identity [name=contact]').fill('customer@example.com');
   await customer.locator('.ggm-chat-form button').click();
@@ -126,8 +127,10 @@ try {
   await customer.locator('[data-select-all]').click();
   await customer.locator('[data-inquire-selected]').click();
   assert.equal(await customer.locator('.ggm-chat-products').count(), 0, 'Favorites do not show a pending watch panel');
-  await customer.waitForFunction(() => document.querySelector('#ggm-chat-message')?.value.includes('AP-002'));
-  assert.match(await customer.locator('#ggm-chat-message').inputValue(), /Which of these watches are available\?[\s\S]*AP-001[\s\S]*AP-002/);
+  await customer.waitForFunction(() => document.querySelector('#ggm-chat-message')?.value.includes('\n2. '));
+  const favoritesInquiry = await customer.locator('#ggm-chat-message').inputValue();
+  assert.match(favoritesInquiry, /^Hello! Which of these watches are available\?\n1\. .+\n2\. .+$/);
+  assert.doesNotMatch(favoritesInquiry, /\bID AP-00[12]\b/);
   await customer.waitForTimeout(3100);
   await customer.locator('#ggm-chat-message').fill('Are these favorites available?');
   await customer.locator('.ggm-chat-form button').click();

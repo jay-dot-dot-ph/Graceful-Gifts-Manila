@@ -9,7 +9,7 @@ const sound = createNotifier('customer', () => renderChrome());
 let connectionPromise, db, uid;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const time = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Now';
-const watchLabel = (watch) => `${watch.name || watch.brand || 'Watch'} (ID ${watch.id})`;
+const watchLabel = (watch) => watch.name || watch.brand || 'Watch';
 const suggestedInquiry = (watches) => watches.length > 1
   ? `Hello! Which of these watches are available?\n${watches.map((watch, index) => `${index + 1}. ${watchLabel(watch)}`).join('\n')}`
   : watches[0]?.stock === 0
