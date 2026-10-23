@@ -41,7 +41,7 @@ function openProductPreview(id, opener) {
     previewDialog.addEventListener('click', (event) => { if (event.target === previewDialog) previewDialog.close(); });
   }
   const image = /^\/images\/[A-Za-z0-9._-]+$/.test(watch.image || '') ? watch.image : '';
-  const facts = [['Brand', watch.brand], ['Watch ID', watch.id], ['Price', watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`], ['Size', watch.size], ['Stock', Number.isInteger(watch.stock) ? String(watch.stock) : '']].filter(([, value]) => value);
+  const facts = [['Brand', watch.brand], ['Watch ID', watch.id], ['Price', watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`], ['Size', watch.size]].filter(([, value]) => value);
   previewDialog.dataset.watchId = id;
   previewDialog.innerHTML = `<div class="admin-preview-panel"><button type="button" class="admin-preview-close" aria-label="Close watch preview">×</button><div class="admin-preview-image">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}">` : '<span aria-hidden="true">GGM</span>'}</div><div><p class="eyebrow">WATCH INQUIRY</p><h2>${esc(watch.name || watch.id)}</h2><dl>${facts.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl><section class="admin-catalog-details" data-catalog-details hidden></section></div></div>`;
   previewDialog.querySelector('.admin-preview-close').onclick = () => previewDialog.close();

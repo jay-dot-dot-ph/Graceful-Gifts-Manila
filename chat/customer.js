@@ -19,7 +19,7 @@ const productCard = (watch) => {
   if (!/^[A-Z0-9-]{2,20}$/.test(watch.id || '')) return '';
   const image = /^\/images\/[A-Za-z0-9._-]+$/.test(watch.image || '') ? watch.image : '';
   const price = watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`;
-  const availability = Number.isInteger(watch.stock) ? watch.stock === 0 ? 'Sold out' : `${watch.stock} available` : '';
+  const availability = watch.stock === 0 ? 'Sold out' : '';
   const identity = [watch.brand, `ID ${watch.id}`].filter(Boolean).join(' · ');
   return `<a class="chat-product" href="/watch/${encodeURIComponent(watch.id)}" target="_blank" rel="noopener"><span class="chat-watch-photo">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}" loading="lazy">` : '<span aria-hidden="true">G</span>'}</span><span class="chat-product-info"><strong>${esc(watch.name || watch.id)}</strong><span class="chat-product-meta">${esc(identity)}</span><span class="chat-product-price">${esc(price)}</span>${watch.size || availability ? `<span class="chat-product-meta">${[watch.size, availability].filter(Boolean).map(esc).join(' · ')}</span>` : ''}</span></a>`;
 };

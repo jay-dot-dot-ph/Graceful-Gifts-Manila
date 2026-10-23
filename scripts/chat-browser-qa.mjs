@@ -86,6 +86,7 @@ try {
   await customer.getByText(initialInquiry).waitFor();
   const sentWatch = customer.locator('.ggm-chat-bubble.outgoing .chat-product').first();
   await sentWatch.waitFor();
+  assert.doesNotMatch(await sentWatch.innerText(), /\b\d+ available\b|Only 1 remaining|Availability on request/i, 'Customer chat hides stock quantities');
   assert.ok((await sentWatch.locator('.chat-watch-photo').boundingBox()).height >= 145, 'Inquiry watch photo is large enough to inspect');
   await customer.waitForFunction(() => {
     const frame = document.querySelector('.ggm-chat-bubble.outgoing .chat-product .chat-watch-photo');

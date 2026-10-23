@@ -69,6 +69,7 @@ try {
   await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
   await page.locator('#catalog-search').fill('AP-001');
   assert.match(await page.locator('#result-count').innerText(), /1 watch/);
+  assert.doesNotMatch(await page.locator('.watch-card').first().innerText(), /\b\d+ available\b|Only 1 remaining|Availability on request/i);
   await page.goto(base + '/watches/rolex');
   await page.locator('.watch-card').first().waitFor({ timeout: 30000 });
   assert.match(await page.locator('#result-count').innerText(), /\d+ watches?/);
@@ -101,6 +102,7 @@ try {
   await page.goto(base + '/watch/AP-001');
   await page.locator('.detail-copy h1').waitFor({ timeout: 30000 });
   assert.match(await page.locator('.detail-copy h1').innerText(), /Royal Oak/i);
+  assert.equal(await page.locator('.detail-stock').count(), 0, 'In-stock watch does not show its quantity');
   for (const width of [1440, 1000]) {
     await page.setViewportSize({ width, height: 1000 });
     const columnGap = await page.locator('.specs-grid').evaluate((grid) => {
