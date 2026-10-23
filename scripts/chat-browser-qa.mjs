@@ -259,6 +259,14 @@ try {
   await customer.waitForFunction(() => document.querySelector('[data-chat-badge]')?.hidden === true);
   await owner.goto(base + '/admin/staff');
   await owner.locator('#staff-form').waitFor();
+  assert.equal(await owner.locator('.admin-staff-back').getAttribute('href'), '/admin/chat', 'Staff page has a back link to the inbox');
+  await owner.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await owner.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Staff page fits a phone width');
+  await owner.locator('.admin-staff-back').click();
+  await owner.locator('.admin-inbox').waitFor();
+  await owner.goto(base + '/admin/staff');
+  await owner.locator('#staff-form').waitFor();
+  await owner.setViewportSize({ width: 1280, height: 720 });
   await customer.waitForTimeout(3100);
   await customer.locator('#ggm-chat-message').fill('Can staff see this new question?');
   await customer.locator('.ggm-chat-form button').click();
