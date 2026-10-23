@@ -140,7 +140,20 @@ try {
 
   const ownerContext = await browser.newContext();
   const owner = await ownerContext.newPage(); owner.on('pageerror', (error) => errors.push(error.message));
+  await owner.goto(base + '/admin/chat');
+  await owner.locator('#admin-login-form').waitFor();
+  await owner.locator('.admin-login-appearance summary').click();
+  await owner.locator('[data-admin-theme="dark"]').click();
+  await owner.locator('[data-admin-palette="gold"]').click();
+  assert.equal(await owner.evaluate(() => document.documentElement.dataset.theme), 'dark', 'Sign-in appearance can switch to dark mode');
   await login(owner, ownerEmail);
+  assert.equal(await owner.evaluate(() => document.documentElement.dataset.adminPalette), 'gold', 'Palette persists after sign-in');
+  await owner.locator('.admin-header .admin-appearance summary').click();
+  await owner.locator('[data-admin-palette="forest"]').click();
+  assert.equal(await owner.evaluate(() => document.documentElement.dataset.adminPalette), 'forest', 'Staff can change the admin palette');
+  await owner.locator('[data-admin-theme="light"]').click();
+  await owner.locator('[data-admin-palette="navy"]').click();
+  assert.equal(await owner.evaluate(() => document.documentElement.dataset.theme), 'light', 'Staff can return to light mode');
   await owner.getByText('Test customer').first().waitFor();
   const guestReference = await owner.locator('.admin-inbox-row .guest-names small').first().innerText();
   assert.match(guestReference, /^Guest #[A-Z0-9]{7}$/);

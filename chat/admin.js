@@ -83,18 +83,39 @@ root.addEventListener('click', (event) => { const opener = event.target.closest?
 root.addEventListener('click', (event) => { if (!event.target.closest?.('button, a')) toggleAdminMessageTime(event.target.closest?.('#admin-thread-body .admin-message')); });
 root.addEventListener('keydown', (event) => { if (event.target.matches?.('#admin-thread-body .admin-message') && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleAdminMessageTime(event.target); } });
 root.addEventListener('error', (event) => { if (event.target.matches?.('.admin-product img')) event.target.replaceWith(Object.assign(document.createElement('span'), { textContent: 'G' })); }, true);
+const adminPalettes = [['navy', 'Navy'], ['gold', 'Gold'], ['forest', 'Forest'], ['plum', 'Plum']];
+function appearanceMarkup() {
+  const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  const palette = document.documentElement.dataset.adminPalette || 'navy';
+  return `<details class="admin-appearance"><summary aria-label="Appearance settings" title="Appearance settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="9" r="1"/><circle cx="14" cy="7" r="1"/><circle cx="17" cy="12" r="1"/><path d="M12 21c-1.5-1.4-1.6-3.1-.3-4.2 1.2-1 2.9-.7 4.1-1.1"/></svg></summary><div class="admin-appearance-panel"><strong>Appearance</strong><span class="admin-appearance-label">Mode</span><div class="admin-theme-options" role="group" aria-label="Display mode"><button type="button" data-admin-theme="light" aria-pressed="${theme === 'light'}">☀ Light</button><button type="button" data-admin-theme="dark" aria-pressed="${theme === 'dark'}">☾ Dark</button></div><span class="admin-appearance-label">Color palette</span><div class="admin-palette-options" role="group" aria-label="Color palette">${adminPalettes.map(([id, name]) => `<button type="button" data-admin-palette="${id}" aria-pressed="${palette === id}"><i class="admin-palette-dot admin-palette-${id}" aria-hidden="true"></i>${name}</button>`).join('')}</div><small>Saved on this browser</small></div></details>`;
+}
+function setAdminAppearance(kind, value) {
+  if (kind === 'theme' && ['light', 'dark'].includes(value)) {
+    document.documentElement.dataset.theme = value;
+    try { localStorage.setItem('ggm-admin-theme', value); } catch {}
+  } else if (kind === 'palette' && adminPalettes.some(([id]) => id === value)) {
+    document.documentElement.dataset.adminPalette = value;
+    try { localStorage.setItem('ggm-admin-palette', value); } catch {}
+  }
+  root.querySelectorAll('[data-admin-theme]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.adminTheme === document.documentElement.dataset.theme)));
+  root.querySelectorAll('[data-admin-palette]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.adminPalette === document.documentElement.dataset.adminPalette)));
+}
+function bindAppearance() {
+  root.querySelectorAll('[data-admin-theme]').forEach((button) => button.onclick = () => setAdminAppearance('theme', button.dataset.adminTheme));
+  root.querySelectorAll('[data-admin-palette]').forEach((button) => button.onclick = () => setAdminAppearance('palette', button.dataset.adminPalette));
+}
 function header() {
   const count = state.unread;
   return `<header class="admin-header">
     <a href="/" class="admin-brand" aria-label="Graceful Gifts Manila home"><img src="/favicon.svg" alt="" width="48" height="48"><span><strong>GRACEFUL GIFTS MANILA</strong><small>Store Admin</small></span></a>
     <nav aria-label="Admin navigation"><a href="/admin/chat" class="admin-inbox-link" aria-label="Inbox, ${count} unread" ${state.page === 'chat' ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 5h18v13H3zM3 6l9 7 9-7"/></svg><b class="admin-unread-badge" ${count ? '' : 'hidden'}>${count > 9 ? '9+' : count}</b></a>${state.profile?.role === 'owner' ? `<a href="/admin/staff" ${state.page === 'staff' ? 'aria-current="page"' : ''}>Staff</a>` : ''}</nav>
-    <div class="admin-header-actions"><button type="button" class="admin-push" data-push ${state.pushAvailable ? '' : 'disabled title="Web Push public key or browser support is unavailable"'}>${state.pushAvailable ? state.pushActive ? 'Disable background alerts' : 'Enable background alerts' : 'Background alerts need setup'}</button><button type="button" class="admin-sound" data-sound aria-pressed="${sound.enabled}" aria-label="${sound.label()}" title="${sound.label()}">${soundIcon(sound.enabled)}</button><span class="admin-user">${esc(state.profile?.displayName || state.user?.email || '')} <span>· ${esc(state.profile?.role || '')}</span></span><button type="button" class="admin-logout" data-logout>Sign out</button></div>
+    <div class="admin-header-actions"><button type="button" class="admin-push" data-push ${state.pushAvailable ? '' : 'disabled title="Web Push public key or browser support is unavailable"'}>${state.pushAvailable ? state.pushActive ? 'Disable background alerts' : 'Enable background alerts' : 'Background alerts need setup'}</button>${appearanceMarkup()}<button type="button" class="admin-sound" data-sound aria-pressed="${sound.enabled}" aria-label="${sound.label()}" title="${sound.label()}">${soundIcon(sound.enabled)}</button><span class="admin-user">${esc(state.profile?.displayName || state.user?.email || '')} <span>· ${esc(state.profile?.role || '')}</span></span><button type="button" class="admin-logout" data-logout>Sign out</button></div>
     <span class="admin-notice${state.noticeCentered ? ' is-centered' : ''}" role="status">${esc(state.notice)}</span>
   </header>`;
 }
 function updateHeader() { const link = root.querySelector('.admin-inbox-link'); if (link) { link.setAttribute('aria-label', `Inbox, ${state.unread} unread`); const badge = link.querySelector('b'); badge.hidden = !state.unread; badge.textContent = state.unread > 9 ? '9+' : String(state.unread); } const button = root.querySelector('[data-sound]'); if (button) { button.innerHTML = soundIcon(sound.enabled); button.setAttribute('aria-label', sound.label()); button.title = sound.label(); button.setAttribute('aria-pressed', String(sound.enabled)); } const push = root.querySelector('[data-push]'); if (push) { push.disabled = !state.pushAvailable; if (state.pushAvailable) push.removeAttribute('title'); push.textContent = state.pushAvailable ? state.pushActive ? 'Disable background alerts' : 'Enable background alerts' : 'Background alerts need setup'; } const notice = root.querySelector('.admin-notice'); if (notice) { notice.textContent = state.notice; notice.classList.toggle('is-centered', state.noticeCentered); } }
 function showNotice(message, centered = false, duration = 5000) { clearTimeout(noticeTimer); state.notice = message; state.noticeCentered = centered; updateHeader(); noticeTimer = setTimeout(() => { state.notice = ''; state.noticeCentered = false; updateHeader(); }, duration); }
-function renderLogin() { root.innerHTML = `<main class="admin-login"><form id="admin-login-form" class="admin-card"><p class="eyebrow">GRACEFUL GIFTS MANILA</p><h1>Staff sign in</h1><p>Use your individual staff account.</p><label>Email<input type="email" name="email" autocomplete="username" required></label><label>Password<input type="password" name="password" autocomplete="current-password" required></label><button class="admin-primary" type="submit">Sign in</button>${state.error ? `<p class="admin-error" role="alert">${esc(state.error)}</p>` : ''}</form></main>`; root.querySelector('form').onsubmit = login; }
+function renderLogin() { root.innerHTML = `<main class="admin-login"><div class="admin-login-appearance">${appearanceMarkup()}</div><form id="admin-login-form" class="admin-card"><p class="eyebrow">GRACEFUL GIFTS MANILA</p><h1>Staff sign in</h1><p>Use your individual staff account.</p><label>Email<input type="email" name="email" autocomplete="username" required></label><label>Password<input type="password" name="password" autocomplete="current-password" required></label><button class="admin-primary" type="submit">Sign in</button>${state.error ? `<p class="admin-error" role="alert">${esc(state.error)}</p>` : ''}</form></main>`; root.querySelector('form').onsubmit = login; bindAppearance(); }
 function inboxStatus(item) { const saved = state.inboxReceipts.get(item.id); return status({ id: item.lastMessageId }, saved?.messageId === item.lastMessageId ? saved.data : null); }
 function reconcileInboxReceipts(db) {
   const current = new Map(state.rows.filter((item) => /^[A-Za-z0-9]{20}$/.test(item.lastMessageId || '')).map((item) => [item.id, item.lastMessageId]));
@@ -268,6 +289,7 @@ function renderStaff() {
   bindHeader();
 }
 function bindHeader() {
+  bindAppearance();
   root.querySelector('[data-logout]')?.addEventListener('click', async () => {
     const services = await firebase();
     try { await revokePush(services); } catch (error) { state.error = `Could not remove this device's push token: ${displayError(error)}`; render(); return; }

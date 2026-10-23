@@ -1,5 +1,6 @@
 /* The dashboard has its own palette so the public catalog keeps its styling. */
 :root {
+  color-scheme: light;
   --admin-bg: #eef3ff;
   --admin-surface: #fff;
   --admin-ink: #101d39;
@@ -10,8 +11,11 @@
   --admin-accent: #2e69c8;
   --admin-button: #183b78;
   --admin-shadow: 0 8px 28px #2343710d;
+  --admin-header-start: #f6f9ff;
+  --admin-header-end: #eaf1ff;
 }
 html[data-theme="dark"] {
+  color-scheme: dark;
   --admin-bg: #101827;
   --admin-surface: #1a2639;
   --admin-ink: #f1f5ff;
@@ -20,9 +24,17 @@ html[data-theme="dark"] {
   --admin-soft: #24324a;
   --admin-selected: #293f62;
   --admin-accent: #81b2ff;
-  --admin-button: #4e7fd2;
+  --admin-button: #315fae;
   --admin-shadow: 0 8px 28px #0003;
+  --admin-header-start: #19263b;
+  --admin-header-end: #202c45;
 }
+html[data-admin-palette="gold"] { --admin-bg: #f6f1e8; --admin-line: #e6d8bf; --admin-soft: #fcf8f0; --admin-selected: #f4e8d3; --admin-accent: #835b20; --admin-button: #6c4819; --admin-header-start: #fcf8ef; --admin-header-end: #f2e6ce; }
+html[data-admin-palette="forest"] { --admin-bg: #edf5f0; --admin-line: #cfe1d5; --admin-soft: #f4faf6; --admin-selected: #e1f0e5; --admin-accent: #286447; --admin-button: #245b42; --admin-header-start: #f6fbf7; --admin-header-end: #dceee3; }
+html[data-admin-palette="plum"] { --admin-bg: #f5eff7; --admin-line: #e3d4e7; --admin-soft: #faf6fb; --admin-selected: #f0e3f3; --admin-accent: #78447b; --admin-button: #623764; --admin-header-start: #fbf7fc; --admin-header-end: #eee0f2; }
+html[data-theme="dark"][data-admin-palette="gold"] { --admin-bg: #201b15; --admin-surface: #2c261f; --admin-line: #514330; --admin-soft: #352d23; --admin-selected: #483721; --admin-accent: #e6bd73; --admin-button: #79521d; --admin-header-start: #2b251e; --admin-header-end: #3a2d1e; }
+html[data-theme="dark"][data-admin-palette="forest"] { --admin-bg: #111f19; --admin-surface: #1a2d24; --admin-line: #355444; --admin-soft: #21392d; --admin-selected: #2a4836; --admin-accent: #9bd8af; --admin-button: #286449; --admin-header-start: #1a2b22; --admin-header-end: #243e2f; }
+html[data-theme="dark"][data-admin-palette="plum"] { --admin-bg: #1e1722; --admin-surface: #2c2231; --admin-line: #513d58; --admin-soft: #382b3d; --admin-selected: #4a3353; --admin-accent: #e1aee1; --admin-button: #704473; --admin-header-start: #2a2030; --admin-header-end: #39283e; }
 body { background: var(--admin-bg); color: var(--admin-ink); }
 #admin-app:has(.admin-layout) {
   height: var(--ggm-viewport-height, 100dvh);
@@ -37,11 +49,10 @@ body { background: var(--admin-bg); color: var(--admin-ink); }
   align-items: center;
   gap: clamp(14px, 2vw, 30px);
   padding: 12px clamp(16px, 2vw, 28px);
-  background: linear-gradient(110deg, #f6f9ff, #eaf1ff 55%, #f7f5ff);
+  background: linear-gradient(110deg, var(--admin-header-start), var(--admin-header-end));
   color: var(--admin-ink);
   box-sizing: border-box;
 }
-html[data-theme="dark"] .admin-header { background: linear-gradient(110deg, #19263b, #202c45); }
 .admin-brand {
   display: inline-flex;
   align-items: center;
@@ -86,10 +97,9 @@ html[data-theme="dark"] .admin-header { background: linear-gradient(110deg, #192
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: #e7eeff;
+  background: var(--admin-selected);
   color: var(--admin-ink);
 }
-html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
 .admin-inbox-link svg { width: 21px; height: 21px; }
 .admin-unread-badge {
   position: absolute;
@@ -115,6 +125,25 @@ html[data-theme="dark"] .admin-inbox-link { background: #2b3d5b; }
   font-weight: 700;
   cursor: pointer;
 }
+.admin-appearance { position: relative; flex: none; }
+.admin-appearance summary { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--admin-line); border-radius: 12px; background: var(--admin-surface); color: var(--admin-ink); box-shadow: var(--admin-shadow); cursor: pointer; list-style: none; }
+.admin-appearance summary::-webkit-details-marker { display: none; }
+.admin-appearance summary:hover, .admin-appearance summary:focus-visible { border-color: var(--admin-accent); }
+.admin-appearance summary svg { width: 21px; height: 21px; }
+.admin-appearance-panel { position: absolute; top: calc(100% + 9px); right: 0; z-index: 80; width: min(270px, calc(100vw - 24px)); padding: 17px; border: 1px solid var(--admin-line); border-radius: 14px; background: var(--admin-surface); color: var(--admin-ink); box-shadow: 0 14px 38px #101d3938; }
+.admin-appearance-panel > strong { display: block; margin-bottom: 14px; font-size: .95rem; }
+.admin-appearance-label { display: block; margin: 13px 0 7px; color: var(--admin-muted); font-size: .68rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.admin-theme-options, .admin-palette-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.admin-appearance-panel button, .admin-header .admin-appearance-panel button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 7px 9px; border: 1px solid var(--admin-line); border-radius: 9px; background: var(--admin-soft); color: var(--admin-ink); font: inherit; font-size: .76rem; font-weight: 700; cursor: pointer; }
+.admin-appearance-panel button[aria-pressed="true"] { border-color: var(--admin-accent); background: var(--admin-selected); box-shadow: inset 0 0 0 1px var(--admin-accent); }
+.admin-appearance-panel button:hover { border-color: var(--admin-accent); }
+.admin-palette-dot { width: 13px; height: 13px; flex: none; border: 1px solid #0002; border-radius: 50%; }
+.admin-palette-navy { background: #2e69c8; }
+.admin-palette-gold { background: #a77a36; }
+.admin-palette-forest { background: #347655; }
+.admin-palette-plum { background: #8b5592; }
+.admin-appearance-panel small { display: block; margin-top: 13px; color: var(--admin-muted); font-size: .67rem; }
+.admin-login-appearance { position: absolute; top: 20px; right: 20px; z-index: 2; }
 .admin-sound, .admin-push {
   border: 1px solid var(--admin-line);
   background: var(--admin-surface);
