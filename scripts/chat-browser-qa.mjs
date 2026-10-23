@@ -208,6 +208,17 @@ try {
   assert.equal(await customer.locator('.chat-seen-avatar').count(), 1, 'Only the latest seen customer message shows the store marker');
   assert.equal(await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').filter({ hasText: 'Seen' }).count(), 0, 'Seen is not repeated above the store marker');
   await owner.locator('.admin-inbox-link[aria-label="Inbox, 0 unread"]').waitFor();
+  await owner.evaluate(() => {
+    window.__readFlash = false;
+    window.__readFlashObserver = new MutationObserver(() => {
+      if (document.querySelector('.admin-unread-badge:not([hidden]), .admin-inbox-row.selected.unread')) window.__readFlash = true;
+    });
+    window.__readFlashObserver.observe(document.body, { subtree: true, childList: true, attributes: true });
+  });
+  await owner.locator('.admin-inbox-row.selected').click();
+  await owner.locator('#admin-thread-body .admin-message.customer').first().waitFor();
+  await owner.waitForTimeout(1000);
+  assert.equal(await owner.evaluate(() => { window.__readFlashObserver.disconnect(); return window.__readFlash; }), false, 'Opening an already-seen chat never flashes unread');
   await owner.setViewportSize({ width: 390, height: 844 });
   assert.ok(await owner.locator('.admin-thread').isVisible(), 'Mobile thread is visible after selection');
   assert.ok((await adminWatch.locator('.chat-watch-photo').boundingBox()).height >= 180, 'Admin watch photo remains large on mobile');

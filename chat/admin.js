@@ -30,6 +30,13 @@ function toggleAdminMessageTime(bubble) {
 }
 function avatar(identity) { return `<span class="guest-avatar guest-shape-${identity.shape}" style="--guest-color:${identity.color}" aria-hidden="true">${identity.mark}</span>`; }
 function customerLabel(item) { const identity = guestIdentity(item.id, item.customerName); return `<span class="guest-identity">${avatar(identity)}<span class="guest-names"><strong>${esc(identity.label)}</strong>${identity.label !== identity.reference ? `<small>${esc(identity.reference)}</small>` : ''}</span></span>`; }
+function unreadConversation(item) { return item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); }
+function keepNewerReadMarker(item, previous) {
+  if (!previous || item.lastMessageId !== previous.lastMessageId) return item;
+  const previousRead = previous.staffReadAt?.toMillis?.();
+  const incomingRead = item.staffReadAt?.toMillis?.();
+  return previousRead != null && (incomingRead == null || previousRead > incomingRead) ? { ...item, staffReadAt: previous.staffReadAt } : item;
+}
 let previewDialog, catalogPromise;
 function openProductPreview(id, opener) {
   const conversation = state.rows.find((item) => item.id === state.selected);
@@ -107,7 +114,7 @@ function reconcileInboxReceipts(db) {
     state.inboxReceiptListeners.set(id, { messageId, unsubscribe });
   }
 }
-function row(item) { const unread = item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); const receipt = inboxStatus(item); return `<button type="button" class="admin-inbox-row ${unread ? 'unread' : ''} ${state.selected === item.id ? 'selected' : ''}" data-select-chat="${esc(item.id)}"><span class="admin-row-top">${customerLabel(item)}<span class="admin-row-receipt" aria-label="Latest message: ${receipt}">${receipt}</span></span><span class="admin-row-summary"><span class="admin-row-preview">${esc(displayMessage(item.lastMessage || ''))}</span>${unread ? '<b class="admin-row-unread" aria-label="Unread message"></b>' : ''}</span>${state.blocked && state.selected === item.id && state.deletingId !== item.id ? '<span class="admin-row-meta"><em>Blocked</em></span>' : ''}</button>`; }
+function row(item) { const unread = unreadConversation(item); const receipt = inboxStatus(item); return `<button type="button" class="admin-inbox-row ${unread ? 'unread' : ''} ${state.selected === item.id ? 'selected' : ''}" data-select-chat="${esc(item.id)}"><span class="admin-row-top">${customerLabel(item)}<span class="admin-row-receipt" aria-label="Latest message: ${receipt}">${receipt}</span></span><span class="admin-row-summary"><span class="admin-row-preview">${esc(displayMessage(item.lastMessage || ''))}</span>${unread ? '<b class="admin-row-unread" aria-label="Unread message"></b>' : ''}</span>${state.blocked && state.selected === item.id && state.deletingId !== item.id ? '<span class="admin-row-meta"><em>Blocked</em></span>' : ''}</button>`; }
 function updateMediaForm() {
   const form = root.querySelector('#admin-reply'); if (!form) return;
   const attach = form.querySelector('.chat-attach'); attach.classList.toggle('is-disabled', !state.mediaAvailable || state.replySending || state.blocked); attach.title = state.mediaAvailable ? 'Attach photo or video' : 'Photo and video sharing needs store setup';
@@ -288,7 +295,8 @@ function scheduleStaffSeen() {
   }
 }
 async function advanceStaffRead(db, id, messageId) {
-  if (state.readInFlight || state.rows.find((row) => row.id === id)?.lastMessageId !== messageId) return;
+  const current = state.rows.find((row) => row.id === id);
+  if (state.readInFlight || current?.lastMessageId !== messageId || !unreadConversation(current)) return;
   state.readInFlight = true;
   try { await updateDoc(doc(db, 'conversations', id), { staffReadAt: serverTimestamp() }); }
   catch (error) { console.warn('Staff read marker failed:', error?.code || error?.message); }
@@ -306,7 +314,8 @@ function subscribeInbox(db) {
   const inbox = state.profile.role === 'staff' ? query(base, where('assignedStaffUid', '==', state.user.uid), orderBy('lastMessageAt', 'desc'), limit(50)) : query(base, orderBy('lastMessageAt', 'desc'), limit(50));
   state.unsubInbox = onSnapshot(inbox, { includeMetadataChanges: true }, (snapshot) => {
     const selectedRow = state.rows.find((item) => item.id === state.selected);
-    state.rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    const previousRows = new Map(state.rows.map((item) => [item.id, item]));
+    state.rows = snapshot.docs.map((item) => keepNewerReadMarker({ id: item.id, ...item.data({ serverTimestamps: 'estimate' }) }, previousRows.get(item.id)));
     if (selectedRow && !state.rows.some((item) => item.id === selectedRow.id)) state.rows.push(selectedRow);
     state.cursor = snapshot.docs.at(-1) || null; state.more = snapshot.docs.length === 50;
     if (!snapshot.metadata.fromCache) {
@@ -327,7 +336,7 @@ function subscribeInbox(db) {
         }
       }
     }
-    state.unread = state.rows.filter((item) => item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis())).length;
+    state.unread = state.rows.filter(unreadConversation).length;
     reconcileInboxReceipts(db);
     if (state.selected && !state.rows.some((item) => item.id === state.selected)) { clearSelected(); renderChat(); }
     else renderInboxOnly();
@@ -344,7 +353,7 @@ function clearSelected() {
 async function selectConversation(id) {
   const { db } = await firebase(); clearSelected(); state.selected = id; state.mobileThread = true;
   const ref = doc(db, 'conversations', id);
-  state.unsubSelected = onSnapshot(ref, (snapshot) => { if (state.selected !== id) return; if (!snapshot.exists()) { clearSelected(); render(); } else { state.rows = state.rows.map((item) => item.id === id ? { id, ...snapshot.data() } : item); reconcileInboxReceipts(db); renderInboxOnly(); } }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
+  state.unsubSelected = onSnapshot(ref, (snapshot) => { if (state.selected !== id) return; if (!snapshot.exists()) { clearSelected(); render(); } else { state.rows = state.rows.map((item) => item.id === id ? keepNewerReadMarker({ id, ...snapshot.data({ serverTimestamps: 'estimate' }) }, item) : item); reconcileInboxReceipts(db); renderInboxOnly(); } }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
   state.unsubBlock = onSnapshot(doc(db, 'blockedCustomers', id), (snapshot) => { if (state.selected !== id) return; if (state.blocked !== snapshot.exists()) { state.blocked = snapshot.exists(); renderChat(); } }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
   state.unsubReceipts = subscribeReceipts(db, id, (receipts) => { state.receipts = new Map([...state.receipts, ...receipts]); renderThreadMessages(); const latest = state.rows.find((row) => row.id === id); if (latest?.lastSenderRole === 'customer' && receipts.get(latest.lastMessageId)?.seenAt) advanceStaffRead(db, id, latest.lastMessageId); }, (error) => { state.error = displayError(error); render(); });
   state.unsubMessages = onSnapshot(query(collection(ref, 'messages'), orderBy('createdAt', 'desc'), limit(40)), { includeMetadataChanges: true }, (snapshot) => { state.threadSynced = !snapshot.metadata.fromCache; state.messages = snapshot.docs.map((item) => ({ id: item.id, ...item.data(), metadata: item.metadata })).reverse(); if (state.pendingReply && state.messages.some((item) => item.id === state.pendingReply.id)) state.pendingReply = null; state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; if (!state.threadReady) { state.threadReady = true; renderChat(); } else renderThreadMessages(); acknowledgeThread(db); }, (error) => { state.error = displayError(error); render(); });
