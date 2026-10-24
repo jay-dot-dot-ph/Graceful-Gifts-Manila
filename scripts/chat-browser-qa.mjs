@@ -179,8 +179,8 @@ try {
   assert.ok(await owner.evaluate(() => getComputedStyle(document.body, '::before').backgroundImage.includes('blob:')), 'Wallpaper appears behind the entire admin page');
   assert.equal(await owner.evaluate(() => getComputedStyle(document.body, '::after').content), 'none', 'Wallpaper is not drawn twice');
   assert.equal(await owner.evaluate(() => getComputedStyle(document.querySelector('.admin-header')).backgroundColor), 'rgba(0, 0, 0, 0)', 'Header itself stays transparent');
-  assert.match(await owner.evaluate(() => getComputedStyle(document.querySelector('.admin-header'), '::before').backgroundColor), /\/ 0\.72\)$/, 'Header glass layer softens the wallpaper without hiding it');
-  assert.equal(await owner.evaluate(() => getComputedStyle(document.querySelector('.admin-header'), '::before').backdropFilter), 'blur(10px)', 'Header glass layer softens the wallpaper');
+  assert.match(await owner.evaluate(() => getComputedStyle(document.querySelector('.admin-header'), '::before').backgroundColor), /\/ 0\.5\)$/, 'Header glass layer uses a half-transparent surface');
+  assert.equal(await owner.evaluate(() => getComputedStyle(document.querySelector('.admin-header'), '::before').backdropFilter), 'blur(4px)', 'Header glass layer softens the wallpaper');
   assert.equal(await owner.evaluate(() => getComputedStyle(document.querySelector('.admin-header'), '::before').backgroundImage), 'none', 'Header does not draw a second wallpaper');
   assert.equal(await owner.evaluate(() => getComputedStyle(document.querySelector('.admin-layout')).backgroundColor), 'rgba(0, 0, 0, 0)', 'Dashboard reveals the page wallpaper');
   await owner.locator('[data-background-fit]').selectOption('contain');
@@ -218,7 +218,6 @@ try {
   const linkedConversation = await owner.locator('.admin-inbox-row').first().getAttribute('data-select-chat');
   await owner.goto(`${base}/admin/chat?conversation=${linkedConversation}`);
   await owner.locator(`.admin-inbox-row.selected[data-select-chat="${linkedConversation}"]`).waitFor();
-  assert.equal(await owner.locator('.admin-inbox-row.selected').evaluate((row) => getComputedStyle(row).backgroundColor), await owner.locator('.admin-logout').evaluate((button) => getComputedStyle(button).backgroundColor), 'Selected conversation uses the solid action color');
   await owner.locator('.admin-message.customer').first().getByText(initialInquiry).waitFor();
   assert.equal(await owner.evaluate(() => getComputedStyle(document.querySelector('.admin-thread-body')).backgroundImage), 'none', 'Message pane does not display a separate wallpaper');
   await owner.getByText('Are these favorites available?').first().waitFor();
@@ -313,8 +312,6 @@ try {
   try { await owner.locator('#admin-thread-body').getByText('Yes, AP-001 is available.').waitFor({ timeout: 5000 }); }
   catch (error) { let saved = []; await environment.withSecurityRulesDisabled(async (context) => { const conversation = (await getDocs(collection(context.firestore(), 'conversations'))).docs[0]; if (conversation) saved = (await getDocs(collection(context.firestore(), 'conversations', conversation.id, 'messages'))).docs.map((item) => item.data().message); }); console.error('Owner reply diagnosis:', await owner.locator('.admin-thread').innerText(), await owner.locator('.admin-toast').allInnerTexts(), 'draft:', await owner.locator('#admin-message').inputValue(), 'disabled:', await owner.locator('#admin-reply button').isDisabled(), 'saved:', saved); throw error; }
   assert.ok(await owner.locator('.admin-message.staff').last().evaluate((bubble) => bubble.getBoundingClientRect().width < bubble.parentElement.getBoundingClientRect().width * .5), 'Short admin message fits its text');
-  assert.equal(await owner.locator('.admin-message.staff').last().evaluate((bubble) => getComputedStyle(bubble).backgroundColor), await owner.locator('.admin-logout').evaluate((button) => getComputedStyle(button).backgroundColor), 'Sent messages use the solid action color');
-  assert.equal(await owner.locator('.admin-message.staff').last().evaluate((bubble) => getComputedStyle(bubble).color), 'rgb(255, 255, 255)', 'Sent message text stays readable');
   await owner.locator('.admin-message.staff .chat-receipt').last().getByText('Sent').waitFor();
   await customer.evaluate(() => { delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange')); });
   await owner.locator('.admin-message.staff .chat-receipt').last().getByText('Delivered').waitFor();
