@@ -159,6 +159,8 @@ try {
   assert.equal(await owner.evaluate(() => getComputedStyle(document.body, '::before').backgroundSize), 'cover', 'One wallpaper fills the admin page by default');
   assert.ok(await owner.evaluate(() => getComputedStyle(document.body, '::before').backgroundImage.includes('blob:')), 'Wallpaper appears behind the entire admin page');
   assert.equal(await owner.evaluate(() => getComputedStyle(document.body, '::after').content), 'none', 'Wallpaper is not drawn twice');
+  assert.equal(await owner.evaluate(() => getComputedStyle(document.querySelector('.admin-header')).backgroundColor), 'rgba(0, 0, 0, 0)', 'Header has no container fill over the wallpaper');
+  assert.equal(await owner.evaluate(() => getComputedStyle(document.querySelector('.admin-header')).backgroundImage), 'none', 'Header shows the same uninterrupted wallpaper');
   assert.equal(await owner.evaluate(() => getComputedStyle(document.querySelector('.admin-layout')).backgroundColor), 'rgba(0, 0, 0, 0)', 'Dashboard reveals the page wallpaper');
   await owner.locator('[data-background-fit]').selectOption('contain');
   assert.equal(await owner.evaluate(() => getComputedStyle(document.body, '::before').backgroundSize), 'contain', 'Whole picture remains an option');

@@ -625,7 +625,12 @@ html[data-theme="dark"] .admin-state-pill.is-active { color: #a5e2bc; border-col
 
 /* Keep one continuous wallpaper behind the admin interface on every page. */
 html[data-admin-background="true"] .admin-layout { background: transparent; }
-html[data-admin-background="true"] .admin-header,
+html[data-admin-background="true"] .admin-header { background: transparent; }
+html[data-admin-background="true"] .admin-brand span,
+html[data-admin-background="true"] .admin-header nav a:not(.admin-inbox-link),
+html[data-admin-background="true"] .admin-user {
+  text-shadow: 0 1px 2px var(--admin-surface), 0 0 12px var(--admin-surface);
+}
 html[data-admin-background="true"] .admin-inbox,
 html[data-admin-background="true"] .admin-thread-head,
 html[data-admin-background="true"] #admin-reply,
