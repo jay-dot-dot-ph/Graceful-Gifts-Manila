@@ -26,7 +26,7 @@ Start `firebase emulators:start --only auth,firestore,storage --project demo-gra
 
 - `chat/customer.js`: anonymous sign-in when chat opens, one persistent conversation per browser Auth UID, watch attachments, real-time messages, unread badge, history paging (40 messages), loading and sending states.
 - `chat/admin.js`: individual email/password sign-in, real-time inbox, staff-only assigned queries, owner/admin assignment, status changes, replies, owner staff management, activity view, and a per-device sound control. Admin routes are `/admin/chat` and `/admin/staff`.
-- `chat/admin-background.js`: the admin Appearance menu saves an uploaded chat background in this browser's IndexedDB. It applies only to the admin chat area, persists after refresh, and can be removed. It is not shared with other staff devices or uploaded to Firebase.
+- `chat/admin-background.js`: the admin Appearance menu saves an uploaded page background in this browser's IndexedDB. It appears behind the admin dashboard and staff page, persists after refresh, and can be removed. It is not shared with other staff devices or uploaded to Firebase.
 - `chat/firebase.js`: shared Firebase connection and transactional message writes. On Firebase Hosting it reads the public web configuration from `/__/firebase/init.json`. No service account or privileged credential goes to the browser.
 - `chat/guest.js`: stable guest labels and geometric avatars derived from conversation IDs, with no third-party avatar service or Firestore write.
 - `chat/push.js` and `chat/messaging-sw.js`: opt-in staff browser token registration and a worker ready to receive trusted data-only push messages. A sending backend has not been approved or deployed.

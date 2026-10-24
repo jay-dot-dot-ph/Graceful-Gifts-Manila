@@ -38,6 +38,14 @@ html[data-theme="dark"][data-admin-palette="plum"] { --admin-bg: #1e1722; --admi
 html[data-admin-palette="custom"] { --admin-bg: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 9%, white); --admin-line: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 25%, white); --admin-soft: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 5%, white); --admin-selected: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 16%, white); --admin-accent: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 62%, black); --admin-button: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 35%, black); --admin-header-start: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 4%, white); --admin-header-end: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 18%, white); }
 html[data-theme="dark"][data-admin-palette="custom"] { --admin-bg: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 10%, #10151c); --admin-surface: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 12%, #1a222c); --admin-line: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 28%, #34404b); --admin-soft: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 18%, #24303b); --admin-selected: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 31%, #26313d); --admin-accent: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 60%, white); --admin-button: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 35%, black); --admin-header-start: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 13%, #1a222c); --admin-header-end: color-mix(in srgb, var(--admin-custom-color, #3a67ad) 24%, #202936); }
 body { background: var(--admin-bg); color: var(--admin-ink); }
+html[data-theme][data-admin-background="true"] body {
+  background-color: var(--admin-bg);
+  background-image: var(--admin-page-background-image);
+  background-position: center;
+  background-size: var(--admin-page-background-size, cover);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
 #admin-app:has(.admin-layout) {
   height: var(--ggm-viewport-height, 100dvh);
   min-height: 0;
@@ -148,7 +156,7 @@ body { background: var(--admin-bg); color: var(--admin-ink); }
 .admin-custom-palette[data-active="true"] { border-color: var(--admin-accent); background: var(--admin-selected); box-shadow: inset 0 0 0 1px var(--admin-accent); }
 .admin-custom-palette input { width: 45px; height: 30px; padding: 1px; border: 0; background: transparent; cursor: pointer; }
 .admin-background-setting { margin-top: 14px; padding-top: 2px; border-top: 1px solid var(--admin-line); }
-.admin-background-preview { height: 82px; margin: 8px 0; border: 1px solid var(--admin-line); border-radius: 9px; background-color: var(--admin-soft); background-image: var(--admin-chat-background-image); background-position: center; background-size: var(--admin-chat-background-size, cover); background-repeat: no-repeat; }
+.admin-background-preview { height: 82px; margin: 8px 0; border: 1px solid var(--admin-line); border-radius: 9px; background-color: var(--admin-soft); background-image: var(--admin-page-background-image); background-position: center; background-size: var(--admin-page-background-size, cover); background-repeat: no-repeat; }
 .admin-background-preview[hidden], .admin-background-remove[hidden] { display: none; }
 .admin-background-upload { display: flex; align-items: center; justify-content: center; min-height: 38px; padding: 7px 9px; border: 1px solid var(--admin-line); border-radius: 9px; background: var(--admin-soft); color: var(--admin-ink); font-size: .76rem; font-weight: 700; cursor: pointer; }
 .admin-background-upload:hover, .admin-background-upload:focus-within { border-color: var(--admin-accent); }
@@ -383,10 +391,6 @@ body { background: var(--admin-bg); color: var(--admin-ink); }
   padding: 18px 22px;
   overscroll-behavior: contain;
   background-color: var(--admin-surface);
-  background-image: var(--admin-chat-background-image, none);
-  background-position: center;
-  background-size: var(--admin-chat-background-size, cover);
-  background-repeat: no-repeat;
 }
 .admin-message {
   max-width: min(68%, 540px);
@@ -611,6 +615,31 @@ html[data-theme="dark"] .admin-state-pill.is-active { color: #a5e2bc; border-col
 .admin-preview-panel dt { color: var(--admin-muted); }
 .admin-preview-panel dd { margin: 0; text-align: right; font-weight: 700; }
 .admin-catalog-details h3 { margin: 18px 0 8px; color: var(--admin-muted); font-size: .74rem; letter-spacing: .06em; text-transform: uppercase; }
+
+/* Keep one continuous wallpaper behind the admin interface on every page. */
+html[data-admin-background="true"] .admin-layout { background: transparent; }
+html[data-admin-background="true"] .admin-header,
+html[data-admin-background="true"] .admin-inbox,
+html[data-admin-background="true"] .admin-thread-head,
+html[data-admin-background="true"] #admin-reply,
+html[data-admin-background="true"] .admin-refs,
+html[data-admin-background="true"] .admin-card,
+html[data-admin-background="true"] .admin-staff-hero {
+  background: color-mix(in srgb, var(--admin-surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+html[data-admin-background="true"] .admin-thread-body {
+  background: color-mix(in srgb, var(--admin-surface) 12%, transparent);
+}
+html[data-admin-background="true"] .admin-inbox-row {
+  background: color-mix(in srgb, var(--admin-surface) 68%, transparent);
+}
+html[data-admin-background="true"] .admin-inbox-row:hover {
+  background: color-mix(in srgb, var(--admin-soft) 88%, transparent);
+}
+html[data-admin-background="true"] .admin-inbox-row.selected {
+  background: color-mix(in srgb, var(--admin-selected) 90%, transparent);
+}
 
 @media (max-width: 1000px) {
   .admin-header { gap: 12px; }

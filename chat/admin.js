@@ -17,13 +17,14 @@ let backgroundUrl = null;
 let hasBackground = false;
 let backgroundFit = 'cover';
 try { backgroundFit = localStorage.getItem('ggm-admin-background-fit') === 'contain' ? 'contain' : 'cover'; } catch {}
-document.documentElement.style.setProperty('--admin-chat-background-size', backgroundFit);
+document.documentElement.style.setProperty('--admin-page-background-size', backgroundFit);
 function applyBackground(image) {
   const oldUrl = backgroundUrl;
   backgroundUrl = image ? URL.createObjectURL(image) : null;
   hasBackground = !!backgroundUrl;
-  if (backgroundUrl) document.documentElement.style.setProperty('--admin-chat-background-image', `url("${backgroundUrl}")`);
-  else document.documentElement.style.removeProperty('--admin-chat-background-image');
+  document.documentElement.dataset.adminBackground = String(hasBackground);
+  if (backgroundUrl) document.documentElement.style.setProperty('--admin-page-background-image', `url("${backgroundUrl}")`);
+  else document.documentElement.style.removeProperty('--admin-page-background-image');
   if (oldUrl) URL.revokeObjectURL(oldUrl);
   root.querySelectorAll('[data-background-preview]').forEach((preview) => { preview.hidden = !hasBackground; });
   root.querySelectorAll('[data-background-remove]').forEach((button) => { button.hidden = !hasBackground; });
@@ -139,7 +140,7 @@ function setAdminAppearance(kind, value) {
   root.querySelectorAll('[data-custom-palette]').forEach((label) => label.dataset.active = String(document.documentElement.dataset.adminPalette === 'custom'));
 }
 function backgroundMarkup() {
-  return `<section class="admin-background-setting"><span class="admin-appearance-label">Chat background</span><div class="admin-background-preview" data-background-preview ${hasBackground ? '' : 'hidden'} aria-label="Current chat background"></div><label class="admin-background-upload">Upload picture<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" data-background-file class="visually-hidden"></label><button type="button" class="admin-background-remove" data-background-remove ${hasBackground ? '' : 'hidden'}>Remove picture</button><label class="admin-background-fit">Display<select data-background-fit><option value="cover" ${backgroundFit === 'cover' ? 'selected' : ''}>Fill chat area</option><option value="contain" ${backgroundFit === 'contain' ? 'selected' : ''}>Show whole picture</option></select></label><small>Saved only on this browser. JPG, PNG, WebP, GIF, AVIF or BMP, up to 10 MB.</small></section>`;
+  return `<section class="admin-background-setting"><span class="admin-appearance-label">Admin page background</span><div class="admin-background-preview" data-background-preview ${hasBackground ? '' : 'hidden'} aria-label="Current admin page background"></div><label class="admin-background-upload">Upload picture<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" data-background-file class="visually-hidden"></label><button type="button" class="admin-background-remove" data-background-remove ${hasBackground ? '' : 'hidden'}>Remove picture</button><label class="admin-background-fit">Display<select data-background-fit><option value="cover" ${backgroundFit === 'cover' ? 'selected' : ''}>Fill page</option><option value="contain" ${backgroundFit === 'contain' ? 'selected' : ''}>Show whole picture</option></select></label><small>Shown across the admin pages and saved only on this browser. JPG, PNG, WebP, GIF, AVIF or BMP, up to 10 MB.</small></section>`;
 }
 async function uploadBackground(input) {
   const file = input.files?.[0];
@@ -157,7 +158,7 @@ async function uploadBackground(input) {
     await backgroundReady;
     await saveAdminBackground(file);
     applyBackground(file);
-    showNotice('Chat background saved on this browser.');
+    showNotice('Admin background saved on this browser.');
   } catch {
     showNotice('Could not save this picture. Try a smaller image or check browser storage.');
   } finally {
@@ -176,12 +177,12 @@ function bindAppearance() {
   });
   root.querySelectorAll('[data-background-file]').forEach((input) => input.onchange = () => { void uploadBackground(input); });
   root.querySelectorAll('[data-background-remove]').forEach((button) => button.onclick = async () => {
-    try { await backgroundReady; await removeAdminBackground(); applyBackground(null); showNotice('Chat background removed.'); }
-    catch { showNotice('Could not remove the chat background.'); }
+    try { await backgroundReady; await removeAdminBackground(); applyBackground(null); showNotice('Admin background removed.'); }
+    catch { showNotice('Could not remove the admin background.'); }
   });
   root.querySelectorAll('[data-background-fit]').forEach((select) => select.onchange = () => {
     backgroundFit = select.value === 'contain' ? 'contain' : 'cover';
-    document.documentElement.style.setProperty('--admin-chat-background-size', backgroundFit);
+    document.documentElement.style.setProperty('--admin-page-background-size', backgroundFit);
     try { localStorage.setItem('ggm-admin-background-fit', backgroundFit); } catch {}
   });
 }
