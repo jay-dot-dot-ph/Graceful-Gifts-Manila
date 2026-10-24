@@ -173,7 +173,7 @@ try {
   await owner.getByText('Are these favorites available?').first().waitFor();
   const adminWatch = owner.locator('.admin-message.customer.has-product .admin-product').first();
   await adminWatch.waitFor();
-  assert.ok((await adminWatch.locator('.chat-watch-photo').boundingBox()).height >= 200, 'Admin message shows a large watch photo');
+  await owner.waitForFunction(() => document.querySelector('.admin-message.customer.has-product .admin-product .chat-watch-photo')?.getBoundingClientRect().height >= 200);
   await owner.waitForFunction(() => {
     const frame = document.querySelector('.admin-message.customer.has-product .admin-product .chat-watch-photo');
     const image = frame?.querySelector('img');
@@ -335,15 +335,27 @@ try {
   await staff.locator('#admin-reply button').click();
   try { await customer.getByText('I can help with this watch.').waitFor({ timeout: 5000 }); }
   catch (error) { console.error('Staff reply diagnosis:', await staff.locator('.admin-thread').innerText(), await staff.locator('.admin-toast').allInnerTexts()); throw error; }
+  await staff.locator('.admin-message.staff').filter({ hasText: 'I can help with this watch.' }).locator('.chat-message-menu summary').click();
   await staff.locator('.admin-message.staff').filter({ hasText: 'I can help with this watch.' }).locator('[data-edit-message]').click();
   await staff.locator('.admin-message-edit textarea').fill('I can help with this watch today.');
   await staff.locator('.admin-message-edit button[type="submit"]').click();
   await customer.getByText('I can help with this watch today.').waitFor();
   await staff.locator('.admin-message.staff').filter({ hasText: 'I can help with this watch today.' }).getByText('Edited').waitFor();
+  await customer.locator('.ggm-chat-bubble.outgoing').filter({ hasText: 'Can staff see this new question?' }).locator('.chat-message-menu summary').click();
   await customer.locator('.ggm-chat-bubble.outgoing').filter({ hasText: 'Can staff see this new question?' }).locator('[data-edit-message]').click();
   await customer.locator('.ggm-chat-edit textarea').fill('Are both favorite watches available today?');
   await customer.locator('.ggm-chat-edit button[type="submit"]').click();
-  await staff.getByText('Are both favorite watches available today?').waitFor();
+  try { await staff.getByText('Are both favorite watches available today?').waitFor({ timeout: 5000 }); }
+  catch (error) { console.error('Customer edit diagnosis:', await customer.locator('.ggm-chat').innerText(), 'draft=', await customer.locator('.ggm-chat-edit textarea').inputValue().catch(() => 'none'), 'disabled=', await customer.locator('.ggm-chat-edit button[type="submit"]').isDisabled().catch(() => false), 'errors=', errors, await staff.locator('.admin-thread').innerText()); throw error; }
+  staff.once('dialog', (dialog) => dialog.accept());
+  await staff.locator('.admin-message.staff').filter({ hasText: 'I can help with this watch today.' }).locator('.chat-message-menu summary').click();
+  await staff.locator('.admin-message.staff').filter({ hasText: 'I can help with this watch today.' }).locator('[data-unsend-message]').click();
+  await customer.getByText('I can help with this watch today.').waitFor({ state: 'detached' });
+  await customer.locator('.ggm-chat-bubble.is-unsent').first().waitFor();
+  customer.once('dialog', (dialog) => dialog.accept());
+  await customer.locator('.ggm-chat-bubble.outgoing').filter({ hasText: 'Are both favorite watches available today?' }).locator('.chat-message-menu summary').click();
+  await customer.locator('.ggm-chat-bubble.outgoing').filter({ hasText: 'Are both favorite watches available today?' }).locator('[data-unsend-message]').click();
+  await staff.getByText('Are both favorite watches available today?').waitFor({ state: 'detached' });
   await owner.goto(base + '/admin/staff');
   await owner.locator(`[data-toggle-staff="${staffUid}"]`).click();
   await owner.waitForFunction((uid) => document.querySelector(`[data-toggle-staff="${uid}"]`)?.textContent === 'Enable', staffUid);
@@ -385,5 +397,5 @@ try {
     assert.equal((await getDocs(collection(db, 'conversations', linkedConversation, 'receipts'))).size, 0);
   });
   assert.deepEqual(errors, []);
-  console.log('Chat browser QA passed: cross-client receipts, unread alerts, mobile layout, inquiries, replies, assignment, revocation, block/unblock, and delete.');
+  console.log('Chat browser QA passed: cross-client receipts, unread alerts, mobile layout, inquiries, replies, edit, unsend, assignment, revocation, block/unblock, and delete.');
 } finally { await browser.close(); await environment.cleanup(); }

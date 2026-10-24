@@ -1,4 +1,4 @@
-import { firebase, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, writeBatch, updateDoc, setDoc, deleteDoc, serverTimestamp, sendMessage, editMessage, newMessageId, displayError } from './firebase.js';
+import { firebase, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, writeBatch, updateDoc, setDoc, deleteDoc, serverTimestamp, sendMessage, editMessage, unsendMessage, newMessageId, displayError } from './firebase.js';
 import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } from './receipts.js';
 import { createNotifier, soundIcon } from './notify.js';
 import { guestIdentity } from './guest.js';
@@ -9,17 +9,18 @@ import { mediaEnabled, checkFile, uploadMedia, deleteChatMedia, mediaMarkup, hyd
 const root = document.getElementById('admin-app');
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const stamp = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Just now';
-const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), inboxReceipts: new Map(), inboxReceiptListeners: new Map(), expandedTimes: new Set(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', noticeCentered: false, deletingId: null, loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, editing: null, attachment: null, uploadProgress: 0, mediaAvailable: false, blocked: false, moderationBusy: false, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubBlock: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
+const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), inboxReceipts: new Map(), inboxReceiptListeners: new Map(), expandedTimes: new Set(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', noticeCentered: false, deletingId: null, loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, editing: null, menuMessageId: null, unsending: null, attachment: null, uploadProgress: 0, mediaAvailable: false, blocked: false, moderationBusy: false, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubBlock: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
 const sound = createNotifier('staff', () => updateHeader());
 let noticeTimer, deepLinkHandled = false;
 function cleanup() { if (previewDialog?.open) previewDialog.close(); for (const listener of state.inboxReceiptListeners.values()) listener.unsubscribe(); state.inboxReceiptListeners.clear(); state.inboxReceipts.clear(); for (const key of ['unsubInbox', 'unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubBlock', 'unsubProfile', 'unsubStaff', 'unsubActivity', 'unsubSettings']) { state[key]?.(); state[key] = null; } }
 function profileName(uid) { return state.staff.find((person) => person.id === uid)?.displayName || (uid ? 'Staff member' : 'Unassigned'); }
+const messageMenu = (id) => `<details class="chat-message-menu" ${state.menuMessageId === id ? 'open' : ''}><summary data-menu-trigger="${esc(id)}" aria-label="Message options" title="Message options" aria-haspopup="menu">⋮</summary><div role="menu"><button type="button" role="menuitem" data-edit-message="${esc(id)}">Edit</button><button type="button" role="menuitem" data-unsend-message="${esc(id)}">Unsend</button></div></details>`;
 function product(watch) { if (!/^[A-Z0-9-]{2,20}$/.test(watch.id || '')) return ''; const image = /^\/images\/[A-Za-z0-9._-]+$/.test(watch.image || '') ? watch.image : ''; const detail = [watch.id, watch.brand, watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`, watch.size || ''].filter(Boolean).join(' · '); return `<button type="button" class="admin-product" data-preview-product="${esc(watch.id)}" aria-label="Preview ${esc(watch.name || watch.id)}"><span class="chat-watch-photo">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}" loading="lazy">` : '<span aria-hidden="true">G</span>'}</span><span><strong>${esc(watch.name || watch.id)}</strong><small>${esc(detail)}</small></span></button>`; }
 function adminMessage(message) {
   const showTime = state.expandedTimes.has(`${state.selected}/${message.id}`);
   const editing = state.editing?.id === message.id;
-  const editable = message.senderUid === state.user?.uid && !message.pending && !state.blocked && /^[A-Za-z0-9]{20}$/.test(message.id);
-  return `<div class="admin-message ${message.senderRole === 'customer' ? 'customer' : 'staff'}${message.productReferences?.length ? ' has-product' : ''}" data-message-id="${esc(message.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time">${editing ? `<form class="admin-message-edit"><label class="visually-hidden" for="staff-edit-message">Edit message</label><textarea id="staff-edit-message" maxlength="2000" required ${state.editing.saving ? 'disabled' : ''}>${esc(state.editing.draft)}</textarea><div><button type="button" data-cancel-edit ${state.editing.saving ? 'disabled' : ''}>Cancel</button><button type="submit" ${state.editing.saving ? 'disabled' : ''}>Save</button></div></form>` : `<p>${esc(displayMessage(message.message))}</p>`}${(message.productReferences || []).map(product).join('')}${message.editedAt ? '<span class="chat-edited">Edited</span>' : ''}<small class="admin-message-time" ${showTime ? '' : 'hidden'}>${stamp(message.createdAt)}</small>${editable && !editing ? `<button type="button" class="chat-edit-action" data-edit-message="${esc(message.id)}" aria-label="Edit message">Edit</button>` : ''}</div>`;
+  const editable = message.senderUid === state.user?.uid && !message.pending && !message.unsentAt && !state.blocked && /^[A-Za-z0-9]{20}$/.test(message.id);
+  return `<div class="admin-message ${message.senderRole === 'customer' ? 'customer' : 'staff'}${message.productReferences?.length ? ' has-product' : ''}${message.unsentAt ? ' is-unsent' : ''}" data-message-id="${esc(message.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time">${message.unsentAt ? '<p>Message unsent</p>' : editing ? `<form class="admin-message-edit"><label class="visually-hidden" for="staff-edit-message">Edit message</label><textarea id="staff-edit-message" maxlength="2000" required ${state.editing.saving ? 'disabled' : ''}>${esc(state.editing.draft)}</textarea><div><button type="button" data-cancel-edit ${state.editing.saving ? 'disabled' : ''}>Cancel</button><button type="submit" ${state.editing.saving ? 'disabled' : ''}>Save</button></div></form>` : `<p>${esc(displayMessage(message.message))}</p>`}${message.unsentAt ? '' : (message.productReferences || []).map(product).join('')}${message.editedAt && !message.unsentAt ? '<span class="chat-edited">Edited</span>' : ''}<small class="admin-message-time" ${showTime ? '' : 'hidden'}>${stamp(message.createdAt)}</small>${editable && !editing && state.unsending !== message.id ? messageMenu(message.id) : ''}</div>`;
 }
 function toggleAdminMessageTime(bubble) {
   const id = bubble?.dataset.messageId, label = bubble?.querySelector('.admin-message-time');
@@ -32,7 +33,7 @@ function toggleAdminMessageTime(bubble) {
 }
 function avatar(identity) { return `<span class="guest-avatar guest-shape-${identity.shape}" style="--guest-color:${identity.color}" aria-hidden="true">${identity.mark}</span>`; }
 function customerLabel(item) { const identity = guestIdentity(item.id, item.customerName); return `<span class="guest-identity">${avatar(identity)}<span class="guest-names"><strong>${esc(identity.label)}</strong>${identity.label !== identity.reference ? `<small>${esc(identity.reference)}</small>` : ''}</span></span>`; }
-function unreadConversation(item) { return item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); }
+function unreadConversation(item) { return item.lastMessage !== 'Message unsent' && item.lastSenderRole === 'customer' && (!item.staffReadAt || item.lastMessageAt?.toMillis() > item.staffReadAt?.toMillis()); }
 function keepNewerReadMarker(item, previous) {
   if (!previous || item.lastMessageId !== previous.lastMessageId) return item;
   const previousRead = previous.staffReadAt?.toMillis?.();
@@ -82,11 +83,15 @@ function openProductPreview(id, opener) {
   });
 }
 root.addEventListener('click', (event) => { const opener = event.target.closest?.('[data-preview-product]'); if (opener) openProductPreview(opener.dataset.previewProduct, opener); });
-root.addEventListener('click', (event) => { if (!event.target.closest?.('button, a, textarea, form')) toggleAdminMessageTime(event.target.closest?.('#admin-thread-body .admin-message')); });
+root.addEventListener('click', (event) => { if (!event.target.closest?.('button, a, textarea, form, details, summary')) toggleAdminMessageTime(event.target.closest?.('#admin-thread-body .admin-message')); });
 root.addEventListener('click', (event) => {
+  const trigger = event.target.closest?.('[data-menu-trigger]');
+  if (trigger) state.menuMessageId = state.menuMessageId === trigger.dataset.menuTrigger ? null : trigger.dataset.menuTrigger;
   const start = event.target.closest?.('[data-edit-message]');
-  if (start) { const item = [...state.older, ...state.messages].find((message) => message.id === start.dataset.editMessage); if (item?.senderUid === state.user?.uid && !state.blocked) { state.editing = { id: item.id, draft: item.message, saving: false }; renderThreadMessages(); root.querySelector('.admin-message-edit textarea')?.focus(); } }
+  if (start) { const item = [...state.older, ...state.messages].find((message) => message.id === start.dataset.editMessage); if (item?.senderUid === state.user?.uid && !item.unsentAt && !state.blocked) { state.menuMessageId = null; state.editing = { id: item.id, draft: item.message, saving: false }; renderThreadMessages(); root.querySelector('.admin-message-edit textarea')?.focus(); } }
   if (event.target.closest?.('[data-cancel-edit]') && !state.editing?.saving) { state.editing = null; renderThreadMessages(); }
+  const unsend = event.target.closest?.('[data-unsend-message]');
+  if (unsend) { const item = [...state.older, ...state.messages].find((message) => message.id === unsend.dataset.unsendMessage); if (item?.senderUid === state.user?.uid && !item.unsentAt && !state.blocked) { state.menuMessageId = null; void unsendAdminMessage(item.id); } }
 });
 root.addEventListener('input', (event) => { if (event.target.matches?.('.admin-message-edit textarea') && state.editing) state.editing.draft = event.target.value; });
 root.addEventListener('submit', saveAdminEdit);
@@ -132,9 +137,9 @@ function header() {
 function updateHeader() { const link = root.querySelector('.admin-inbox-link'); if (link) { link.setAttribute('aria-label', `Inbox, ${state.unread} unread`); const badge = link.querySelector('b'); badge.hidden = !state.unread; badge.textContent = state.unread > 9 ? '9+' : String(state.unread); } const button = root.querySelector('[data-sound]'); if (button) { button.innerHTML = soundIcon(sound.enabled); button.setAttribute('aria-label', sound.label()); button.title = sound.label(); button.setAttribute('aria-pressed', String(sound.enabled)); } const push = root.querySelector('[data-push]'); if (push) { push.disabled = !state.pushAvailable; if (state.pushAvailable) push.removeAttribute('title'); push.textContent = state.pushAvailable ? state.pushActive ? 'Disable background alerts' : 'Enable background alerts' : 'Background alerts need setup'; } const notice = root.querySelector('.admin-notice'); if (notice) { notice.textContent = state.notice; notice.classList.toggle('is-centered', state.noticeCentered); } }
 function showNotice(message, centered = false, duration = 5000) { clearTimeout(noticeTimer); state.notice = message; state.noticeCentered = centered; updateHeader(); noticeTimer = setTimeout(() => { state.notice = ''; state.noticeCentered = false; updateHeader(); }, duration); }
 function renderLogin() { root.innerHTML = `<main class="admin-login"><div class="admin-login-appearance">${appearanceMarkup()}</div><form id="admin-login-form" class="admin-card"><p class="eyebrow">GRACEFUL GIFTS MANILA</p><h1>Staff sign in</h1><p>Use your individual staff account.</p><label>Email<input type="email" name="email" autocomplete="username" required></label><label>Password<input type="password" name="password" autocomplete="current-password" required></label><button class="admin-primary" type="submit">Sign in</button>${state.error ? `<p class="admin-error" role="alert">${esc(state.error)}</p>` : ''}</form></main>`; root.querySelector('form').onsubmit = login; bindAppearance(); }
-function inboxStatus(item) { const saved = state.inboxReceipts.get(item.id); return status({ id: item.lastMessageId }, saved?.messageId === item.lastMessageId ? saved.data : null); }
+function inboxStatus(item) { if (item.lastMessage === 'Message unsent') return ''; const saved = state.inboxReceipts.get(item.id); return status({ id: item.lastMessageId }, saved?.messageId === item.lastMessageId ? saved.data : null); }
 function reconcileInboxReceipts(db) {
-  const current = new Map(state.rows.filter((item) => /^[A-Za-z0-9]{20}$/.test(item.lastMessageId || '')).map((item) => [item.id, item.lastMessageId]));
+  const current = new Map(state.rows.filter((item) => item.lastMessage !== 'Message unsent' && /^[A-Za-z0-9]{20}$/.test(item.lastMessageId || '')).map((item) => [item.id, item.lastMessageId]));
   for (const [id, listener] of state.inboxReceiptListeners) {
     if (current.get(id) === listener.messageId) continue;
     listener.unsubscribe(); state.inboxReceiptListeners.delete(id); state.inboxReceipts.delete(id);
@@ -244,12 +249,12 @@ function renderInboxOnly() {
 function decorateThread() {
   const body = root.querySelector('#admin-thread-body'); if (!body || !state.user) return;
   const records = [...state.older, ...state.messages];
-  const lastSeen = [...records].reverse().find((item) => item.senderUid === state.user.uid && state.receipts.get(item.id)?.seenAt)?.id;
+  const lastSeen = [...records].reverse().find((item) => !item.unsentAt && item.senderUid === state.user.uid && state.receipts.get(item.id)?.seenAt)?.id;
   body.querySelectorAll('.admin-message').forEach((bubble, index) => {
     const item = records[index]; if (!item) return;
     bubble.dataset.messageId = item.id;
-    if (item.media && !bubble.querySelector('.chat-media')) bubble.querySelector('p')?.insertAdjacentHTML('afterend', mediaMarkup(item.media, state.selected, item.id));
-    if (item.senderUid === state.user.uid) {
+    if (!item.unsentAt && item.media && !bubble.querySelector('.chat-media')) bubble.querySelector('p')?.insertAdjacentHTML('afterend', mediaMarkup(item.media, state.selected, item.id));
+    if (!item.unsentAt && item.senderUid === state.user.uid) {
       const label = status(item, state.receipts.get(item.id));
       if (label !== 'Seen') { const receipt = document.createElement('span'); receipt.className = 'chat-receipt'; receipt.textContent = label; receipt.setAttribute('aria-label', `Message status: ${label}`); bubble.append(receipt); }
       if (item.id === lastSeen) { const avatar = document.createElement('span'); avatar.className = 'chat-seen-avatar'; avatar.setAttribute('aria-label', 'Seen by customer'); avatar.innerHTML = '<span aria-hidden="true">C</span>Seen'; bubble.append(avatar); }
@@ -330,7 +335,7 @@ function subscribeStaff(db) { state.unsubStaff?.(); state.unsubActivity?.(); sta
 function subscribeSettings(db) { state.unsubSettings?.(); state.unsubSettings = onSnapshot(doc(db, 'settings', 'chat'), (snapshot) => { state.settings = snapshot.exists() ? snapshot.data() : { staffSoundEnabled: false, storeAvatarUrl: '' }; if (state.page === 'staff') render(); }, (error) => { state.error = displayError(error); render(); }); }
 function acknowledgeInbox(db, items) {
   if (document.visibilityState !== 'visible' || state.page !== 'chat') return;
-  for (const item of items) if (item.lastSenderRole === 'customer' && item.lastMessageId) {
+  for (const item of items) if (item.lastMessage !== 'Message unsent' && item.lastSenderRole === 'customer' && item.lastMessageId) {
     acknowledge(db, item.id, { id: item.lastMessageId, senderUid: item.lastSenderUid, senderRole: 'customer' }, state.user.uid).catch(() => {});
   }
 }
@@ -340,7 +345,7 @@ function scheduleStaffSeen() {
   for (const bubble of body?.querySelectorAll('.admin-message.customer') || []) {
     if (!bubbleVisible(bubble, body)) continue;
     const item = [...state.older, ...state.messages].find((message) => message.id === bubble.dataset.messageId);
-    if (!item || state.receipts.get(item.id)?.seenAt) continue;
+    if (!item || item.unsentAt || state.receipts.get(item.id)?.seenAt) continue;
     const selected = state.selected;
     firebase().then(({ db }) => acknowledge(db, selected, item, state.user.uid, true).then(() => { if (selected === state.selected && state.rows.find((row) => row.id === selected)?.lastMessageId === item.id) advanceStaffRead(db, selected, item.id); })).catch(() => {});
   }
@@ -353,7 +358,7 @@ async function advanceStaffRead(db, id, messageId) {
   catch (error) { console.warn('Staff read marker failed:', error?.code || error?.message); }
   finally { state.readInFlight = false; }
 }
-function acknowledgeThread(db) { if (!state.threadSynced || document.visibilityState !== 'visible' || !state.selected) return; for (const item of state.messages) if (item.senderRole === 'customer' && !state.receipts.get(item.id)?.deliveredAt && !item.metadata?.hasPendingWrites) acknowledge(db, state.selected, item, state.user.uid).catch(() => {}); }
+function acknowledgeThread(db) { if (!state.threadSynced || document.visibilityState !== 'visible' || !state.selected) return; for (const item of state.messages) if (!item.unsentAt && item.senderRole === 'customer' && !state.receipts.get(item.id)?.deliveredAt && !item.metadata?.hasPendingWrites) acknowledge(db, state.selected, item, state.user.uid).catch(() => {}); }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; firebase().then(({ db }) => { acknowledgeInbox(db, state.rows); acknowledgeThread(db); scheduleStaffSeen(); }).catch(() => {}); });
 window.addEventListener('focus', scheduleStaffSeen);
 function subscribeInbox(db) {
@@ -399,7 +404,7 @@ async function loadMore() {
 }
 function clearSelected() {
   for (const key of ['unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubBlock']) { state[key]?.(); state[key] = null; }
-  state.selected = null; state.mobileThread = false; state.threadReady = false; state.threadSynced = false; state.messages = []; state.older = []; state.receipts = new Map(); state.first = null; state.replyDraft = ''; state.editing = null; state.attachment = null; state.blocked = false;
+  state.selected = null; state.mobileThread = false; state.threadReady = false; state.threadSynced = false; state.messages = []; state.older = []; state.receipts = new Map(); state.first = null; state.replyDraft = ''; state.editing = null; state.menuMessageId = null; state.unsending = null; state.attachment = null; state.blocked = false;
 }
 async function selectConversation(id) {
   const { db } = await firebase(); clearSelected(); state.selected = id; state.mobileThread = true;
@@ -421,6 +426,14 @@ async function saveAdminEdit(event) {
   catch (error) { state.error = displayError(error); editing.saving = false; }
   renderThreadMessages();
   if (state.error) showNotice(state.error, true);
+}
+async function unsendAdminMessage(messageId) {
+  if (state.unsending || !state.selected || !window.confirm('Unsend this message for everyone?')) return;
+  const conversationId = state.selected;
+  state.unsending = messageId; renderThreadMessages();
+  try { const { db } = await firebase(); await unsendMessage(db, conversationId, messageId, state.user.uid); state.error = ''; }
+  catch (error) { state.error = displayError(error); showNotice(state.error, true); }
+  finally { state.unsending = null; if (state.selected === conversationId) renderThreadMessages(); }
 }
 async function retryReply() {
   const pending = state.pendingReply; if (!pending || state.replySending || state.blocked) return;

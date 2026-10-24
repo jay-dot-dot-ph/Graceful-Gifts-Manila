@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, connectAuthEmulator, setPersistence, browserLocalPersistence, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, writeBatch, serverTimestamp, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, writeBatch, serverTimestamp, updateDoc, setDoc, deleteDoc, deleteField } from 'firebase/firestore';
 
 let services;
 export async function firebase() {
@@ -111,9 +111,21 @@ export async function editMessage(db, conversationId, messageId, uid, text) {
   const message = doc(conversation, 'messages', messageId);
   await runTransaction(db, async (tx) => {
     const [thread, entry] = await Promise.all([tx.get(conversation), tx.get(message)]);
-    if (!thread.exists() || !entry.exists() || entry.data().senderUid !== uid) throw new Error('Message unavailable for editing.');
+    if (!thread.exists() || !entry.exists() || entry.data().senderUid !== uid || entry.data().unsentAt) throw new Error('Message unavailable for editing.');
     if (entry.data().message === body) return;
     tx.update(message, { message: body, editedAt: serverTimestamp() });
     if (thread.data().lastMessageId === messageId) tx.update(conversation, { lastMessage: body, updatedAt: serverTimestamp() });
+  });
+}
+
+export async function unsendMessage(db, conversationId, messageId, uid) {
+  if (!/^[A-Za-z0-9]{20}$/.test(messageId)) throw new Error('Invalid message ID.');
+  const conversation = doc(db, 'conversations', conversationId);
+  const message = doc(conversation, 'messages', messageId);
+  await runTransaction(db, async (tx) => {
+    const [thread, entry] = await Promise.all([tx.get(conversation), tx.get(message)]);
+    if (!thread.exists() || !entry.exists() || entry.data().senderUid !== uid || entry.data().unsentAt) throw new Error('Message unavailable for unsending.');
+    tx.update(message, { message: 'Message unsent', productReferences: [], media: deleteField(), unsentAt: serverTimestamp() });
+    if (thread.data().lastMessageId === messageId) tx.update(conversation, { lastMessage: 'Message unsent', updatedAt: serverTimestamp() });
   });
 }

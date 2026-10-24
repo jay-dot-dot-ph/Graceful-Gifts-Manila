@@ -1,13 +1,14 @@
-import { customerSession, firebase, doc, collection, query, orderBy, limit, startAfter, getDocs, onSnapshot, updateDoc, serverTimestamp, sendMessage, editMessage, newMessageId, displayError, safeProduct } from './firebase.js';
+import { customerSession, firebase, doc, collection, query, orderBy, limit, startAfter, getDocs, onSnapshot, updateDoc, serverTimestamp, sendMessage, editMessage, unsendMessage, newMessageId, displayError, safeProduct } from './firebase.js';
 import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } from './receipts.js';
 import { createNotifier, soundIcon } from './notify.js';
 import { mediaEnabled, checkFile, uploadMedia, mediaMarkup, hydrateMedia } from './media.js';
 import { displayMessage } from './message-text.js';
 
-const state = { open: false, scrollToLatest: false, products: [], messages: [], older: [], receipts: new Map(), expandedTimes: new Set(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', generatedDraft: '', focusComposer: false, name: '', contact: '', error: '', conversation: null, pending: null, sending: false, editing: null, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
+const state = { open: false, scrollToLatest: false, products: [], messages: [], older: [], receipts: new Map(), expandedTimes: new Set(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', generatedDraft: '', focusComposer: false, name: '', contact: '', error: '', conversation: null, pending: null, sending: false, editing: null, menuMessageId: null, unsending: null, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
 const sound = createNotifier('customer', () => renderChrome());
 let connectionPromise, db, uid;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+const messageMenu = (id) => `<details class="chat-message-menu" ${state.menuMessageId === id ? 'open' : ''}><summary data-menu-trigger="${esc(id)}" aria-label="Message options" title="Message options" aria-haspopup="menu">⋮</summary><div role="menu"><button type="button" role="menuitem" data-edit-message="${esc(id)}">Edit</button><button type="button" role="menuitem" data-unsend-message="${esc(id)}">Unsend</button></div></details>`;
 const time = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Now';
 const watchLabel = (watch) => watch.name || watch.brand || 'Watch';
 const suggestedInquiry = (watches) => watches.length > 1
@@ -41,8 +42,8 @@ function ensureRoot() {
   document.body.append(root);
   root.querySelector('[data-chat-close]').onclick = () => { state.open = false; render(); };
   root.querySelector('[data-sound]').onclick = () => sound.toggle();
-  root.querySelector('form').onsubmit = submit;
-  root.querySelector('textarea').oninput = (event) => { state.draft = event.target.value; if (state.draft !== state.generatedDraft) state.generatedDraft = ''; };
+  root.querySelector('#ggm-chat-form').onsubmit = submit;
+  root.querySelector('#ggm-chat-message').oninput = (event) => { state.draft = event.target.value; if (state.draft !== state.generatedDraft) state.generatedDraft = ''; };
   const selectAttachment = (file) => {
     try {
       if (!state.mediaAvailable) throw new Error('Photo and video sharing needs store setup.');
@@ -61,15 +62,19 @@ function ensureRoot() {
   };
   root.addEventListener('dragover', (event) => { if (!event.dataTransfer?.types.includes('Files')) return; event.preventDefault(); event.dataTransfer.dropEffect = state.mediaAvailable && state.conversation ? 'copy' : 'none'; });
   root.addEventListener('drop', (event) => { if (!event.dataTransfer?.files.length) return; event.preventDefault(); selectAttachment(event.dataTransfer.files[0]); });
-  root.querySelector('textarea').onkeydown = (event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); root.querySelector('form').requestSubmit(); } };
+  root.querySelector('#ggm-chat-message').onkeydown = (event) => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); root.querySelector('#ggm-chat-form').requestSubmit(); } };
   root.querySelector('[name=name]').oninput = (event) => { state.name = event.target.value; };
   root.querySelector('[name=contact]').oninput = (event) => { state.contact = event.target.value; };
   root.querySelector('#ggm-chat-body').onscroll = scheduleSeen;
-  root.querySelector('#ggm-chat-body').onclick = (event) => { if (!event.target.closest('a, button, textarea, form')) toggleMessageTime(event.target.closest('.ggm-chat-bubble')); };
+  root.querySelector('#ggm-chat-body').onclick = (event) => { if (!event.target.closest('a, button, textarea, form, details, summary')) toggleMessageTime(event.target.closest('.ggm-chat-bubble')); };
   root.querySelector('#ggm-chat-body').addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-menu-trigger]');
+    if (trigger) state.menuMessageId = state.menuMessageId === trigger.dataset.menuTrigger ? null : trigger.dataset.menuTrigger;
     const start = event.target.closest('[data-edit-message]');
-    if (start) { const item = allMessages().find((message) => message.id === start.dataset.editMessage); if (item?.senderUid === uid && !item.pending) { state.editing = { id: item.id, draft: item.message, saving: false }; renderMessages(); ensureRoot().querySelector('.ggm-chat-edit textarea')?.focus(); } }
+    if (start) { const item = allMessages().find((message) => message.id === start.dataset.editMessage); if (item?.senderUid === uid && !item.pending && !item.unsentAt) { state.menuMessageId = null; state.editing = { id: item.id, draft: item.message, saving: false }; renderMessages(); ensureRoot().querySelector('.ggm-chat-edit textarea')?.focus(); } }
     if (event.target.closest('[data-cancel-edit]') && !state.editing?.saving) { state.editing = null; renderMessages(); }
+    const unsend = event.target.closest('[data-unsend-message]');
+    if (unsend) { const item = allMessages().find((message) => message.id === unsend.dataset.unsendMessage); if (item?.senderUid === uid && !item.unsentAt && !item.pending) { state.menuMessageId = null; void unsendCustomerMessage(item.id); } }
   });
   root.querySelector('#ggm-chat-body').addEventListener('input', (event) => { if (event.target.matches('.ggm-chat-edit textarea') && state.editing) state.editing.draft = event.target.value; });
   root.querySelector('#ggm-chat-body').addEventListener('submit', saveEdit);
@@ -80,7 +85,7 @@ function renderChrome() {
   const root = ensureRoot(); root.classList.toggle('is-open', state.open);
   const soundButton = root.querySelector('[data-sound]'); soundButton.innerHTML = soundIcon(sound.enabled); soundButton.setAttribute('aria-label', sound.label()); soundButton.title = sound.label(); soundButton.setAttribute('aria-pressed', String(sound.enabled));
   root.querySelector('.ggm-chat-identity').hidden = !!state.conversation;
-  const composer = root.querySelector('textarea'); if (composer.value !== state.draft) composer.value = state.draft;
+  const composer = root.querySelector('#ggm-chat-message'); if (composer.value !== state.draft) composer.value = state.draft;
   composer.disabled = state.sending || state.loading;
   if (state.open && state.focusComposer && !composer.disabled) {
     state.focusComposer = false;
@@ -92,23 +97,23 @@ function renderChrome() {
   root.querySelector('#ggm-chat-file').disabled = state.sending;
   const preview = root.querySelector('#ggm-attachment-preview'); preview.hidden = !state.attachment; preview.innerHTML = state.attachment ? `<span>${esc(state.attachment.name)} · ${(state.attachment.size / 1_000_000).toFixed(1)} MB${state.sending ? ` · ${state.uploadProgress}%` : ''}</span><button type="button" data-remove-attachment ${state.sending ? 'disabled' : ''} aria-label="Remove attachment">×</button>` : '';
   preview.querySelector('[data-remove-attachment]')?.addEventListener('click', () => { state.attachment = null; renderChrome(); });
-  const send = root.querySelector('form button'); send.disabled = composer.disabled; send.textContent = state.sending ? 'Sending…' : 'Send';
+  const send = root.querySelector('#ggm-chat-form button[type="submit"]'); send.disabled = composer.disabled; send.textContent = state.sending ? 'Sending…' : 'Send';
   const error = root.querySelector('.ggm-chat-error'); error.hidden = !state.error; error.textContent = state.error;
   const badge = document.querySelector('[data-chat-badge]');
-  if (badge) { const c = state.conversation; const unread = c?.lastSenderRole !== 'customer' && c?.lastMessageAt && (!c.customerReadAt || c.lastMessageAt.toMillis() > c.customerReadAt.toMillis()); badge.hidden = !unread; badge.textContent = unread ? '1' : ''; }
+  if (badge) { const c = state.conversation; const unread = c?.lastMessage !== 'Message unsent' && c?.lastSenderRole !== 'customer' && c?.lastMessageAt && (!c.customerReadAt || c.lastMessageAt.toMillis() > c.customerReadAt.toMillis()); badge.hidden = !unread; badge.textContent = unread ? '1' : ''; }
 }
 function renderMessages() {
   const body = ensureRoot().querySelector('#ggm-chat-body');
   const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 72, before = body.scrollHeight, top = body.scrollTop;
   const all = allMessages(); let latestSeen = null;
-  for (const item of all) if (item.senderUid === uid && state.receipts.get(item.id)?.seenAt) latestSeen = item.id;
+  for (const item of all) if (!item.unsentAt && item.senderUid === uid && state.receipts.get(item.id)?.seenAt) latestSeen = item.id;
   body.innerHTML = `${state.loading ? '<p class="ggm-chat-hint">Loading conversation…</p>' : ''}${!all.length && !state.loading ? '<p class="ggm-chat-hint">Hello! Ask us about a watch and we will reply here.</p>' : ''}${state.first ? '<button type="button" class="ggm-chat-more" data-chat-more>Load earlier messages</button>' : ''}${all.map((item) => {
     const outgoing = item.senderUid === uid || item.senderRole === 'customer' && !uid;
     const label = status(item, state.receipts.get(item.id));
     const showTime = state.expandedTimes.has(item.id);
     const editing = state.editing?.id === item.id;
-    const editable = outgoing && item.senderUid === uid && !item.pending && /^[A-Za-z0-9]{20}$/.test(item.id);
-    return `<div class="ggm-chat-bubble ${outgoing ? 'outgoing' : 'incoming'} ${(item.productReferences || []).length ? 'has-product' : ''}" data-message-id="${esc(item.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time">${editing ? `<form class="ggm-chat-edit"><label class="visually-hidden" for="customer-edit-message">Edit message</label><textarea id="customer-edit-message" maxlength="2000" required ${state.editing.saving ? 'disabled' : ''}>${esc(state.editing.draft)}</textarea><div><button type="button" data-cancel-edit ${state.editing.saving ? 'disabled' : ''}>Cancel</button><button type="submit" ${state.editing.saving ? 'disabled' : ''}>Save</button></div></form>` : `<p>${esc(displayMessage(item.message))}</p>`}${item.media ? mediaMarkup(item.media, uid, item.id) : ''}${(item.productReferences || []).map(productCard).join('')}${item.editedAt ? '<span class="chat-edited">Edited</span>' : ''}<small class="chat-message-time" ${showTime ? '' : 'hidden'}>${time(item.createdAt)}</small>${editable && !editing ? `<button type="button" class="chat-edit-action" data-edit-message="${esc(item.id)}" aria-label="Edit message">Edit</button>` : ''}${outgoing ? `${label === 'Seen' ? '' : `<span class="chat-receipt" aria-label="Message status: ${label}">${label}${item.failed ? ' <button type="button" data-retry>Retry</button>' : ''}</span>`}${item.id === latestSeen ? `<span class="chat-seen-avatar" aria-label="Seen by store"><span aria-hidden="true">${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : 'G'}</span>Seen by store</span>` : ''}` : ''}</div>`;
+    const editable = outgoing && item.senderUid === uid && !item.pending && !item.unsentAt && /^[A-Za-z0-9]{20}$/.test(item.id);
+    return `<div class="ggm-chat-bubble ${outgoing ? 'outgoing' : 'incoming'} ${(item.productReferences || []).length ? 'has-product' : ''}${item.unsentAt ? ' is-unsent' : ''}" data-message-id="${esc(item.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time">${item.unsentAt ? '<p>Message unsent</p>' : editing ? `<form class="ggm-chat-edit"><label class="visually-hidden" for="customer-edit-message">Edit message</label><textarea id="customer-edit-message" maxlength="2000" required ${state.editing.saving ? 'disabled' : ''}>${esc(state.editing.draft)}</textarea><div><button type="button" data-cancel-edit ${state.editing.saving ? 'disabled' : ''}>Cancel</button><button type="submit" ${state.editing.saving ? 'disabled' : ''}>Save</button></div></form>` : `<p>${esc(displayMessage(item.message))}</p>`}${!item.unsentAt && item.media ? mediaMarkup(item.media, uid, item.id) : ''}${item.unsentAt ? '' : (item.productReferences || []).map(productCard).join('')}${item.editedAt && !item.unsentAt ? '<span class="chat-edited">Edited</span>' : ''}<small class="chat-message-time" ${showTime ? '' : 'hidden'}>${time(item.createdAt)}</small>${editable && !editing && state.unsending !== item.id ? messageMenu(item.id) : ''}${outgoing && !item.unsentAt ? `${label === 'Seen' ? '' : `<span class="chat-receipt" aria-label="Message status: ${label}">${label}${item.failed ? ' <button type="button" data-retry>Retry</button>' : ''}</span>`}${item.id === latestSeen ? `<span class="chat-seen-avatar" aria-label="Seen by store"><span aria-hidden="true">${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : 'G'}</span>Seen by store</span>` : ''}` : ''}</div>`;
   }).join('')}`;
   body.querySelector('[data-chat-more]')?.addEventListener('click', loadOlder);
   body.querySelector('[data-retry]')?.addEventListener('click', sendPending);
@@ -128,6 +133,13 @@ async function saveEdit(event) {
   catch (error) { state.error = displayError(error); editing.saving = false; }
   render();
 }
+async function unsendCustomerMessage(messageId) {
+  if (state.unsending || !window.confirm('Unsend this message for everyone?')) return;
+  state.unsending = messageId; renderMessages();
+  try { await unsendMessage(db, uid, messageId, uid); state.error = ''; }
+  catch (error) { state.error = displayError(error); }
+  finally { state.unsending = null; render(); }
+}
 function showNotice() {
   let notice = document.getElementById('ggm-chat-notice');
   if (!notice) { notice = document.createElement('div'); notice.id = 'ggm-chat-notice'; notice.setAttribute('role', 'status'); document.body.append(notice); }
@@ -140,7 +152,7 @@ function scheduleSeen() {
   for (const bubble of body?.querySelectorAll('.ggm-chat-bubble.incoming') || []) {
     if (!bubbleVisible(bubble, body)) continue;
     const item = [...state.older, ...state.messages].find((message) => message.id === bubble.dataset.messageId);
-    if (!item || state.receipts.get(item.id)?.seenAt) continue;
+    if (!item || item.unsentAt || state.receipts.get(item.id)?.seenAt) continue;
     acknowledge(db, uid, item, uid, true).then(() => { if (state.conversation?.lastMessageId === item.id) advanceRead(item.id); }).catch(() => {});
   }
 }
@@ -153,7 +165,7 @@ async function advanceRead(messageId) {
 }
 function acknowledgeLoaded() {
   if (!state.synced || document.visibilityState !== 'visible' || !db || !uid) return;
-  for (const item of state.messages) if (item.senderRole !== 'customer' && !state.receipts.get(item.id)?.deliveredAt && !item.metadata?.hasPendingWrites) acknowledge(db, uid, item, uid).catch(() => {});
+  for (const item of state.messages) if (!item.unsentAt && item.senderRole !== 'customer' && !state.receipts.get(item.id)?.deliveredAt && !item.metadata?.hasPendingWrites) acknowledge(db, uid, item, uid).catch(() => {});
 }
 async function connect() {
   const session = await customerSession(); db = session.db; uid = session.user.uid;
@@ -165,7 +177,7 @@ async function connect() {
     if (snapshot.exists() && !state.unsubMessages) {
       state.unsubReceipts = subscribeReceipts(db, uid, (receipts) => { state.receipts = new Map([...state.receipts, ...receipts]); renderMessages(); if (receipts.get(state.conversation?.lastMessageId)?.seenAt) advanceRead(state.conversation.lastMessageId); }, (error) => { state.error = displayError(error); renderChrome(); });
       state.unsubMessages = onSnapshot(query(collection(ref, 'messages'), orderBy('createdAt', 'desc'), limit(40)), { includeMetadataChanges: true }, (messages) => {
-        const incoming = messages.docs.filter((item) => item.data().senderRole !== 'customer' && !item.metadata.hasPendingWrites);
+        const incoming = messages.docs.filter((item) => item.data().senderRole !== 'customer' && !item.data().unsentAt && !item.metadata.hasPendingWrites);
         if (state.messagesReady && !messages.metadata.fromCache && incoming.some((item) => !state.knownIncoming.has(item.id)) && document.visibilityState === 'visible') { sound.notify(); showNotice(); }
         if (!messages.metadata.fromCache) { state.messagesReady = true; for (const item of incoming) state.knownIncoming.add(item.id); }
         state.synced = !messages.metadata.fromCache;
