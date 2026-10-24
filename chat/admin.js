@@ -15,8 +15,8 @@ const sound = createNotifier('staff', () => updateHeader());
 let noticeTimer, deepLinkHandled = false;
 let backgroundUrl = null;
 let hasBackground = false;
-let backgroundFit = 'cover';
-try { backgroundFit = localStorage.getItem('ggm-admin-background-fit') === 'contain' ? 'contain' : 'cover'; } catch {}
+let backgroundFit = 'contain';
+try { backgroundFit = localStorage.getItem('ggm-admin-background-fit-v2') === 'cover' ? 'cover' : 'contain'; } catch {}
 document.documentElement.style.setProperty('--admin-page-background-size', backgroundFit);
 function applyBackground(image) {
   const oldUrl = backgroundUrl;
@@ -140,7 +140,7 @@ function setAdminAppearance(kind, value) {
   root.querySelectorAll('[data-custom-palette]').forEach((label) => label.dataset.active = String(document.documentElement.dataset.adminPalette === 'custom'));
 }
 function backgroundMarkup() {
-  return `<section class="admin-background-setting"><span class="admin-appearance-label">Admin page background</span><div class="admin-background-preview" data-background-preview ${hasBackground ? '' : 'hidden'} aria-label="Current admin page background"></div><label class="admin-background-upload">Upload picture<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" data-background-file class="visually-hidden"></label><button type="button" class="admin-background-remove" data-background-remove ${hasBackground ? '' : 'hidden'}>Remove picture</button><label class="admin-background-fit">Display<select data-background-fit><option value="cover" ${backgroundFit === 'cover' ? 'selected' : ''}>Fill page</option><option value="contain" ${backgroundFit === 'contain' ? 'selected' : ''}>Show whole picture</option></select></label><small>Shown across the admin pages and saved only on this browser. JPG, PNG, WebP, GIF, AVIF or BMP, up to 10 MB.</small></section>`;
+  return `<section class="admin-background-setting"><span class="admin-appearance-label">Admin page background</span><div class="admin-background-preview" data-background-preview ${hasBackground ? '' : 'hidden'} aria-label="Current admin page background"></div><label class="admin-background-upload">Upload picture<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" data-background-file class="visually-hidden"></label><button type="button" class="admin-background-remove" data-background-remove ${hasBackground ? '' : 'hidden'}>Remove picture</button><label class="admin-background-fit">Display<select data-background-fit><option value="contain" ${backgroundFit === 'contain' ? 'selected' : ''}>Show whole picture</option><option value="cover" ${backgroundFit === 'cover' ? 'selected' : ''}>Fill page (crop edges)</option></select></label><small>Shown across the admin pages and saved only on this browser. JPG, PNG, WebP, GIF, AVIF or BMP, up to 10 MB.</small></section>`;
 }
 async function uploadBackground(input) {
   const file = input.files?.[0];
@@ -181,9 +181,9 @@ function bindAppearance() {
     catch { showNotice('Could not remove the admin background.'); }
   });
   root.querySelectorAll('[data-background-fit]').forEach((select) => select.onchange = () => {
-    backgroundFit = select.value === 'contain' ? 'contain' : 'cover';
+    backgroundFit = select.value === 'cover' ? 'cover' : 'contain';
     document.documentElement.style.setProperty('--admin-page-background-size', backgroundFit);
-    try { localStorage.setItem('ggm-admin-background-fit', backgroundFit); } catch {}
+    try { localStorage.setItem('ggm-admin-background-fit-v2', backgroundFit); } catch {}
   });
 }
 function header() {
