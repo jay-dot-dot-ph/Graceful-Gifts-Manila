@@ -631,15 +631,7 @@ html[data-admin-background="true"] .admin-header nav a:not(.admin-inbox-link),
 html[data-admin-background="true"] .admin-user {
   text-shadow: 0 1px 2px var(--admin-surface), 0 0 12px var(--admin-surface);
 }
-html[data-admin-background="true"] .admin-inbox {
-  background: transparent;
-  backdrop-filter: none;
-  border-right: 0;
-}
-html[data-admin-background="true"] .admin-inbox-top,
-html[data-admin-background="true"] .admin-inbox-row {
-  text-shadow: 0 1px 2px var(--admin-surface), 0 0 12px var(--admin-surface);
-}
+html[data-admin-background="true"] .admin-inbox,
 html[data-admin-background="true"] .admin-thread-head,
 html[data-admin-background="true"] #admin-reply,
 html[data-admin-background="true"] .admin-refs,
