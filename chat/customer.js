@@ -4,11 +4,11 @@ import { createNotifier, soundIcon } from './notify.js';
 import { mediaEnabled, checkFile, uploadMedia, mediaMarkup, hydrateMedia } from './media.js';
 import { displayMessage } from './message-text.js';
 
-const state = { open: false, scrollToLatest: false, products: [], messages: [], older: [], receipts: new Map(), expandedTimes: new Set(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', generatedDraft: '', focusComposer: false, name: '', contact: '', error: '', conversation: null, pending: null, sending: false, editing: null, menuMessageId: null, unsending: null, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
+const state = { open: false, scrollToLatest: false, products: [], messages: [], older: [], receipts: new Map(), expandedTimes: new Set(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', generatedDraft: '', focusComposer: false, name: '', contact: '', error: '', conversation: null, pending: null, sending: false, editing: null, activeMessageId: null, menuMessageId: null, unsending: null, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
 const sound = createNotifier('customer', () => renderChrome());
 let connectionPromise, db, uid;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
-const messageMenu = (id) => `<details class="chat-message-menu" ${state.menuMessageId === id ? 'open' : ''}><summary data-menu-trigger="${esc(id)}" aria-label="Message options" title="Message options" aria-haspopup="menu">⋮</summary><div role="menu"><button type="button" role="menuitem" data-edit-message="${esc(id)}">Edit</button><button type="button" role="menuitem" data-unsend-message="${esc(id)}">Unsend</button></div></details>`;
+const messageMenu = (id) => `<details class="chat-message-menu" data-active="${state.activeMessageId === id}" ${state.menuMessageId === id ? 'open' : ''}><summary data-menu-trigger="${esc(id)}" aria-label="Message options" title="Message options" aria-haspopup="menu">⋮</summary><div role="menu"><button type="button" role="menuitem" data-edit-message="${esc(id)}">Edit</button><button type="button" role="menuitem" data-unsend-message="${esc(id)}">Unsend</button></div></details>`;
 const time = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Now';
 const watchLabel = (watch) => watch.name || watch.brand || 'Watch';
 const suggestedInquiry = (watches) => watches.length > 1
@@ -28,6 +28,12 @@ const allMessages = () => { const all = [...state.older, ...state.messages]; if 
 function toggleMessageTime(bubble) {
   const id = bubble?.dataset.messageId, label = bubble?.querySelector('.chat-message-time');
   if (!id || !label) return;
+  state.activeMessageId = state.activeMessageId === id ? null : id;
+  if (state.menuMessageId !== state.activeMessageId) state.menuMessageId = null;
+  bubble.parentElement.querySelectorAll('.chat-message-menu').forEach((menu) => {
+    menu.dataset.active = String(menu.closest('.ggm-chat-bubble')?.dataset.messageId === state.activeMessageId);
+    if (menu.dataset.active === 'false') menu.open = false;
+  });
   const show = !state.expandedTimes.has(id);
   if (show) state.expandedTimes.add(id); else state.expandedTimes.delete(id);
   label.hidden = !show;
@@ -40,7 +46,7 @@ function ensureRoot() {
   root = document.createElement('aside'); root.id = 'ggm-chat'; root.className = 'ggm-chat'; root.setAttribute('aria-label', 'Graceful Gifts Manila customer support');
   root.innerHTML = `<div class="ggm-chat-head"><span class="chat-store-avatar" aria-hidden="true">G</span><div class="chat-store-label"><strong>Graceful Gifts Manila</strong><span>Customer Support</span></div><button type="button" class="chat-sound" data-sound aria-label="Mute sounds"></button><button type="button" class="chat-close" data-chat-close aria-label="Close chat">×</button></div><div class="ggm-chat-body" id="ggm-chat-body" role="log" aria-label="Conversation messages"></div><div class="ggm-chat-identity"><label>Your name (optional)<input name="name" maxlength="80" autocomplete="name"></label><label>Email or phone (optional)<input name="contact" maxlength="120" autocomplete="email"></label></div><div class="chat-attachment-preview" id="ggm-attachment-preview" hidden></div><form id="ggm-chat-form" class="ggm-chat-form"><label class="chat-attach" id="ggm-attach-label" hidden title="Send a message first to start the conversation">＋<span class="visually-hidden">Attach photo or video</span><input id="ggm-chat-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" hidden></label><label for="ggm-chat-message" class="visually-hidden">Your message</label><textarea id="ggm-chat-message" maxlength="2000" rows="2" placeholder="Write your message…"></textarea><button type="submit">Send</button></form><p class="ggm-chat-error" role="alert" hidden></p>`;
   document.body.append(root);
-  root.querySelector('[data-chat-close]').onclick = () => { state.open = false; render(); };
+  root.querySelector('[data-chat-close]').onclick = () => { state.open = false; state.activeMessageId = null; state.menuMessageId = null; render(); };
   root.querySelector('[data-sound]').onclick = () => sound.toggle();
   root.querySelector('#ggm-chat-form').onsubmit = submit;
   root.querySelector('#ggm-chat-message').oninput = (event) => { state.draft = event.target.value; if (state.draft !== state.generatedDraft) state.generatedDraft = ''; };
@@ -71,10 +77,10 @@ function ensureRoot() {
     const trigger = event.target.closest('[data-menu-trigger]');
     if (trigger) state.menuMessageId = state.menuMessageId === trigger.dataset.menuTrigger ? null : trigger.dataset.menuTrigger;
     const start = event.target.closest('[data-edit-message]');
-    if (start) { const item = allMessages().find((message) => message.id === start.dataset.editMessage); if (item?.senderUid === uid && !item.pending && !item.unsentAt) { state.menuMessageId = null; state.editing = { id: item.id, draft: item.message, saving: false }; renderMessages(); ensureRoot().querySelector('.ggm-chat-edit textarea')?.focus(); } }
+    if (start) { const item = allMessages().find((message) => message.id === start.dataset.editMessage); if (item?.senderUid === uid && !item.pending && !item.unsentAt) { state.activeMessageId = null; state.menuMessageId = null; state.editing = { id: item.id, draft: item.message, saving: false }; renderMessages(); ensureRoot().querySelector('.ggm-chat-edit textarea')?.focus(); } }
     if (event.target.closest('[data-cancel-edit]') && !state.editing?.saving) { state.editing = null; renderMessages(); }
     const unsend = event.target.closest('[data-unsend-message]');
-    if (unsend) { const item = allMessages().find((message) => message.id === unsend.dataset.unsendMessage); if (item?.senderUid === uid && !item.unsentAt && !item.pending) { state.menuMessageId = null; void unsendCustomerMessage(item.id); } }
+    if (unsend) { const item = allMessages().find((message) => message.id === unsend.dataset.unsendMessage); if (item?.senderUid === uid && !item.unsentAt && !item.pending) { state.activeMessageId = null; state.menuMessageId = null; void unsendCustomerMessage(item.id); } }
   });
   root.querySelector('#ggm-chat-body').addEventListener('input', (event) => { if (event.target.matches('.ggm-chat-edit textarea') && state.editing) state.editing.draft = event.target.value; });
   root.querySelector('#ggm-chat-body').addEventListener('submit', saveEdit);

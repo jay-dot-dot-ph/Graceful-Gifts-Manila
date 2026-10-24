@@ -9,12 +9,12 @@ import { mediaEnabled, checkFile, uploadMedia, deleteChatMedia, mediaMarkup, hyd
 const root = document.getElementById('admin-app');
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const stamp = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Just now';
-const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), inboxReceipts: new Map(), inboxReceiptListeners: new Map(), expandedTimes: new Set(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', noticeCentered: false, deletingId: null, loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, editing: null, menuMessageId: null, unsending: null, attachment: null, uploadProgress: 0, mediaAvailable: false, blocked: false, moderationBusy: false, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubBlock: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
+const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), inboxReceipts: new Map(), inboxReceiptListeners: new Map(), expandedTimes: new Set(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', noticeCentered: false, deletingId: null, loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, editing: null, activeMessageId: null, menuMessageId: null, unsending: null, attachment: null, uploadProgress: 0, mediaAvailable: false, blocked: false, moderationBusy: false, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubBlock: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
 const sound = createNotifier('staff', () => updateHeader());
 let noticeTimer, deepLinkHandled = false;
 function cleanup() { if (previewDialog?.open) previewDialog.close(); for (const listener of state.inboxReceiptListeners.values()) listener.unsubscribe(); state.inboxReceiptListeners.clear(); state.inboxReceipts.clear(); for (const key of ['unsubInbox', 'unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubBlock', 'unsubProfile', 'unsubStaff', 'unsubActivity', 'unsubSettings']) { state[key]?.(); state[key] = null; } }
 function profileName(uid) { return state.staff.find((person) => person.id === uid)?.displayName || (uid ? 'Staff member' : 'Unassigned'); }
-const messageMenu = (id) => `<details class="chat-message-menu" ${state.menuMessageId === id ? 'open' : ''}><summary data-menu-trigger="${esc(id)}" aria-label="Message options" title="Message options" aria-haspopup="menu">⋮</summary><div role="menu"><button type="button" role="menuitem" data-edit-message="${esc(id)}">Edit</button><button type="button" role="menuitem" data-unsend-message="${esc(id)}">Unsend</button></div></details>`;
+const messageMenu = (id) => `<details class="chat-message-menu" data-active="${state.activeMessageId === id}" ${state.menuMessageId === id ? 'open' : ''}><summary data-menu-trigger="${esc(id)}" aria-label="Message options" title="Message options" aria-haspopup="menu">⋮</summary><div role="menu"><button type="button" role="menuitem" data-edit-message="${esc(id)}">Edit</button><button type="button" role="menuitem" data-unsend-message="${esc(id)}">Unsend</button></div></details>`;
 function product(watch) { if (!/^[A-Z0-9-]{2,20}$/.test(watch.id || '')) return ''; const image = /^\/images\/[A-Za-z0-9._-]+$/.test(watch.image || '') ? watch.image : ''; const detail = [watch.id, watch.brand, watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`, watch.size || ''].filter(Boolean).join(' · '); return `<button type="button" class="admin-product" data-preview-product="${esc(watch.id)}" aria-label="Preview ${esc(watch.name || watch.id)}"><span class="chat-watch-photo">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}" loading="lazy">` : '<span aria-hidden="true">G</span>'}</span><span><strong>${esc(watch.name || watch.id)}</strong><small>${esc(detail)}</small></span></button>`; }
 function adminMessage(message) {
   const showTime = state.expandedTimes.has(`${state.selected}/${message.id}`);
@@ -25,6 +25,12 @@ function adminMessage(message) {
 function toggleAdminMessageTime(bubble) {
   const id = bubble?.dataset.messageId, label = bubble?.querySelector('.admin-message-time');
   if (!id || !label) return;
+  state.activeMessageId = state.activeMessageId === id ? null : id;
+  if (state.menuMessageId !== state.activeMessageId) state.menuMessageId = null;
+  root.querySelectorAll('#admin-thread-body .chat-message-menu').forEach((menu) => {
+    menu.dataset.active = String(menu.closest('.admin-message')?.dataset.messageId === state.activeMessageId);
+    if (menu.dataset.active === 'false') menu.open = false;
+  });
   const key = `${state.selected}/${id}`, show = !state.expandedTimes.has(key);
   if (show) state.expandedTimes.add(key); else state.expandedTimes.delete(key);
   label.hidden = !show;
@@ -88,10 +94,10 @@ root.addEventListener('click', (event) => {
   const trigger = event.target.closest?.('[data-menu-trigger]');
   if (trigger) state.menuMessageId = state.menuMessageId === trigger.dataset.menuTrigger ? null : trigger.dataset.menuTrigger;
   const start = event.target.closest?.('[data-edit-message]');
-  if (start) { const item = [...state.older, ...state.messages].find((message) => message.id === start.dataset.editMessage); if (item?.senderUid === state.user?.uid && !item.unsentAt && !state.blocked) { state.menuMessageId = null; state.editing = { id: item.id, draft: item.message, saving: false }; renderThreadMessages(); root.querySelector('.admin-message-edit textarea')?.focus(); } }
+  if (start) { const item = [...state.older, ...state.messages].find((message) => message.id === start.dataset.editMessage); if (item?.senderUid === state.user?.uid && !item.unsentAt && !state.blocked) { state.activeMessageId = null; state.menuMessageId = null; state.editing = { id: item.id, draft: item.message, saving: false }; renderThreadMessages(); root.querySelector('.admin-message-edit textarea')?.focus(); } }
   if (event.target.closest?.('[data-cancel-edit]') && !state.editing?.saving) { state.editing = null; renderThreadMessages(); }
   const unsend = event.target.closest?.('[data-unsend-message]');
-  if (unsend) { const item = [...state.older, ...state.messages].find((message) => message.id === unsend.dataset.unsendMessage); if (item?.senderUid === state.user?.uid && !item.unsentAt && !state.blocked) { state.menuMessageId = null; void unsendAdminMessage(item.id); } }
+  if (unsend) { const item = [...state.older, ...state.messages].find((message) => message.id === unsend.dataset.unsendMessage); if (item?.senderUid === state.user?.uid && !item.unsentAt && !state.blocked) { state.activeMessageId = null; state.menuMessageId = null; void unsendAdminMessage(item.id); } }
 });
 root.addEventListener('input', (event) => { if (event.target.matches?.('.admin-message-edit textarea') && state.editing) state.editing.draft = event.target.value; });
 root.addEventListener('submit', saveAdminEdit);
@@ -404,7 +410,7 @@ async function loadMore() {
 }
 function clearSelected() {
   for (const key of ['unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubBlock']) { state[key]?.(); state[key] = null; }
-  state.selected = null; state.mobileThread = false; state.threadReady = false; state.threadSynced = false; state.messages = []; state.older = []; state.receipts = new Map(); state.first = null; state.replyDraft = ''; state.editing = null; state.menuMessageId = null; state.unsending = null; state.attachment = null; state.blocked = false;
+  state.selected = null; state.mobileThread = false; state.threadReady = false; state.threadSynced = false; state.messages = []; state.older = []; state.receipts = new Map(); state.first = null; state.replyDraft = ''; state.editing = null; state.activeMessageId = null; state.menuMessageId = null; state.unsending = null; state.attachment = null; state.blocked = false;
 }
 async function selectConversation(id) {
   const { db } = await firebase(); clearSelected(); state.selected = id; state.mobileThread = true;
