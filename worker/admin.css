@@ -350,8 +350,21 @@ html[data-admin-background="true"] body::before {
 }
 .admin-empty { padding: 24px; color: var(--admin-muted); font-size: .86rem; }
 
-.admin-thread { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.admin-thread { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.admin-thread.is-switching::after {
+  content: 'Loading conversation…';
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: var(--admin-surface);
+  color: var(--admin-ink);
+  font-size: .86rem;
+}
 .admin-thread-head {
+  position: relative;
+  z-index: 2;
   flex: none;
   display: flex;
   align-items: center;
@@ -637,12 +650,24 @@ html[data-admin-background="true"] #admin-reply,
 html[data-admin-background="true"] .admin-refs,
 html[data-admin-background="true"] .admin-card,
 html[data-admin-background="true"] .admin-staff-hero {
-  background: color-mix(in srgb, var(--admin-surface) 74%, transparent);
-  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--admin-surface) 55%, transparent);
+  backdrop-filter: blur(6px);
 }
 html[data-admin-background="true"] .admin-thread-body {
-  background: color-mix(in srgb, var(--admin-surface) 68%, transparent);
-  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--admin-surface) 50%, transparent);
+  backdrop-filter: blur(4px);
+}
+html[data-admin-background="true"] .admin-thread.is-switching::after {
+  background: color-mix(in srgb, var(--admin-surface) 85%, transparent);
+  backdrop-filter: blur(6px);
+}
+html[data-admin-background="true"] .admin-inbox-top h1,
+html[data-admin-background="true"] .admin-inbox-top p,
+html[data-admin-background="true"] .admin-inbox-row .guest-names,
+html[data-admin-background="true"] .admin-inbox-row .admin-row-summary,
+html[data-admin-background="true"] .admin-thread-head h2,
+html[data-admin-background="true"] .admin-thread-head small {
+  text-shadow: 0 1px 2px var(--admin-surface), 0 0 8px var(--admin-surface);
 }
 html[data-admin-background="true"] .admin-inbox-row {
   background: transparent;

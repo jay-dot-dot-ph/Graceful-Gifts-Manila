@@ -413,6 +413,33 @@ try {
   await owner.locator('[data-block-user]').click();
   await owner.locator('.admin-blocked-pill').waitFor({ state: 'detached' });
   await owner.waitForFunction(() => !document.querySelector('[data-block-user]')?.disabled);
+  await owner.locator('.admin-header .admin-appearance summary').click();
+  await owner.locator('[data-background-file]').setInputFiles({ name: 'background.jpg', mimeType: 'image/jpeg', buffer: readFileSync(`hosting-dist/images/${backgroundImage}`) });
+  await owner.waitForFunction(() => document.documentElement.dataset.adminBackground === 'true');
+  await owner.locator('.admin-header .admin-appearance summary').click();
+  const switchConversation = `switchtest${Date.now()}`;
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    const original = (await getDoc(doc(db, 'conversations', linkedConversation))).data();
+    await setDoc(doc(db, 'conversations', switchConversation), { ...original, customerUid: 'switch-customer', customerName: 'Switch test', customerContact: '', createdAt: new Date(), lastMessageAt: new Date(), lastMessage: 'Switch test message', lastMessageId: 'switchmessage0000001', lastSenderRole: 'customer', lastSenderUid: 'switch-customer', staffReadAt: new Date(), productReferences: [], assignedStaffUid: null });
+    await setDoc(doc(db, 'conversations', switchConversation, 'messages', 'switchmessage0000001'), { senderUid: 'switch-customer', senderRole: 'customer', message: 'Switch test message', createdAt: new Date() });
+  });
+  await owner.locator(`[data-select-chat="${switchConversation}"]`).waitFor();
+  await owner.evaluate(() => {
+    window.__switchSawEmpty = false;
+    window.__switchWasCovered = false;
+    const app = document.querySelector('#admin-app');
+    window.__switchObserver = new MutationObserver(() => {
+      if (app.querySelector('.admin-empty-thread')) window.__switchSawEmpty = true;
+      if (app.querySelector('.admin-thread.is-switching')) window.__switchWasCovered = true;
+    });
+    window.__switchObserver.observe(app, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+  });
+  await owner.locator(`[data-select-chat="${switchConversation}"]`).click();
+  await owner.locator('.admin-thread-head').getByText('Switch test').waitFor();
+  assert.deepEqual(await owner.evaluate(() => { window.__switchObserver.disconnect(); return [window.__switchSawEmpty, window.__switchWasCovered]; }), [false, true], 'Changing conversations keeps the message pane covered instead of flashing the bare wallpaper');
+  await owner.locator(`[data-select-chat="${linkedConversation}"]`).click();
+  await owner.locator('.admin-thread-head').getByText(guestReference).waitFor();
   await owner.locator('.admin-chat-menu summary').click();
   await owner.evaluate(() => {
     window.__blockedDuringDelete = false;

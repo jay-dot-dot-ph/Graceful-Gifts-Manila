@@ -468,13 +468,34 @@ function clearSelected() {
   state.selected = null; state.mobileThread = false; state.threadReady = false; state.threadSynced = false; state.messages = []; state.older = []; state.receipts = new Map(); state.first = null; state.replyDraft = ''; state.editing = null; state.activeMessageId = null; state.menuMessageId = null; state.unsending = null; state.attachment = null; state.blocked = false;
 }
 async function selectConversation(id) {
+  if (state.selected === id) {
+    state.mobileThread = true;
+    root.querySelector('.admin-layout')?.classList.add('thread-open');
+    requestAnimationFrame(() => {
+      const body = root.querySelector('#admin-thread-body');
+      if (body) body.scrollTop = body.scrollHeight;
+      scheduleStaffSeen();
+    });
+    const latest = state.rows.find((item) => item.id === id);
+    if (latest?.lastSenderRole === 'customer' && state.receipts.get(latest.lastMessageId)?.seenAt) {
+      firebase().then(({ db }) => advanceStaffRead(db, id, latest.lastMessageId)).catch(() => {});
+    }
+    return;
+  }
   const { db } = await firebase(); clearSelected(); state.selected = id; state.mobileThread = true;
+  const previousThread = root.querySelector('.admin-thread:has(#admin-thread-body)');
+  if (previousThread) {
+    previousThread.classList.add('is-switching');
+    previousThread.setAttribute('aria-busy', 'true');
+    root.querySelector('.admin-layout')?.classList.add('thread-open');
+    renderInboxOnly();
+  }
   const ref = doc(db, 'conversations', id);
   state.unsubSelected = onSnapshot(ref, (snapshot) => { if (state.selected !== id) return; if (!snapshot.exists()) { clearSelected(); render(); } else { state.rows = state.rows.map((item) => item.id === id ? keepNewerReadMarker({ id, ...snapshot.data({ serverTimestamps: 'estimate' }) }, item) : item); reconcileInboxReceipts(db); renderInboxOnly(); } }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
-  state.unsubBlock = onSnapshot(doc(db, 'blockedCustomers', id), (snapshot) => { if (state.selected !== id) return; if (state.blocked !== snapshot.exists()) { state.blocked = snapshot.exists(); renderChat(); } }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
-  state.unsubReceipts = subscribeReceipts(db, id, (receipts) => { state.receipts = new Map([...state.receipts, ...receipts]); renderThreadMessages(); const latest = state.rows.find((row) => row.id === id); if (latest?.lastSenderRole === 'customer' && receipts.get(latest.lastMessageId)?.seenAt) advanceStaffRead(db, id, latest.lastMessageId); }, (error) => { state.error = displayError(error); render(); });
-  state.unsubMessages = onSnapshot(query(collection(ref, 'messages'), orderBy('createdAt', 'desc'), limit(40)), { includeMetadataChanges: true }, (snapshot) => { state.threadSynced = !snapshot.metadata.fromCache; state.messages = snapshot.docs.map((item) => ({ id: item.id, ...item.data(), metadata: item.metadata })).reverse(); if (state.pendingReply && state.messages.some((item) => item.id === state.pendingReply.id)) state.pendingReply = null; state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; if (!state.threadReady) { state.threadReady = true; renderChat(); } else renderThreadMessages(); acknowledgeThread(db); }, (error) => { state.error = displayError(error); render(); });
-  render();
+  state.unsubBlock = onSnapshot(doc(db, 'blockedCustomers', id), (snapshot) => { if (state.selected !== id) return; if (state.blocked !== snapshot.exists()) { state.blocked = snapshot.exists(); if (state.threadReady) renderChat(); } }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
+  state.unsubReceipts = subscribeReceipts(db, id, (receipts) => { if (state.selected !== id) return; state.receipts = new Map([...state.receipts, ...receipts]); if (state.threadReady) renderThreadMessages(); const latest = state.rows.find((row) => row.id === id); if (latest?.lastSenderRole === 'customer' && receipts.get(latest.lastMessageId)?.seenAt) advanceStaffRead(db, id, latest.lastMessageId); }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
+  state.unsubMessages = onSnapshot(query(collection(ref, 'messages'), orderBy('createdAt', 'desc'), limit(40)), { includeMetadataChanges: true }, (snapshot) => { if (state.selected !== id) return; state.threadSynced = !snapshot.metadata.fromCache; state.messages = snapshot.docs.map((item) => ({ id: item.id, ...item.data(), metadata: item.metadata })).reverse(); if (state.pendingReply && state.messages.some((item) => item.id === state.pendingReply.id)) state.pendingReply = null; state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; if (!state.threadReady) { state.threadReady = true; renderChat(); } else renderThreadMessages(); acknowledgeThread(db); }, (error) => { if (state.selected !== id) return; state.error = displayError(error); render(); });
+  if (!previousThread) render();
 }
 async function loadOlder() { if (!state.first || !state.selected) return; try { const { db } = await firebase(); const selected = state.selected; const snapshot = await getDocs(query(collection(db, 'conversations', selected, 'messages'), orderBy('createdAt', 'desc'), startAfter(state.first), limit(40))); if (selected !== state.selected) return; const page = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })); state.older = [...page.reverse(), ...state.older]; state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; renderThreadMessages(); const receipts = await olderReceipts(db, selected, page); if (selected !== state.selected) return; state.receipts = new Map([...state.receipts, ...receipts]); renderThreadMessages(); } catch (error) { state.error = displayError(error); render(); } }
 async function saveAdminEdit(event) {
