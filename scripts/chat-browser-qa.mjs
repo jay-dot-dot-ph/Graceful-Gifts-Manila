@@ -208,7 +208,7 @@ try {
   await owner.locator('.admin-inbox-row').first().click();
   await owner.locator('#admin-message').fill('Draft preserved while previewing a watch');
   const openPages = ownerContext.pages().length;
-  await owner.locator('.admin-product').first().click();
+  await adminWatch.click();
   await owner.locator('.admin-product-dialog[open]').waitFor();
   await owner.locator('.admin-product-dialog').getByText('Dial color').waitFor();
   assert.equal(ownerContext.pages().length, openPages, 'Watch preview stays in the dashboard');
@@ -219,6 +219,7 @@ try {
   await owner.waitForFunction(() => getComputedStyle(document.querySelector('.admin-preview-image img')).transform === 'none');
   const threadScroll = await owner.locator('#admin-thread-body').evaluate((body) => body.scrollTop);
   await owner.keyboard.press('Escape');
+  await owner.waitForTimeout(200);
   await owner.waitForFunction(() => document.activeElement?.matches('.admin-product'));
   assert.equal(await owner.locator('#admin-thread-body').evaluate((body) => body.scrollTop), threadScroll, 'Preview keeps conversation scroll position');
   assert.equal(await owner.locator('#admin-message').inputValue(), 'Draft preserved while previewing a watch');
@@ -240,6 +241,12 @@ try {
   assert.equal(await owner.evaluate(() => { window.__readFlashObserver.disconnect(); return window.__readFlash; }), false, 'Opening an already-seen chat never flashes unread');
   await owner.setViewportSize({ width: 390, height: 844 });
   assert.ok(await owner.locator('.admin-thread').isVisible(), 'Mobile thread is visible after selection');
+  assert.equal(await owner.locator('.admin-refs').isVisible(), false, 'Narrow screens hide the separate watches panel');
+  await owner.locator('.admin-chat-menu summary').click();
+  assert.equal(await owner.locator('.admin-chat-menu summary').getAttribute('aria-label'), 'Conversation information');
+  assert.ok(await owner.locator('.admin-chat-info .admin-product').first().isVisible(), 'Discussed watches remain available in conversation information');
+  assert.ok(await owner.locator('.admin-chat-info [data-block-user]').isVisible(), 'Moderation remains available in conversation information');
+  await owner.locator('.admin-chat-menu summary').click();
   assert.ok((await adminWatch.locator('.chat-watch-photo').boundingBox()).height >= 180, 'Admin watch photo remains large on mobile');
   assert.ok(await owner.locator('#admin-message').evaluate((node) => parseFloat(getComputedStyle(node).fontSize) >= 16), 'Mobile staff composer avoids focus zoom');
   const mobileThread = await owner.locator('.admin-thread').boundingBox();

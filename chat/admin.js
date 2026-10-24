@@ -63,7 +63,7 @@ function openProductPreview(id, opener) {
   previewDialog.querySelector('.admin-preview-close').onclick = () => previewDialog.close();
   previewDialog.querySelector('img')?.addEventListener('error', (event) => { event.target.replaceWith(Object.assign(document.createElement('span'), { textContent: 'Image unavailable' })); });
   previewDialog.addEventListener('close', () => {
-    const focusTarget = opener.isConnected ? opener : [...root.querySelectorAll('[data-preview-product]')].find((button) => button.dataset.previewProduct === id);
+    const focusTarget = opener.isConnected && opener.getClientRects().length ? opener : [...root.querySelectorAll('[data-preview-product]')].find((button) => button.dataset.previewProduct === id && button.getClientRects().length);
     focusTarget?.focus();
   }, { once: true });
   previewDialog.showModal(); previewDialog.querySelector('.admin-preview-close').focus();
@@ -181,11 +181,12 @@ function renderModerationMenu(selected) {
   const controls = root.querySelector('.admin-controls');
   if (!selected || !controls) return;
   if (state.blocked) { const badge = document.createElement('span'); badge.className = 'admin-blocked-pill'; badge.textContent = 'Blocked'; controls.append(badge); }
-  if (!['owner', 'admin'].includes(state.profile?.role)) return;
+  const canModerate = ['owner', 'admin'].includes(state.profile?.role);
+  const watches = selected.productReferences || [];
   const menu = document.createElement('details'); menu.className = 'admin-chat-menu';
-  menu.innerHTML = `<summary aria-label="Conversation options" title="Conversation options">⋮</summary><div role="menu"><button type="button" role="menuitem" data-block-user ${state.moderationBusy ? 'disabled' : ''}>${state.blocked ? 'Unblock user' : 'Block user'}</button>${state.profile.role === 'owner' ? `<button type="button" role="menuitem" class="danger" data-delete-chat ${state.moderationBusy ? 'disabled' : ''}>Delete chat</button>` : ''}</div>`;
+  menu.innerHTML = `<summary aria-label="Conversation information" title="Conversation information"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01" stroke-linecap="round"/></svg></summary><div class="admin-chat-info"><strong>Conversation information</strong><section><h3>Watches discussed</h3>${watches.length ? watches.map(product).join('') : '<p>No watches linked to this chat.</p>'}</section>${canModerate ? `<div class="admin-chat-actions"><button type="button" data-block-user ${state.moderationBusy ? 'disabled' : ''}>${state.blocked ? 'Unblock user' : 'Block user'}</button>${state.profile.role === 'owner' ? `<button type="button" class="danger" data-delete-chat ${state.moderationBusy ? 'disabled' : ''}>Delete chat</button>` : ''}</div>` : ''}</div>`;
   controls.append(menu);
-  menu.querySelector('[data-block-user]').onclick = () => { menu.open = false; toggleBlock(); };
+  menu.querySelector('[data-block-user]')?.addEventListener('click', () => { menu.open = false; toggleBlock(); });
   menu.querySelector('[data-delete-chat]')?.addEventListener('click', () => { menu.open = false; deleteConversation(); });
   root.onpointerdown = (event) => { if (!event.target.closest('.admin-chat-menu')) menu.open = false; };
 }
