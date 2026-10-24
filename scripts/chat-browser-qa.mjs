@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { chromium } from 'playwright-core';
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, getDocs, collection } from 'firebase/firestore';
@@ -151,12 +151,21 @@ try {
   await owner.locator('.admin-header .admin-appearance summary').click();
   await owner.locator('[data-admin-palette="forest"]').click();
   assert.equal(await owner.evaluate(() => document.documentElement.dataset.adminPalette), 'forest', 'Staff can change the admin palette');
+  const backgroundImage = readdirSync('hosting-dist/images').find((name) => name.endsWith('.jpg'));
+  assert.ok(backgroundImage, 'The test catalog includes a background image');
+  await owner.locator('[data-background-file]').setInputFiles({ name: 'background.jpg', mimeType: 'image/jpeg', buffer: readFileSync(`hosting-dist/images/${backgroundImage}`) });
+  await owner.waitForFunction(() => document.documentElement.style.getPropertyValue('--admin-chat-background-image').includes('blob:'));
+  await owner.locator('[data-background-fit]').selectOption('contain');
   await owner.locator('[data-admin-color]').fill('#b64268');
   assert.equal(await owner.evaluate(() => document.documentElement.dataset.adminPalette), 'custom', 'Custom color activates the custom palette');
   assert.equal(await owner.evaluate(() => localStorage.getItem('ggm-admin-custom-color')), '#b64268', 'Custom color is saved');
   await owner.reload();
   assert.equal(await owner.evaluate(() => document.documentElement.style.getPropertyValue('--admin-custom-color')), '#b64268', 'Custom color survives reload');
+  await owner.waitForFunction(() => document.documentElement.style.getPropertyValue('--admin-chat-background-image').includes('blob:'));
+  assert.equal(await owner.evaluate(() => document.documentElement.style.getPropertyValue('--admin-chat-background-size')), 'contain', 'Chat background display choice survives reload');
   await owner.locator('.admin-header .admin-appearance summary').click();
+  await owner.locator('[data-background-remove]').click();
+  await owner.waitForFunction(() => !document.documentElement.style.getPropertyValue('--admin-chat-background-image'));
   await owner.locator('[data-admin-theme="light"]').click();
   await owner.locator('[data-admin-palette="navy"]').click();
   assert.equal(await owner.evaluate(() => document.documentElement.dataset.theme), 'light', 'Staff can return to light mode');
@@ -344,6 +353,7 @@ try {
   await staff.locator('.admin-message-edit button[type="submit"]').click();
   await customer.getByText('I can help with this watch today.').waitFor();
   await staff.locator('.admin-message.staff').filter({ hasText: 'I can help with this watch today.' }).getByText('Edited').waitFor();
+  if (await customer.locator('.ggm-chat-bubble.outgoing').filter({ hasText: 'Can staff see this new question?' }).locator('.chat-message-menu summary').isVisible()) await customer.locator('.ggm-chat-bubble.outgoing').filter({ hasText: 'Can staff see this new question?' }).locator('p').first().click();
   assert.equal(await customer.locator('.ggm-chat-bubble.outgoing').filter({ hasText: 'Can staff see this new question?' }).locator('.chat-message-menu summary').isVisible(), false);
   await customer.locator('.ggm-chat-bubble.outgoing').filter({ hasText: 'Can staff see this new question?' }).locator('p').first().click();
   assert.equal(await customer.locator('#ggm-chat-body .chat-message-menu[data-active="true"]').count(), 1);

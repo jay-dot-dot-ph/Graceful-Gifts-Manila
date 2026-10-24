@@ -5,6 +5,7 @@ import { guestIdentity } from './guest.js';
 import { displayMessage } from './message-text.js';
 import { enablePush, refreshPush, revokePush, pushEnabled, pushAvailable } from './push.js';
 import { mediaEnabled, checkFile, uploadMedia, deleteChatMedia, mediaMarkup, hydrateMedia } from './media.js';
+import { loadAdminBackground, saveAdminBackground, removeAdminBackground } from './admin-background.js';
 
 const root = document.getElementById('admin-app');
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -12,6 +13,22 @@ const stamp = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', 
 const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), inboxReceipts: new Map(), inboxReceiptListeners: new Map(), expandedTimes: new Set(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', noticeCentered: false, deletingId: null, loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, editing: null, activeMessageId: null, menuMessageId: null, unsending: null, attachment: null, uploadProgress: 0, mediaAvailable: false, blocked: false, moderationBusy: false, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubBlock: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
 const sound = createNotifier('staff', () => updateHeader());
 let noticeTimer, deepLinkHandled = false;
+let backgroundUrl = null;
+let hasBackground = false;
+let backgroundFit = 'cover';
+try { backgroundFit = localStorage.getItem('ggm-admin-background-fit') === 'contain' ? 'contain' : 'cover'; } catch {}
+document.documentElement.style.setProperty('--admin-chat-background-size', backgroundFit);
+function applyBackground(image) {
+  const oldUrl = backgroundUrl;
+  backgroundUrl = image ? URL.createObjectURL(image) : null;
+  hasBackground = !!backgroundUrl;
+  if (backgroundUrl) document.documentElement.style.setProperty('--admin-chat-background-image', `url("${backgroundUrl}")`);
+  else document.documentElement.style.removeProperty('--admin-chat-background-image');
+  if (oldUrl) URL.revokeObjectURL(oldUrl);
+  root.querySelectorAll('[data-background-preview]').forEach((preview) => { preview.hidden = !hasBackground; });
+  root.querySelectorAll('[data-background-remove]').forEach((button) => { button.hidden = !hasBackground; });
+}
+const backgroundReady = loadAdminBackground().then(applyBackground).catch(() => {});
 function cleanup() { if (previewDialog?.open) previewDialog.close(); for (const listener of state.inboxReceiptListeners.values()) listener.unsubscribe(); state.inboxReceiptListeners.clear(); state.inboxReceipts.clear(); for (const key of ['unsubInbox', 'unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubBlock', 'unsubProfile', 'unsubStaff', 'unsubActivity', 'unsubSettings']) { state[key]?.(); state[key] = null; } }
 function profileName(uid) { return state.staff.find((person) => person.id === uid)?.displayName || (uid ? 'Staff member' : 'Unassigned'); }
 const messageMenu = (id) => `<details class="chat-message-menu" data-active="${state.activeMessageId === id}" ${state.menuMessageId === id ? 'open' : ''}><summary data-menu-trigger="${esc(id)}" aria-label="Message options" title="Message options" aria-haspopup="menu">⋮</summary><div role="menu"><button type="button" role="menuitem" data-edit-message="${esc(id)}">Edit</button><button type="button" role="menuitem" data-unsend-message="${esc(id)}">Unsend</button></div></details>`;
@@ -121,7 +138,34 @@ function setAdminAppearance(kind, value) {
   root.querySelectorAll('[data-admin-palette]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.adminPalette === document.documentElement.dataset.adminPalette)));
   root.querySelectorAll('[data-custom-palette]').forEach((label) => label.dataset.active = String(document.documentElement.dataset.adminPalette === 'custom'));
 }
+function backgroundMarkup() {
+  return `<section class="admin-background-setting"><span class="admin-appearance-label">Chat background</span><div class="admin-background-preview" data-background-preview ${hasBackground ? '' : 'hidden'} aria-label="Current chat background"></div><label class="admin-background-upload">Upload picture<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" data-background-file class="visually-hidden"></label><button type="button" class="admin-background-remove" data-background-remove ${hasBackground ? '' : 'hidden'}>Remove picture</button><label class="admin-background-fit">Display<select data-background-fit><option value="cover" ${backgroundFit === 'cover' ? 'selected' : ''}>Fill chat area</option><option value="contain" ${backgroundFit === 'contain' ? 'selected' : ''}>Show whole picture</option></select></label><small>Saved only on this browser. JPG, PNG, WebP, GIF, AVIF or BMP, up to 10 MB.</small></section>`;
+}
+async function uploadBackground(input) {
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  if (!/^(image\/jpeg|image\/png|image\/webp|image\/gif|image\/avif|image\/bmp)$/.test(file.type) || file.size > 10 * 1024 * 1024 || !file.size) {
+    showNotice('Choose a JPG, PNG, WebP, GIF, AVIF or BMP image under 10 MB.');
+    return;
+  }
+  const checkUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = checkUrl;
+    await image.decode();
+    await backgroundReady;
+    await saveAdminBackground(file);
+    applyBackground(file);
+    showNotice('Chat background saved on this browser.');
+  } catch {
+    showNotice('Could not save this picture. Try a smaller image or check browser storage.');
+  } finally {
+    URL.revokeObjectURL(checkUrl);
+  }
+}
 function bindAppearance() {
+  if (state.profile) root.querySelectorAll('.admin-appearance-panel').forEach((panel) => panel.querySelector('small')?.insertAdjacentHTML('beforebegin', backgroundMarkup()));
   root.querySelectorAll('[data-admin-theme]').forEach((button) => button.onclick = () => setAdminAppearance('theme', button.dataset.adminTheme));
   root.querySelectorAll('[data-admin-palette]').forEach((button) => button.onclick = () => setAdminAppearance('palette', button.dataset.adminPalette));
   root.querySelectorAll('[data-admin-color]').forEach((input) => input.oninput = () => {
@@ -129,6 +173,16 @@ function bindAppearance() {
     document.documentElement.style.setProperty('--admin-custom-color', input.value);
     try { localStorage.setItem('ggm-admin-custom-color', input.value); } catch {}
     setAdminAppearance('palette', 'custom');
+  });
+  root.querySelectorAll('[data-background-file]').forEach((input) => input.onchange = () => { void uploadBackground(input); });
+  root.querySelectorAll('[data-background-remove]').forEach((button) => button.onclick = async () => {
+    try { await backgroundReady; await removeAdminBackground(); applyBackground(null); showNotice('Chat background removed.'); }
+    catch { showNotice('Could not remove the chat background.'); }
+  });
+  root.querySelectorAll('[data-background-fit]').forEach((select) => select.onchange = () => {
+    backgroundFit = select.value === 'contain' ? 'contain' : 'cover';
+    document.documentElement.style.setProperty('--admin-chat-background-size', backgroundFit);
+    try { localStorage.setItem('ggm-admin-background-fit', backgroundFit); } catch {}
   });
 }
 function header() {

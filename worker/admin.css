@@ -132,7 +132,7 @@ body { background: var(--admin-bg); color: var(--admin-ink); }
 .admin-appearance summary::-webkit-details-marker { display: none; }
 .admin-appearance summary:hover, .admin-appearance summary:focus-visible { border-color: var(--admin-accent); }
 .admin-appearance summary svg { width: 21px; height: 21px; }
-.admin-appearance-panel { position: absolute; top: calc(100% + 9px); right: 0; z-index: 80; width: min(270px, calc(100vw - 24px)); padding: 17px; border: 1px solid var(--admin-line); border-radius: 14px; background: var(--admin-surface); color: var(--admin-ink); box-shadow: 0 14px 38px #101d3938; }
+.admin-appearance-panel { position: absolute; top: calc(100% + 9px); right: 0; z-index: 80; width: min(270px, calc(100vw - 24px)); max-height: min(75dvh, 620px); overflow-y: auto; padding: 17px; border: 1px solid var(--admin-line); border-radius: 14px; background: var(--admin-surface); color: var(--admin-ink); box-shadow: 0 14px 38px #101d3938; }
 .admin-appearance-panel > strong { display: block; margin-bottom: 14px; font-size: .95rem; }
 .admin-appearance-label { display: block; margin: 13px 0 7px; color: var(--admin-muted); font-size: .68rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
 .admin-theme-options, .admin-palette-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
@@ -147,6 +147,14 @@ body { background: var(--admin-bg); color: var(--admin-ink); }
 .admin-custom-palette { display: flex; align-items: center; justify-content: space-between; min-height: 40px; margin-top: 9px; padding: 5px 9px; border: 1px solid var(--admin-line); border-radius: 9px; background: var(--admin-soft); color: var(--admin-ink); font-size: .76rem; font-weight: 700; cursor: pointer; }
 .admin-custom-palette[data-active="true"] { border-color: var(--admin-accent); background: var(--admin-selected); box-shadow: inset 0 0 0 1px var(--admin-accent); }
 .admin-custom-palette input { width: 45px; height: 30px; padding: 1px; border: 0; background: transparent; cursor: pointer; }
+.admin-background-setting { margin-top: 14px; padding-top: 2px; border-top: 1px solid var(--admin-line); }
+.admin-background-preview { height: 82px; margin: 8px 0; border: 1px solid var(--admin-line); border-radius: 9px; background-color: var(--admin-soft); background-image: var(--admin-chat-background-image); background-position: center; background-size: var(--admin-chat-background-size, cover); background-repeat: no-repeat; }
+.admin-background-preview[hidden], .admin-background-remove[hidden] { display: none; }
+.admin-background-upload { display: flex; align-items: center; justify-content: center; min-height: 38px; padding: 7px 9px; border: 1px solid var(--admin-line); border-radius: 9px; background: var(--admin-soft); color: var(--admin-ink); font-size: .76rem; font-weight: 700; cursor: pointer; }
+.admin-background-upload:hover, .admin-background-upload:focus-within { border-color: var(--admin-accent); }
+.admin-background-fit { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--admin-muted); font-size: .76rem; }
+.admin-background-fit select { min-width: 0; padding: 7px; border: 1px solid var(--admin-line); border-radius: 8px; background: var(--admin-surface); color: var(--admin-ink); font: inherit; }
+.admin-appearance-panel .admin-background-remove { width: 100%; margin-top: 7px; }
 .admin-appearance-panel small { display: block; margin-top: 13px; color: var(--admin-muted); font-size: .67rem; }
 .admin-login-appearance { position: absolute; top: 20px; right: 20px; z-index: 2; }
 .admin-sound, .admin-push {
@@ -374,6 +382,11 @@ body { background: var(--admin-bg); color: var(--admin-ink); }
   overflow-y: auto;
   padding: 18px 22px;
   overscroll-behavior: contain;
+  background-color: var(--admin-surface);
+  background-image: var(--admin-chat-background-image, none);
+  background-position: center;
+  background-size: var(--admin-chat-background-size, cover);
+  background-repeat: no-repeat;
 }
 .admin-message {
   max-width: min(68%, 540px);
