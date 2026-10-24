@@ -245,7 +245,7 @@ html[data-admin-background="true"] .admin-live-preview { background-image: var(-
   min-height: 0;
   display: grid;
   grid-template-columns: clamp(320px, 25vw, 420px) minmax(0, 1fr);
-  gap: 2px;
+  gap: 12px;
   margin: 15px 15px 15px;
   overflow: hidden;
   border-radius: 15px;
@@ -257,7 +257,8 @@ html[data-admin-background="true"] .admin-live-preview { background-image: var(-
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--admin-line);
+  overflow: hidden;
+  border-radius: 15px;
 }
 .admin-inbox-top {
   flex: none;
@@ -369,7 +370,7 @@ html[data-admin-background="true"] .admin-live-preview { background-image: var(-
 }
 .admin-empty { padding: 24px; color: var(--admin-muted); font-size: .86rem; }
 
-.admin-thread { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.admin-thread { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border-radius: 15px; }
 .admin-thread.is-switching::after {
   content: 'Loading conversation…';
   position: absolute;
