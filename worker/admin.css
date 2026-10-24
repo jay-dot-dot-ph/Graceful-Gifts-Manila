@@ -246,7 +246,7 @@ html[data-admin-background="true"] .admin-live-preview { background-image: var(-
   display: grid;
   grid-template-columns: clamp(320px, 25vw, 420px) minmax(0, 1fr);
   gap: 2px;
-  margin: 12px 20px 20px;
+  margin: 15px 15px 15px;
   overflow: hidden;
   border-radius: 15px;
   background: var(--admin-surface);
@@ -733,7 +733,7 @@ html[data-admin-background="true"] .admin-inbox-row.selected {
   .admin-header nav a:not(.admin-inbox-link) { font-size: .78rem; }
   .admin-header-actions { flex: 1 1 100%; justify-content: flex-end; gap: 8px; }
   .admin-header button { min-height: 38px; padding: 7px 11px; font-size: .75rem; }
-  .admin-layout { display: block; margin: 20px 0 0; border-radius: 20px 20px 0 0; }
+  .admin-layout { display: block; margin: 15px 0 0; border-radius: 15px 15px 0 0; }
   .admin-inbox { height: 100%; }
   .admin-thread { display: none; }
   .admin-layout.thread-open .admin-inbox { display: none; }
@@ -778,3 +778,8 @@ html[data-admin-background="true"] .admin-inbox-row.selected {
   .admin-preview-image img { height: 190px; }
   .admin-product-dialog { max-height: calc(100dvh - 24px); overflow: auto; }
 }
+
+
+
+
+
