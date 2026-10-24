@@ -102,3 +102,18 @@ export async function sendMessage(db, conversationId, uid, role, text, products 
   });
   return message.id;
 }
+
+export async function editMessage(db, conversationId, messageId, uid, text) {
+  const body = messageText(text);
+  if (!body) throw new Error('Message cannot be empty.');
+  if (!/^[A-Za-z0-9]{20}$/.test(messageId)) throw new Error('Invalid message ID.');
+  const conversation = doc(db, 'conversations', conversationId);
+  const message = doc(conversation, 'messages', messageId);
+  await runTransaction(db, async (tx) => {
+    const [thread, entry] = await Promise.all([tx.get(conversation), tx.get(message)]);
+    if (!thread.exists() || !entry.exists() || entry.data().senderUid !== uid) throw new Error('Message unavailable for editing.');
+    if (entry.data().message === body) return;
+    tx.update(message, { message: body, editedAt: serverTimestamp() });
+    if (thread.data().lastMessageId === messageId) tx.update(conversation, { lastMessage: body, updatedAt: serverTimestamp() });
+  });
+}

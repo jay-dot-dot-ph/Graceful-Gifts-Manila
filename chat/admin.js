@@ -1,4 +1,4 @@
-import { firebase, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, writeBatch, updateDoc, setDoc, deleteDoc, serverTimestamp, sendMessage, newMessageId, displayError } from './firebase.js';
+import { firebase, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, writeBatch, updateDoc, setDoc, deleteDoc, serverTimestamp, sendMessage, editMessage, newMessageId, displayError } from './firebase.js';
 import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } from './receipts.js';
 import { createNotifier, soundIcon } from './notify.js';
 import { guestIdentity } from './guest.js';
@@ -9,7 +9,7 @@ import { mediaEnabled, checkFile, uploadMedia, deleteChatMedia, mediaMarkup, hyd
 const root = document.getElementById('admin-app');
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const stamp = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Just now';
-const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), inboxReceipts: new Map(), inboxReceiptListeners: new Map(), expandedTimes: new Set(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', noticeCentered: false, deletingId: null, loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, attachment: null, uploadProgress: 0, mediaAvailable: false, blocked: false, moderationBusy: false, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubBlock: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
+const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), inboxReceipts: new Map(), inboxReceiptListeners: new Map(), expandedTimes: new Set(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', noticeCentered: false, deletingId: null, loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, editing: null, attachment: null, uploadProgress: 0, mediaAvailable: false, blocked: false, moderationBusy: false, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubBlock: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
 const sound = createNotifier('staff', () => updateHeader());
 let noticeTimer, deepLinkHandled = false;
 function cleanup() { if (previewDialog?.open) previewDialog.close(); for (const listener of state.inboxReceiptListeners.values()) listener.unsubscribe(); state.inboxReceiptListeners.clear(); state.inboxReceipts.clear(); for (const key of ['unsubInbox', 'unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubBlock', 'unsubProfile', 'unsubStaff', 'unsubActivity', 'unsubSettings']) { state[key]?.(); state[key] = null; } }
@@ -17,7 +17,9 @@ function profileName(uid) { return state.staff.find((person) => person.id === ui
 function product(watch) { if (!/^[A-Z0-9-]{2,20}$/.test(watch.id || '')) return ''; const image = /^\/images\/[A-Za-z0-9._-]+$/.test(watch.image || '') ? watch.image : ''; const detail = [watch.id, watch.brand, watch.price == null ? 'Price on request' : `₱${Number(watch.price).toLocaleString('en-PH')}`, watch.size || ''].filter(Boolean).join(' · '); return `<button type="button" class="admin-product" data-preview-product="${esc(watch.id)}" aria-label="Preview ${esc(watch.name || watch.id)}"><span class="chat-watch-photo">${image ? `<img src="${esc(image)}" alt="${esc(watch.name || watch.id)}" loading="lazy">` : '<span aria-hidden="true">G</span>'}</span><span><strong>${esc(watch.name || watch.id)}</strong><small>${esc(detail)}</small></span></button>`; }
 function adminMessage(message) {
   const showTime = state.expandedTimes.has(`${state.selected}/${message.id}`);
-  return `<div class="admin-message ${message.senderRole === 'customer' ? 'customer' : 'staff'}${message.productReferences?.length ? ' has-product' : ''}" data-message-id="${esc(message.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time"><p>${esc(displayMessage(message.message))}</p>${(message.productReferences || []).map(product).join('')}<small class="admin-message-time" ${showTime ? '' : 'hidden'}>${stamp(message.createdAt)}</small></div>`;
+  const editing = state.editing?.id === message.id;
+  const editable = message.senderUid === state.user?.uid && !message.pending && !state.blocked && /^[A-Za-z0-9]{20}$/.test(message.id);
+  return `<div class="admin-message ${message.senderRole === 'customer' ? 'customer' : 'staff'}${message.productReferences?.length ? ' has-product' : ''}" data-message-id="${esc(message.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time">${editing ? `<form class="admin-message-edit"><label class="visually-hidden" for="staff-edit-message">Edit message</label><textarea id="staff-edit-message" maxlength="2000" required ${state.editing.saving ? 'disabled' : ''}>${esc(state.editing.draft)}</textarea><div><button type="button" data-cancel-edit ${state.editing.saving ? 'disabled' : ''}>Cancel</button><button type="submit" ${state.editing.saving ? 'disabled' : ''}>Save</button></div></form>` : `<p>${esc(displayMessage(message.message))}</p>`}${(message.productReferences || []).map(product).join('')}${message.editedAt ? '<span class="chat-edited">Edited</span>' : ''}<small class="admin-message-time" ${showTime ? '' : 'hidden'}>${stamp(message.createdAt)}</small>${editable && !editing ? `<button type="button" class="chat-edit-action" data-edit-message="${esc(message.id)}" aria-label="Edit message">Edit</button>` : ''}</div>`;
 }
 function toggleAdminMessageTime(bubble) {
   const id = bubble?.dataset.messageId, label = bubble?.querySelector('.admin-message-time');
@@ -63,8 +65,8 @@ function openProductPreview(id, opener) {
   previewDialog.querySelector('.admin-preview-close').onclick = () => previewDialog.close();
   previewDialog.querySelector('img')?.addEventListener('error', (event) => { event.target.replaceWith(Object.assign(document.createElement('span'), { textContent: 'Image unavailable' })); });
   previewDialog.addEventListener('close', () => {
-    const focusTarget = opener.isConnected && opener.getClientRects().length ? opener : [...root.querySelectorAll('[data-preview-product]')].find((button) => button.dataset.previewProduct === id && button.getClientRects().length);
-    focusTarget?.focus();
+    const focusTarget = opener.isConnected && opener.closest('.admin-thread-body') ? opener : [...root.querySelectorAll('.admin-thread-body [data-preview-product], .admin-refs [data-preview-product], .admin-chat-menu[open] [data-preview-product]')].find((button) => button.dataset.previewProduct === id && button.getClientRects().length);
+    requestAnimationFrame(() => focusTarget?.isConnected && focusTarget.focus({ preventScroll: true }));
   }, { once: true });
   previewDialog.showModal(); previewDialog.querySelector('.admin-preview-close').focus();
   catalogPromise ||= fetch('/api/catalog.json').then((response) => response.ok ? response.json() : null).catch(() => null);
@@ -80,7 +82,14 @@ function openProductPreview(id, opener) {
   });
 }
 root.addEventListener('click', (event) => { const opener = event.target.closest?.('[data-preview-product]'); if (opener) openProductPreview(opener.dataset.previewProduct, opener); });
-root.addEventListener('click', (event) => { if (!event.target.closest?.('button, a')) toggleAdminMessageTime(event.target.closest?.('#admin-thread-body .admin-message')); });
+root.addEventListener('click', (event) => { if (!event.target.closest?.('button, a, textarea, form')) toggleAdminMessageTime(event.target.closest?.('#admin-thread-body .admin-message')); });
+root.addEventListener('click', (event) => {
+  const start = event.target.closest?.('[data-edit-message]');
+  if (start) { const item = [...state.older, ...state.messages].find((message) => message.id === start.dataset.editMessage); if (item?.senderUid === state.user?.uid && !state.blocked) { state.editing = { id: item.id, draft: item.message, saving: false }; renderThreadMessages(); root.querySelector('.admin-message-edit textarea')?.focus(); } }
+  if (event.target.closest?.('[data-cancel-edit]') && !state.editing?.saving) { state.editing = null; renderThreadMessages(); }
+});
+root.addEventListener('input', (event) => { if (event.target.matches?.('.admin-message-edit textarea') && state.editing) state.editing.draft = event.target.value; });
+root.addEventListener('submit', saveAdminEdit);
 root.addEventListener('keydown', (event) => { if (event.target.matches?.('#admin-thread-body .admin-message') && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleAdminMessageTime(event.target); } });
 root.addEventListener('error', (event) => { if (event.target.matches?.('.admin-product img')) event.target.replaceWith(Object.assign(document.createElement('span'), { textContent: 'G' })); }, true);
 const adminPalettes = [['navy', 'Navy'], ['gold', 'Gold'], ['forest', 'Forest'], ['plum', 'Plum']];
@@ -390,7 +399,7 @@ async function loadMore() {
 }
 function clearSelected() {
   for (const key of ['unsubSelected', 'unsubMessages', 'unsubReceipts', 'unsubBlock']) { state[key]?.(); state[key] = null; }
-  state.selected = null; state.mobileThread = false; state.threadReady = false; state.threadSynced = false; state.messages = []; state.older = []; state.receipts = new Map(); state.first = null; state.replyDraft = ''; state.attachment = null; state.blocked = false;
+  state.selected = null; state.mobileThread = false; state.threadReady = false; state.threadSynced = false; state.messages = []; state.older = []; state.receipts = new Map(); state.first = null; state.replyDraft = ''; state.editing = null; state.attachment = null; state.blocked = false;
 }
 async function selectConversation(id) {
   const { db } = await firebase(); clearSelected(); state.selected = id; state.mobileThread = true;
@@ -402,6 +411,17 @@ async function selectConversation(id) {
   render();
 }
 async function loadOlder() { if (!state.first || !state.selected) return; try { const { db } = await firebase(); const selected = state.selected; const snapshot = await getDocs(query(collection(db, 'conversations', selected, 'messages'), orderBy('createdAt', 'desc'), startAfter(state.first), limit(40))); if (selected !== state.selected) return; const page = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })); state.older = [...page.reverse(), ...state.older]; state.first = snapshot.docs.length === 40 ? snapshot.docs.at(-1) : null; renderThreadMessages(); const receipts = await olderReceipts(db, selected, page); if (selected !== state.selected) return; state.receipts = new Map([...state.receipts, ...receipts]); renderThreadMessages(); } catch (error) { state.error = displayError(error); render(); } }
+async function saveAdminEdit(event) {
+  if (!event.target.matches('.admin-message-edit')) return;
+  event.preventDefault();
+  const editing = state.editing, conversationId = state.selected, text = editing?.draft.trim();
+  if (!editing || editing.saving || !text || !conversationId || state.blocked) return;
+  editing.saving = true; renderThreadMessages();
+  try { const { db } = await firebase(); await editMessage(db, conversationId, editing.id, state.user.uid, text); if (state.editing === editing) state.editing = null; state.error = ''; }
+  catch (error) { state.error = displayError(error); editing.saving = false; }
+  renderThreadMessages();
+  if (state.error) showNotice(state.error, true);
+}
 async function retryReply() {
   const pending = state.pendingReply; if (!pending || state.replySending || state.blocked) return;
   state.replySending = true; pending.pending = true; pending.failed = false; state.error = ''; renderThreadMessages();

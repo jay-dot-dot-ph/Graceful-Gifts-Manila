@@ -335,6 +335,15 @@ try {
   await staff.locator('#admin-reply button').click();
   try { await customer.getByText('I can help with this watch.').waitFor({ timeout: 5000 }); }
   catch (error) { console.error('Staff reply diagnosis:', await staff.locator('.admin-thread').innerText(), await staff.locator('.admin-toast').allInnerTexts()); throw error; }
+  await staff.locator('.admin-message.staff').filter({ hasText: 'I can help with this watch.' }).locator('[data-edit-message]').click();
+  await staff.locator('.admin-message-edit textarea').fill('I can help with this watch today.');
+  await staff.locator('.admin-message-edit button[type="submit"]').click();
+  await customer.getByText('I can help with this watch today.').waitFor();
+  await staff.locator('.admin-message.staff').filter({ hasText: 'I can help with this watch today.' }).getByText('Edited').waitFor();
+  await customer.locator('.ggm-chat-bubble.outgoing').filter({ hasText: 'Can staff see this new question?' }).locator('[data-edit-message]').click();
+  await customer.locator('.ggm-chat-edit textarea').fill('Are both favorite watches available today?');
+  await customer.locator('.ggm-chat-edit button[type="submit"]').click();
+  await staff.getByText('Are both favorite watches available today?').waitFor();
   await owner.goto(base + '/admin/staff');
   await owner.locator(`[data-toggle-staff="${staffUid}"]`).click();
   await owner.waitForFunction((uid) => document.querySelector(`[data-toggle-staff="${uid}"]`)?.textContent === 'Enable', staffUid);

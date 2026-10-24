@@ -126,7 +126,9 @@ Use Firebase Console **Firestore → Usage**, **Authentication → Usage/Users**
 
 ## Chat moderation (October 22, 2026)
 
-The chat header no longer has a status selector, and the inbox no longer has a status filter. Owner and admin accounts see a three-dot conversation menu. Both roles can block and unblock the selected anonymous customer; only the owner can permanently delete a chat. Staff cannot use either action. Firestore rules enforce these limits and log block, unblock, and delete actions in owner-visible `auditLogs`.
+The chat header no longer has a status selector, and the inbox no longer has a status filter. Owner and admin accounts see a conversation information menu. Both roles can block and unblock the selected anonymous customer; only the owner can permanently delete a chat. Staff cannot use either action. Firestore rules enforce these limits and log block, unblock, and delete actions in owner-visible `auditLogs`.
+
+Customers and staff can edit the text of messages they sent using the Edit button on the message. Save updates the message for both participants and shows an Edited label; Cancel keeps the original. The message's original send time, watch references, media, sender, and receipts remain unchanged. Editing the newest message also updates its inbox preview. Firestore rules restrict edits to the original sender and require the matching conversation preview update. Deploy `firestore.rules` before the updated Hosting assets. No data migration or paid service is required; each edit adds a Firestore write, and editing the newest message adds a second write for the conversation preview.
 
 Blocking records the customer's anonymous Firebase Auth UID in `blockedCustomers/{uid}`. The rules then reject reads, sends, and receipt writes from that UID; staff replies to that blocked chat are also disabled. Unblocking restores access. A visitor who clears site data or uses another browser gets a new anonymous UID, so this is a session-identity block, not a permanent person or IP ban. Stronger abuse controls require a trusted backend or App Check.
 

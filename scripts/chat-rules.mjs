@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, getDoc, collection, query, where, orderBy, limit, getDocs, runTransaction, writeBatch, updateDoc, serverTimestamp, setDoc, deleteDoc } from 'firebase/firestore';
-import { sendMessage } from '../chat/firebase.js';
+import { sendMessage, editMessage } from '../chat/firebase.js';
 import { acknowledge, receiptRef, olderReceipts } from '../chat/receipts.js';
 
 const projectId = 'demo-graceful-gifts-manila';
@@ -21,6 +21,12 @@ try {
   assert.equal((await assertSucceeds(getDoc(doc(customer, 'conversations', 'customer-uid')))).data().status, 'new');
   assert.equal((await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().customerName, 'Test customer');
   const firstMessageId = (await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessageId;
+  await assertFails(updateDoc(doc(customer, 'conversations', 'customer-uid', 'messages', firstMessageId), { message: 'Changed without summary', editedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(customer, 'conversations', 'customer-uid', 'messages', firstMessageId), { senderRole: 'owner', message: 'Tampered', editedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(owner, 'conversations', 'customer-uid', 'messages', firstMessageId), { message: 'Not my message', editedAt: serverTimestamp() }));
+  await assertSucceeds(editMessage(customer, 'customer-uid', firstMessageId, 'customer-uid', 'Is this Royal Oak available?'));
+  assert.equal((await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessage, 'Is this Royal Oak available?');
+  assert.ok((await getDoc(doc(customer, 'conversations', 'customer-uid', 'messages', firstMessageId))).data().editedAt);
   const first = { id: firstMessageId, senderUid: 'customer-uid', senderRole: 'customer' };
   await assertFails(updateDoc(doc(owner, 'conversations', 'customer-uid'), { staffReadAt: serverTimestamp() }));
   await assertFails(setDoc(receiptRef(customer, 'customer-uid', firstMessageId), { recipientUid: 'customer-uid', deliveredAt: serverTimestamp(), seenAt: serverTimestamp(), seenByUid: 'customer-uid' }));
@@ -63,6 +69,11 @@ try {
   await assertSucceeds(sendMessage(staff, 'customer-uid', 'staff-uid', 'staff', 'It is available.'));
   assert.equal((await assertSucceeds(getDoc(doc(customer, 'conversations', 'customer-uid')))).data().lastMessage, 'It is available.');
   const replyId = (await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessageId;
+  await assertSucceeds(editMessage(customer, 'customer-uid', firstMessageId, 'customer-uid', 'Is the Royal Oak available today?'));
+  assert.equal((await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessage, 'It is available.', 'Editing an older message preserves the inbox preview');
+  await assertFails(updateDoc(doc(customer, 'conversations', 'customer-uid', 'messages', replyId), { message: 'Not my reply', editedAt: serverTimestamp() }));
+  await assertSucceeds(editMessage(staff, 'customer-uid', replyId, 'staff-uid', 'Yes, it is available.'));
+  assert.equal((await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessage, 'Yes, it is available.');
   const staffReply = { id: replyId, senderUid: 'staff-uid', senderRole: 'staff' };
   await assertFails(updateDoc(doc(customer, 'conversations', 'customer-uid'), { customerReadAt: serverTimestamp() }));
   await assertFails(setDoc(receiptRef(staff, 'customer-uid', replyId), { recipientUid: 'staff-uid', deliveredAt: serverTimestamp(), seenAt: serverTimestamp(), seenByUid: 'staff-uid' }));
@@ -76,6 +87,7 @@ try {
   await assertSucceeds(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Can I ask about this watch again?'));
   const finalCustomerMessageId = (await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessageId;
   await assertSucceeds(updateDoc(doc(owner, 'staff', 'staff-uid'), { active: false }));
+  await assertFails(editMessage(staff, 'customer-uid', replyId, 'staff-uid', 'Disabled staff edit'));
   await assertFails(sendMessage(staff, 'customer-uid', 'staff-uid', 'staff', 'I should be disabled.'));
   await assertFails(setDoc(doc(staff, 'staff', 'staff-uid', 'pushTokens', 'c'.repeat(40)), { token: 't'.repeat(80), createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
   await assertFails(acknowledge(staff, 'customer-uid', { id: finalCustomerMessageId, senderUid: 'customer-uid', senderRole: 'customer' }, 'staff-uid', true));

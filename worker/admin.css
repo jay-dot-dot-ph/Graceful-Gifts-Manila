@@ -393,6 +393,14 @@ body { background: var(--admin-bg); color: var(--admin-ink); }
 .admin-message small { color: var(--admin-muted); font-size: .68rem; }
 .admin-message p { margin: 7px 0; line-height: 1.45; white-space: pre-wrap; font-size: .88rem; }
 .admin-message .chat-receipt { display: block; text-align: right; color: var(--admin-muted); font-size: .69rem; }
+.admin-message .chat-edit-action { display: block; margin: 5px 0 0 auto; padding: 4px 0; border: 0; background: transparent; color: var(--admin-ink); font: 700 .7rem var(--sans); text-decoration: underline; cursor: pointer; }
+.admin-message .chat-edited { display: block; color: var(--admin-muted); font-size: .68rem; text-align: right; }
+.admin-message-edit { width: min(320px, 62vw); }
+.admin-message-edit textarea { box-sizing: border-box; width: 100%; min-height: 76px; padding: 9px; border: 1px solid var(--admin-line); border-radius: 8px; background: var(--admin-surface); color: var(--admin-ink); font: inherit; font-size: 16px; resize: vertical; }
+.admin-message-edit > div { display: flex; justify-content: flex-end; gap: 7px; margin-top: 7px; }
+.admin-message-edit button { min-height: 34px; padding: 6px 10px; border: 1px solid var(--admin-line); border-radius: 7px; background: var(--admin-surface); color: var(--admin-ink); font: 700 .75rem var(--sans); cursor: pointer; }
+.admin-message-edit button[type="submit"] { background: var(--admin-button); color: #fff; }
+.admin-message-edit button:disabled { opacity: .55; cursor: wait; }
 .admin-message .chat-seen-avatar { justify-content: flex-end; }
 .admin-message { cursor: pointer; }
 .admin-message:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 2px; }

@@ -33,3 +33,6 @@
 .ggm-chat-head .chat-sound{width:40px;height:40px;min-width:40px;min-height:40px;padding:0;display:grid;place-items:center}
 .ggm-chat-head .chat-sound svg{width:19px;height:19px}
 .ggm-chat-form .chat-attach.is-disabled{pointer-events:auto;cursor:not-allowed}
+.ggm-chat-bubble .chat-edit-action{display:block;margin:4px 0 0 auto;padding:4px 0;border:0;background:transparent;color:inherit;font:600 .7rem var(--sans);text-decoration:underline;cursor:pointer}
+.ggm-chat-bubble .chat-edited{display:block;color:var(--muted);font-size:.65rem;text-align:right}
+.ggm-chat-edit{width:min(275px,68vw)}.ggm-chat-edit textarea{box-sizing:border-box;width:100%;min-height:74px;padding:8px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink);font:inherit;font-size:16px;resize:vertical}.ggm-chat-edit>div{display:flex;justify-content:flex-end;gap:7px;margin-top:7px}.ggm-chat-edit button{min-height:34px;padding:6px 10px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink);font:600 .75rem var(--sans);cursor:pointer}.ggm-chat-edit button[type=submit]{background:var(--dark);color:#fff}.ggm-chat-edit button:disabled{opacity:.55;cursor:wait}

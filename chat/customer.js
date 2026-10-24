@@ -1,10 +1,10 @@
-import { customerSession, firebase, doc, collection, query, orderBy, limit, startAfter, getDocs, onSnapshot, updateDoc, serverTimestamp, sendMessage, newMessageId, displayError, safeProduct } from './firebase.js';
+import { customerSession, firebase, doc, collection, query, orderBy, limit, startAfter, getDocs, onSnapshot, updateDoc, serverTimestamp, sendMessage, editMessage, newMessageId, displayError, safeProduct } from './firebase.js';
 import { acknowledge, subscribeReceipts, olderReceipts, status, bubbleVisible } from './receipts.js';
 import { createNotifier, soundIcon } from './notify.js';
 import { mediaEnabled, checkFile, uploadMedia, mediaMarkup, hydrateMedia } from './media.js';
 import { displayMessage } from './message-text.js';
 
-const state = { open: false, scrollToLatest: false, products: [], messages: [], older: [], receipts: new Map(), expandedTimes: new Set(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', generatedDraft: '', focusComposer: false, name: '', contact: '', error: '', conversation: null, pending: null, sending: false, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
+const state = { open: false, scrollToLatest: false, products: [], messages: [], older: [], receipts: new Map(), expandedTimes: new Set(), avatarUrl: '', first: null, loading: false, synced: false, messagesReady: false, draft: '', generatedDraft: '', focusComposer: false, name: '', contact: '', error: '', conversation: null, pending: null, sending: false, editing: null, attachment: null, uploadProgress: 0, mediaAvailable: false, unsubConversation: null, unsubMessages: null, unsubReceipts: null, unsubSettings: null, knownIncoming: new Set(), readInFlight: false };
 const sound = createNotifier('customer', () => renderChrome());
 let connectionPromise, db, uid;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -65,7 +65,14 @@ function ensureRoot() {
   root.querySelector('[name=name]').oninput = (event) => { state.name = event.target.value; };
   root.querySelector('[name=contact]').oninput = (event) => { state.contact = event.target.value; };
   root.querySelector('#ggm-chat-body').onscroll = scheduleSeen;
-  root.querySelector('#ggm-chat-body').onclick = (event) => { if (!event.target.closest('a, button')) toggleMessageTime(event.target.closest('.ggm-chat-bubble')); };
+  root.querySelector('#ggm-chat-body').onclick = (event) => { if (!event.target.closest('a, button, textarea, form')) toggleMessageTime(event.target.closest('.ggm-chat-bubble')); };
+  root.querySelector('#ggm-chat-body').addEventListener('click', (event) => {
+    const start = event.target.closest('[data-edit-message]');
+    if (start) { const item = allMessages().find((message) => message.id === start.dataset.editMessage); if (item?.senderUid === uid && !item.pending) { state.editing = { id: item.id, draft: item.message, saving: false }; renderMessages(); ensureRoot().querySelector('.ggm-chat-edit textarea')?.focus(); } }
+    if (event.target.closest('[data-cancel-edit]') && !state.editing?.saving) { state.editing = null; renderMessages(); }
+  });
+  root.querySelector('#ggm-chat-body').addEventListener('input', (event) => { if (event.target.matches('.ggm-chat-edit textarea') && state.editing) state.editing.draft = event.target.value; });
+  root.querySelector('#ggm-chat-body').addEventListener('submit', saveEdit);
   root.querySelector('#ggm-chat-body').onkeydown = (event) => { if (event.target.matches('.ggm-chat-bubble') && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleMessageTime(event.target); } };
   return root;
 }
@@ -99,7 +106,9 @@ function renderMessages() {
     const outgoing = item.senderUid === uid || item.senderRole === 'customer' && !uid;
     const label = status(item, state.receipts.get(item.id));
     const showTime = state.expandedTimes.has(item.id);
-    return `<div class="ggm-chat-bubble ${outgoing ? 'outgoing' : 'incoming'} ${(item.productReferences || []).length ? 'has-product' : ''}" data-message-id="${esc(item.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time"><p>${esc(displayMessage(item.message))}</p>${item.media ? mediaMarkup(item.media, uid, item.id) : ''}${(item.productReferences || []).map(productCard).join('')}<small class="chat-message-time" ${showTime ? '' : 'hidden'}>${time(item.createdAt)}</small>${outgoing ? `${label === 'Seen' ? '' : `<span class="chat-receipt" aria-label="Message status: ${label}">${label}${item.failed ? ' <button type="button" data-retry>Retry</button>' : ''}</span>`}${item.id === latestSeen ? `<span class="chat-seen-avatar" aria-label="Seen by store"><span aria-hidden="true">${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : 'G'}</span>Seen by store</span>` : ''}` : ''}</div>`;
+    const editing = state.editing?.id === item.id;
+    const editable = outgoing && item.senderUid === uid && !item.pending && /^[A-Za-z0-9]{20}$/.test(item.id);
+    return `<div class="ggm-chat-bubble ${outgoing ? 'outgoing' : 'incoming'} ${(item.productReferences || []).length ? 'has-product' : ''}" data-message-id="${esc(item.id)}" tabindex="0" aria-expanded="${showTime}" title="Click to ${showTime ? 'hide' : 'show'} date and time">${editing ? `<form class="ggm-chat-edit"><label class="visually-hidden" for="customer-edit-message">Edit message</label><textarea id="customer-edit-message" maxlength="2000" required ${state.editing.saving ? 'disabled' : ''}>${esc(state.editing.draft)}</textarea><div><button type="button" data-cancel-edit ${state.editing.saving ? 'disabled' : ''}>Cancel</button><button type="submit" ${state.editing.saving ? 'disabled' : ''}>Save</button></div></form>` : `<p>${esc(displayMessage(item.message))}</p>`}${item.media ? mediaMarkup(item.media, uid, item.id) : ''}${(item.productReferences || []).map(productCard).join('')}${item.editedAt ? '<span class="chat-edited">Edited</span>' : ''}<small class="chat-message-time" ${showTime ? '' : 'hidden'}>${time(item.createdAt)}</small>${editable && !editing ? `<button type="button" class="chat-edit-action" data-edit-message="${esc(item.id)}" aria-label="Edit message">Edit</button>` : ''}${outgoing ? `${label === 'Seen' ? '' : `<span class="chat-receipt" aria-label="Message status: ${label}">${label}${item.failed ? ' <button type="button" data-retry>Retry</button>' : ''}</span>`}${item.id === latestSeen ? `<span class="chat-seen-avatar" aria-label="Seen by store"><span aria-hidden="true">${state.avatarUrl ? `<img src="${esc(state.avatarUrl)}" alt="">` : 'G'}</span>Seen by store</span>` : ''}` : ''}</div>`;
   }).join('')}`;
   body.querySelector('[data-chat-more]')?.addEventListener('click', loadOlder);
   body.querySelector('[data-retry]')?.addEventListener('click', sendPending);
@@ -109,6 +118,16 @@ function renderMessages() {
   if (state.open) requestAnimationFrame(() => { body.scrollTop = state.scrollToLatest || nearBottom ? body.scrollHeight : top + body.scrollHeight - before; if (!state.loading) state.scrollToLatest = false; scheduleSeen(); });
 }
 function render() { renderChrome(); renderMessages(); }
+async function saveEdit(event) {
+  if (!event.target.matches('.ggm-chat-edit')) return;
+  event.preventDefault();
+  const editing = state.editing, text = editing?.draft.trim();
+  if (!editing || editing.saving || !text) return;
+  editing.saving = true; renderMessages();
+  try { await editMessage(db, uid, editing.id, uid, text); if (state.editing === editing) state.editing = null; state.error = ''; }
+  catch (error) { state.error = displayError(error); editing.saving = false; }
+  render();
+}
 function showNotice() {
   let notice = document.getElementById('ggm-chat-notice');
   if (!notice) { notice = document.createElement('div'); notice.id = 'ggm-chat-notice'; notice.setAttribute('role', 'status'); document.body.append(notice); }
