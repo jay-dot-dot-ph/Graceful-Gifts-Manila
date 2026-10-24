@@ -34,7 +34,7 @@
 .ggm-chat-head .chat-sound svg{width:19px;height:19px}
 .ggm-chat-form .chat-attach.is-disabled{pointer-events:auto;cursor:not-allowed}
 .ggm-chat-bubble{position:relative}
-.ggm-chat-bubble .chat-message-menu{position:absolute;left:-34px;top:50%;transform:translateY(-50%);display:block;width:28px}
+.ggm-chat-bubble .chat-message-menu{position:absolute;left:-34px;bottom:0;display:block;width:28px}
 .ggm-chat-bubble .chat-message-menu summary{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;list-style:none;cursor:pointer;font-size:1.35rem;line-height:1;color:var(--ink);background:var(--paper);border:1px solid var(--line)}
 .ggm-chat-bubble .chat-message-menu summary::-webkit-details-marker{display:none}
 .ggm-chat-bubble .chat-message-menu summary:hover,.ggm-chat-bubble .chat-message-menu summary:focus-visible{background:#7773;outline:2px solid transparent}

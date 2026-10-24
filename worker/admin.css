@@ -394,7 +394,7 @@ body { background: var(--admin-bg); color: var(--admin-ink); }
 .admin-message p { margin: 7px 0; line-height: 1.45; white-space: pre-wrap; font-size: .88rem; }
 .admin-message .chat-receipt { display: block; text-align: right; color: var(--admin-muted); font-size: .69rem; }
 .admin-message { position: relative; }
-.admin-message .chat-message-menu { position: absolute; left: -34px; top: 50%; transform: translateY(-50%); display: block; width: 28px; }
+.admin-message .chat-message-menu { position: absolute; left: -34px; bottom: 0; display: block; width: 28px; }
 .admin-message .chat-message-menu summary { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; list-style: none; cursor: pointer; font-size: 1.35rem; line-height: 1; color: var(--admin-ink); background: var(--admin-surface); border: 1px solid var(--admin-line); }
 .admin-message .chat-message-menu summary::-webkit-details-marker { display: none; }
 .admin-message .chat-message-menu summary:hover, .admin-message .chat-message-menu summary:focus-visible { background: var(--admin-line); outline: 2px solid transparent; }
