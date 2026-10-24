@@ -246,7 +246,7 @@ html[data-admin-background="true"] .admin-live-preview { background-image: var(-
   display: grid;
   grid-template-columns: clamp(320px, 25vw, 420px) minmax(0, 1fr);
   gap: 2px;
-  margin: 0 12px 12px;
+  margin: 24px 12px 12px;
   overflow: hidden;
   border-radius: 15px;
   background: var(--admin-surface);
@@ -733,7 +733,7 @@ html[data-admin-background="true"] .admin-inbox-row.selected {
   .admin-header nav a:not(.admin-inbox-link) { font-size: .78rem; }
   .admin-header-actions { flex: 1 1 100%; justify-content: flex-end; gap: 8px; }
   .admin-header button { min-height: 38px; padding: 7px 11px; font-size: .75rem; }
-  .admin-layout { display: block; margin: 0; border-radius: 0; }
+  .admin-layout { display: block; margin: 12px 0 0; border-radius: 12px 12px 0 0; }
   .admin-inbox { height: 100%; }
   .admin-thread { display: none; }
   .admin-layout.thread-open .admin-inbox { display: none; }
