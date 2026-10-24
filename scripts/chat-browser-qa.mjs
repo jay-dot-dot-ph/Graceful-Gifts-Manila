@@ -147,6 +147,7 @@ try {
   await owner.locator('[data-admin-palette="gold"]').click();
   assert.equal(await owner.evaluate(() => document.documentElement.dataset.theme), 'dark', 'Sign-in appearance can switch to dark mode');
   await login(owner, ownerEmail);
+  await owner.locator('.admin-inbox-row').first().waitFor();
   assert.equal(await owner.evaluate(() => document.documentElement.dataset.adminPalette), 'gold', 'Palette persists after sign-in');
   await owner.locator('.admin-header .admin-appearance summary').click();
   await owner.locator('[data-admin-palette="forest"]').click();
@@ -210,8 +211,7 @@ try {
     const box = frame.getBoundingClientRect(), imageBox = image.getBoundingClientRect();
     return imageBox.width <= box.width + 1 && imageBox.height <= box.height + 1;
   });
-  assert.equal(await owner.locator('.admin-refs').count(), 0, 'The redundant watches sidebar is absent');
-  assert.ok(await owner.evaluate(() => Math.abs(document.querySelector('.admin-thread-body').getBoundingClientRect().width - document.querySelector('.admin-thread').getBoundingClientRect().width) < 2), 'Messages use the full thread width');
+  assert.ok((await owner.locator('.admin-refs .chat-watch-photo').first().boundingBox()).height <= 60, 'Sidebar watch reference stays compact');
   const adminBubble = owner.locator('.admin-message.customer.has-product').first();
   const adminTime = adminBubble.locator('.admin-message-time');
   assert.equal(await adminBubble.locator(':scope > small:not(.admin-message-time)').count(), 0, 'Admin message has no Customer or staff author label');
@@ -271,6 +271,7 @@ try {
   assert.equal(await owner.evaluate(() => { window.__readFlashObserver.disconnect(); return window.__readFlash; }), false, 'Opening an already-seen chat never flashes unread');
   await owner.setViewportSize({ width: 390, height: 844 });
   assert.ok(await owner.locator('.admin-thread').isVisible(), 'Mobile thread is visible after selection');
+  assert.equal(await owner.locator('.admin-refs').isVisible(), false, 'Narrow screens hide the separate watches panel');
   await owner.locator('.admin-chat-menu summary').click();
   assert.equal(await owner.locator('.admin-chat-menu summary').getAttribute('aria-label'), 'Conversation information');
   assert.ok(await owner.locator('.admin-chat-info .admin-product').first().isVisible(), 'Discussed watches remain available in conversation information');
@@ -417,6 +418,14 @@ try {
   await owner.locator('[data-background-file]').setInputFiles({ name: 'background.jpg', mimeType: 'image/jpeg', buffer: readFileSync(`hosting-dist/images/${backgroundImage}`) });
   await owner.waitForFunction(() => document.documentElement.dataset.adminBackground === 'true');
   await owner.locator('.admin-header .admin-appearance summary').click();
+  const watchesPanelAlpha = await owner.locator('.admin-refs').evaluate((panel) => {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    context.fillStyle = getComputedStyle(panel).backgroundColor;
+    context.fillRect(0, 0, 1, 1);
+    return context.getImageData(0, 0, 1, 1).data[3];
+  });
+  assert.ok(watchesPanelAlpha > 0 && watchesPanelAlpha < 255, 'Watches discussed panel stays visible and translucent over the wallpaper');
   const switchConversation = `switchtest${Date.now()}`;
   await environment.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
