@@ -452,36 +452,6 @@ html[data-admin-background="true"] body::before {
 .admin-message:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 2px; }
 .admin-message .admin-message-time { display: block; margin-top: 7px; text-align: right; }
 .admin-message .admin-message-time[hidden] { display: none !important; }
-.admin-refs {
-  flex: none;
-  max-height: 152px;
-  overflow-y: auto;
-  padding: 8px 22px;
-  border-top: 1px solid var(--admin-line);
-}
-.admin-refs > strong { color: var(--admin-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
-@media (max-width: 1150px) { .admin-refs { display: none; } }
-@media (min-width: 1151px) {
-  .admin-thread:has(.admin-refs) {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) clamp(270px, 26%, 350px);
-    grid-template-rows: auto minmax(0, 1fr) auto;
-  }
-  .admin-thread:has(.admin-refs) .admin-thread-head { grid-column: 1 / -1; grid-row: 1; }
-  .admin-thread:has(.admin-refs) .admin-thread-body { grid-column: 1; grid-row: 2; }
-  .admin-thread:has(.admin-refs) .admin-refs {
-    grid-column: 2;
-    grid-row: 2 / 4;
-    min-height: 0;
-    max-height: none;
-    padding: 20px 16px;
-    border-top: 0;
-    border-left: 1px solid var(--admin-line);
-    background: var(--admin-soft);
-  }
-  .admin-thread:has(.admin-refs) .admin-refs > strong { display: block; margin-bottom: 12px; }
-  .admin-thread:has(.admin-refs) #admin-reply { grid-column: 1; grid-row: 3; }
-}
 .admin-product {
   width: 100%;
   min-width: 0;
@@ -647,7 +617,6 @@ html[data-admin-background="true"] .admin-user {
 html[data-admin-background="true"] .admin-inbox,
 html[data-admin-background="true"] .admin-thread-head,
 html[data-admin-background="true"] #admin-reply,
-html[data-admin-background="true"] .admin-refs,
 html[data-admin-background="true"] .admin-card,
 html[data-admin-background="true"] .admin-staff-hero {
   background: color-mix(in srgb, var(--admin-surface) 55%, transparent);
@@ -715,7 +684,6 @@ html[data-admin-background="true"] .admin-inbox-row.selected {
   .admin-message { max-width: 88%; }
   .admin-message.has-product { width: 88%; }
   .admin-message.has-product .admin-product .chat-watch-photo { height: 185px; }
-  .admin-refs { max-height: 130px; padding: 7px 12px; }
   #admin-reply { gap: 8px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
   #admin-reply textarea { min-height: 46px; max-height: 100px; }
   #admin-reply .admin-primary { min-width: 74px; padding: 8px 10px; font-size: .78rem; }

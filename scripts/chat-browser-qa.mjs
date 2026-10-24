@@ -210,7 +210,8 @@ try {
     const box = frame.getBoundingClientRect(), imageBox = image.getBoundingClientRect();
     return imageBox.width <= box.width + 1 && imageBox.height <= box.height + 1;
   });
-  assert.ok((await owner.locator('.admin-refs .chat-watch-photo').first().boundingBox()).height <= 60, 'Sidebar watch reference stays compact');
+  assert.equal(await owner.locator('.admin-refs').count(), 0, 'The redundant watches sidebar is absent');
+  assert.ok(await owner.evaluate(() => Math.abs(document.querySelector('.admin-thread-body').getBoundingClientRect().width - document.querySelector('.admin-thread').getBoundingClientRect().width) < 2), 'Messages use the full thread width');
   const adminBubble = owner.locator('.admin-message.customer.has-product').first();
   const adminTime = adminBubble.locator('.admin-message-time');
   assert.equal(await adminBubble.locator(':scope > small:not(.admin-message-time)').count(), 0, 'Admin message has no Customer or staff author label');
@@ -270,7 +271,6 @@ try {
   assert.equal(await owner.evaluate(() => { window.__readFlashObserver.disconnect(); return window.__readFlash; }), false, 'Opening an already-seen chat never flashes unread');
   await owner.setViewportSize({ width: 390, height: 844 });
   assert.ok(await owner.locator('.admin-thread').isVisible(), 'Mobile thread is visible after selection');
-  assert.equal(await owner.locator('.admin-refs').isVisible(), false, 'Narrow screens hide the separate watches panel');
   await owner.locator('.admin-chat-menu summary').click();
   assert.equal(await owner.locator('.admin-chat-menu summary').getAttribute('aria-label'), 'Conversation information');
   assert.ok(await owner.locator('.admin-chat-info .admin-product').first().isVisible(), 'Discussed watches remain available in conversation information');
