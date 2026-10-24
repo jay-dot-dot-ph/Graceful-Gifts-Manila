@@ -8,6 +8,8 @@ import { mediaEnabled, checkFile, uploadMedia, deleteChatMedia, mediaMarkup, hyd
 import { loadAdminBackground, saveAdminBackground, removeAdminBackground } from './admin-background.js';
 
 const root = document.getElementById('admin-app');
+document.addEventListener('pointerdown', (event) => { root.querySelectorAll('.admin-appearance[open]').forEach((menu) => { if (!menu.contains(event.target)) menu.open = false; }); });
+document.addEventListener('keydown', (event) => { if (event.key !== 'Escape') return; const menu = root.querySelector('.admin-appearance[open]'); if (menu) { menu.open = false; menu.querySelector('summary')?.focus(); } });
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const stamp = (value) => value?.toDate ? value.toDate().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Just now';
 const state = { user: null, profile: null, staff: [], activity: [], settings: { staffSoundEnabled: false, storeAvatarUrl: '' }, rows: [], selected: null, threadReady: false, threadSynced: false, messages: [], older: [], receipts: new Map(), inboxReceipts: new Map(), inboxReceiptListeners: new Map(), expandedTimes: new Set(), first: null, page: 'chat', filter: 'all', search: '', cursor: null, more: false, error: '', notice: '', noticeCentered: false, deletingId: null, loading: true, unread: 0, inboxInitialized: false, knownInbox: new Map(), pushActive: false, pushAvailable: false, replyDraft: '', replySending: false, pendingReply: null, editing: null, activeMessageId: null, menuMessageId: null, unsending: null, attachment: null, uploadProgress: 0, mediaAvailable: false, blocked: false, moderationBusy: false, staffCreating: false, readInFlight: false, unsubInbox: null, unsubSelected: null, unsubMessages: null, unsubReceipts: null, unsubBlock: null, unsubProfile: null, unsubStaff: null, unsubActivity: null, unsubSettings: null };
@@ -27,6 +29,8 @@ function applyBackground(image) {
   else document.documentElement.style.removeProperty('--admin-page-background-image');
   if (oldUrl) URL.revokeObjectURL(oldUrl);
   root.querySelectorAll('[data-background-preview]').forEach((preview) => { preview.hidden = !hasBackground; });
+  root.querySelectorAll('[data-background-empty]').forEach((empty) => { empty.hidden = hasBackground; });
+  root.querySelectorAll('.admin-background-upload-action').forEach((action) => { action.textContent = hasBackground ? 'Change picture' : 'Choose picture'; });
   root.querySelectorAll('[data-background-remove]').forEach((button) => { button.hidden = !hasBackground; });
 }
 const backgroundReady = loadAdminBackground().then(applyBackground).catch(() => {});
@@ -123,7 +127,8 @@ root.addEventListener('keydown', (event) => { if (event.target.matches?.('#admin
 root.addEventListener('error', (event) => { if (event.target.matches?.('.admin-product img')) event.target.replaceWith(Object.assign(document.createElement('span'), { textContent: 'G' })); }, true);
 function appearanceMarkup() {
   const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
-  return `<details class="admin-appearance"><summary aria-label="Appearance settings" title="Appearance settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="9" r="1"/><path d="M12 21c-1.5-1.4-1.6-3.1-.3-4.2 1.2-1 2.9-.7 4.1-1.1"/></svg></summary><div class="admin-appearance-panel"><strong>Appearance</strong><span class="admin-appearance-label">Mode</span><div class="admin-theme-options" role="group" aria-label="Display mode"><button type="button" data-admin-theme="light" aria-pressed="${theme === 'light'}">☀ Light</button><button type="button" data-admin-theme="dark" aria-pressed="${theme === 'dark'}">☾ Dark</button></div><label class="admin-custom-palette" data-custom-palette data-active="true">Custom color<input type="color" data-admin-color aria-label="Choose a custom admin color" value="${document.documentElement.style.getPropertyValue('--admin-custom-color') || '#3a67ad'}"></label><small>Saved on this browser</small></div></details>`;
+  const color = document.documentElement.style.getPropertyValue('--admin-custom-color') || '#3a67ad';
+  return `<details class="admin-appearance"><summary aria-label="Appearance settings" title="Appearance settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="9" r="1"/><path d="M12 21c-1.5-1.4-1.6-3.1-.3-4.2 1.2-1 2.9-.7 4.1-1.1"/></svg></summary><div class="admin-appearance-panel"><div class="admin-appearance-heading"><div><strong>Appearance</strong><span>Make this workspace yours</span></div><button type="button" class="admin-appearance-close" data-close-appearance aria-label="Close appearance settings">×</button></div><div class="admin-live-preview" aria-label="Live preview of your admin colors"><div class="admin-live-preview-top"><i></i><span>Graceful Gifts Manila</span><b>Preview</b></div><div class="admin-live-preview-content"><div class="admin-live-preview-side"><i></i><i></i><i></i></div><div class="admin-live-preview-chat"><i></i><span>Hello! How can we help?</span><b>Thanks!</b></div></div></div><section class="admin-appearance-section"><span class="admin-appearance-label">Display mode</span><div class="admin-theme-options" role="group" aria-label="Display mode"><button type="button" data-admin-theme="light" aria-pressed="${theme === 'light'}"><span aria-hidden="true">☀</span><span>Light</span></button><button type="button" data-admin-theme="dark" aria-pressed="${theme === 'dark'}"><span aria-hidden="true">☾</span><span>Dark</span></button></div></section><section class="admin-appearance-section"><span class="admin-appearance-label">Accent color</span><label class="admin-custom-palette" data-custom-palette><span><strong>Custom color</strong><small data-admin-color-value>${esc(color.toUpperCase())}</small></span><input type="color" data-admin-color aria-label="Choose a custom admin color" value="${esc(color)}"></label></section>${state.profile ? backgroundMarkup() : ''}<p class="admin-appearance-footnote">Changes are saved on this browser.</p></div></details>`;
 }
 function setAdminAppearance(kind, value) {
   if (kind === 'theme' && ['light', 'dark'].includes(value)) {
@@ -133,11 +138,9 @@ function setAdminAppearance(kind, value) {
   root.querySelectorAll('[data-admin-theme]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.adminTheme === document.documentElement.dataset.theme)));
 }
 function backgroundMarkup() {
-  return `<section class="admin-background-setting"><span class="admin-appearance-label">Admin page background</span><div class="admin-background-preview" data-background-preview ${hasBackground ? '' : 'hidden'} aria-label="Current admin page background"></div><label class="admin-background-upload">Upload picture<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" data-background-file class="visually-hidden"></label><button type="button" class="admin-background-remove" data-background-remove ${hasBackground ? '' : 'hidden'}>Remove picture</button><label class="admin-background-fit">Display<select data-background-fit><option value="cover" ${backgroundFit === 'cover' ? 'selected' : ''}>Fill page</option><option value="contain" ${backgroundFit === 'contain' ? 'selected' : ''}>Show whole picture</option></select></label><small>Shown behind the whole admin interface and saved only on this browser. JPG, PNG, WebP, GIF, AVIF or BMP, up to 10 MB.</small></section>`;
+  return `<section class="admin-background-setting"><span class="admin-appearance-label">Admin page background</span><label class="admin-background-upload" data-background-dropzone><span class="admin-background-preview" data-background-preview ${hasBackground ? '' : 'hidden'} aria-label="Current admin page background"></span><span class="admin-background-empty" data-background-empty ${hasBackground ? 'hidden' : ''}><span aria-hidden="true">▧</span>Drop an image here or browse</span><span class="admin-background-upload-action">${hasBackground ? 'Change picture' : 'Choose picture'}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" data-background-file class="visually-hidden"></label><div class="admin-background-actions"><label class="admin-background-fit">Display<select data-background-fit><option value="cover" ${backgroundFit === 'cover' ? 'selected' : ''}>Fill page</option><option value="contain" ${backgroundFit === 'contain' ? 'selected' : ''}>Show whole picture</option></select></label><button type="button" class="admin-background-remove" data-background-remove ${hasBackground ? '' : 'hidden'}>Remove</button></div><small>Saved on this browser · JPG, PNG, WebP, GIF, AVIF or BMP · 10 MB max</small></section>`;
 }
-async function uploadBackground(input) {
-  const file = input.files?.[0];
-  input.value = '';
+async function uploadBackground(file) {
   if (!file) return;
   if (!/^(image\/jpeg|image\/png|image\/webp|image\/gif|image\/avif|image\/bmp)$/.test(file.type) || file.size > 10 * 1024 * 1024 || !file.size) {
     showNotice('Choose a JPG, PNG, WebP, GIF, AVIF or BMP image under 10 MB.');
@@ -159,14 +162,20 @@ async function uploadBackground(input) {
   }
 }
 function bindAppearance() {
-  if (state.profile) root.querySelectorAll('.admin-appearance-panel').forEach((panel) => panel.querySelector('small')?.insertAdjacentHTML('beforebegin', backgroundMarkup()));
+  root.querySelectorAll('[data-close-appearance]').forEach((button) => button.onclick = () => { const menu = button.closest('.admin-appearance'); menu.open = false; menu.querySelector('summary')?.focus(); });
   root.querySelectorAll('[data-admin-theme]').forEach((button) => button.onclick = () => setAdminAppearance('theme', button.dataset.adminTheme));
   root.querySelectorAll('[data-admin-color]').forEach((input) => input.oninput = () => {
     if (!/^#[0-9a-f]{6}$/i.test(input.value)) return;
     document.documentElement.style.setProperty('--admin-custom-color', input.value);
     try { localStorage.setItem('ggm-admin-custom-color', input.value); } catch {}
+    input.closest('.admin-custom-palette').querySelector('[data-admin-color-value]').textContent = input.value.toUpperCase();
   });
-  root.querySelectorAll('[data-background-file]').forEach((input) => input.onchange = () => { void uploadBackground(input); });
+  root.querySelectorAll('[data-background-file]').forEach((input) => input.onchange = () => { const file = input.files?.[0]; input.value = ''; void uploadBackground(file); });
+  root.querySelectorAll('[data-background-dropzone]').forEach((zone) => {
+    zone.ondragover = (event) => { event.preventDefault(); zone.dataset.dragging = 'true'; };
+    zone.ondragleave = (event) => { if (!zone.contains(event.relatedTarget)) delete zone.dataset.dragging; };
+    zone.ondrop = (event) => { event.preventDefault(); delete zone.dataset.dragging; void uploadBackground(event.dataTransfer?.files?.[0]); };
+  });
   root.querySelectorAll('[data-background-remove]').forEach((button) => button.onclick = async () => {
     try { await backgroundReady; await removeAdminBackground(); applyBackground(null); showNotice('Admin background removed.'); }
     catch { showNotice('Could not remove the admin background.'); }

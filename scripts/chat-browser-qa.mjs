@@ -147,15 +147,29 @@ try {
   assert.equal(await owner.evaluate(() => document.documentElement.dataset.adminPalette), 'custom', 'Old preset selection moves to custom color');
   assert.equal(await owner.evaluate(() => document.documentElement.style.getPropertyValue('--admin-custom-color')), '#a77a36', 'Old preset retains its color');
   await owner.locator('.admin-login-appearance summary').click();
+  assert.equal(await owner.locator('.admin-live-preview').count(), 1, 'Appearance shows a live workspace preview');
+  const previewLight = await owner.locator('.admin-live-preview-top').evaluate((element) => getComputedStyle(element).backgroundColor);
   await owner.locator('[data-admin-theme="dark"]').click();
+  assert.notEqual(await owner.locator('.admin-live-preview-top').evaluate((element) => getComputedStyle(element).backgroundColor), previewLight, 'Preview follows display mode');
   assert.equal(await owner.locator('.admin-palette-options, button[data-admin-palette]').count(), 0, 'Preset palette controls are absent');
   assert.equal(await owner.locator('[data-admin-color]').inputValue(), '#a77a36', 'Custom picker shows the active color');
+  await owner.locator('[data-close-appearance]').click();
+  assert.equal(await owner.locator('.admin-login-appearance .admin-appearance').evaluate((menu) => menu.open), false, 'Appearance closes with its close button');
   assert.equal(await owner.evaluate(() => document.documentElement.dataset.theme), 'dark', 'Sign-in appearance can switch to dark mode');
   await login(owner, ownerEmail);
   await owner.locator('.admin-inbox-row').first().waitFor();
   assert.equal(await owner.evaluate(() => document.documentElement.dataset.adminPalette), 'custom', 'Custom color persists after sign-in');
   await owner.locator('.admin-header .admin-appearance summary').click();
   assert.equal(await owner.locator('.admin-palette-options, button[data-admin-palette]').count(), 0, 'Signed-in Appearance has no preset palette controls');
+  await owner.locator('[data-background-dropzone]').evaluate((zone) => {
+    const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg=='), (character) => character.charCodeAt(0));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([bytes], 'dropped.png', { type: 'image/png' }));
+    zone.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+  });
+  await owner.waitForFunction(() => document.documentElement.style.getPropertyValue('--admin-page-background-image').includes('blob:'));
+  assert.equal(await owner.locator('[data-background-preview]').isVisible(), true, 'Dropped image appears in the background preview');
   const backgroundImage = readdirSync('hosting-dist/images').find((name) => name.endsWith('.jpg'));
   assert.ok(backgroundImage, 'The test catalog includes a background image');
   await owner.locator('[data-background-file]').setInputFiles({ name: 'background.jpg', mimeType: 'image/jpeg', buffer: readFileSync(`hosting-dist/images/${backgroundImage}`) });
@@ -175,6 +189,7 @@ try {
   await owner.locator('[data-admin-color]').fill('#b64268');
   assert.equal(await owner.evaluate(() => document.documentElement.dataset.adminPalette), 'custom', 'Custom color activates the custom palette');
   assert.equal(await owner.evaluate(() => localStorage.getItem('ggm-admin-custom-color')), '#b64268', 'Custom color is saved');
+  assert.equal(await owner.locator('[data-admin-color-value]').innerText(), '#B64268', 'Preview controls show the chosen color');
   await owner.reload();
   assert.equal(await owner.evaluate(() => document.documentElement.style.getPropertyValue('--admin-custom-color')), '#b64268', 'Custom color survives reload');
   await owner.waitForFunction(() => document.documentElement.style.getPropertyValue('--admin-page-background-image').includes('blob:'));
