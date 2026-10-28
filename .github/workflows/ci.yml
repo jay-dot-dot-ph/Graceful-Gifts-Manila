@@ -46,6 +46,7 @@ jobs:
           fi
 
       - name: Build Firebase Hosting artifact
+        id: build
         run: npm run build:firebase
 
       - name: Validate build artifact
@@ -74,9 +75,19 @@ jobs:
         run: npm run test:browser
 
       - name: Write performance report
-        if: success()
+        if: always() && steps.build.outcome == 'success'
         run: npm run report:performance
 
       - name: Show local preview log on failure
         if: failure()
         run: cat "$RUNNER_TEMP/graceful-gifts-preview.log" || true
+
+      - name: Upload browser diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-qa-diagnostics
+          if-no-files-found: warn
+          path: |
+            .sites-runtime/qa-browser-failure.png
+            ${{ runner.temp }}/graceful-gifts-preview.log

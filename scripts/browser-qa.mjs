@@ -10,11 +10,26 @@ const catalogEndpoint = process.argv[3] || process.env.QA_CATALOG_URL || '/api/c
 const output = resolve('.sites-runtime');
 mkdirSync(output, { recursive: true });
 const browser = await chromium.launch({ ...(executablePath ? { executablePath } : {}), headless: true });
-const errors = [];
+const pageErrors = [];
+const consoleErrors = [];
+const failedRequests = [];
+const httpFailures = [];
+let activePage;
+function attachDiagnostics(page, label) {
+  page.on('pageerror', (error) => pageErrors.push(`[${label}] ${error.message}`));
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(`[${label}] ${message.text()}`);
+  });
+  page.on('requestfailed', (request) => failedRequests.push(`[${label}] ${request.url()} — ${request.failure()?.errorText || 'unknown failure'}`));
+  page.on('response', (response) => {
+    if (response.status() >= 400) httpFailures.push(`[${label}] ${response.status()} ${response.url()}`);
+  });
+}
 try {
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 1000 }, permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await desktop.newPage();
-  page.on('pageerror', (error) => errors.push(error.message));
+  activePage = page;
+  attachDiagnostics(page, 'desktop');
   await page.goto(base + '/', { waitUntil: 'domcontentloaded' });
   await page.locator('.hero h1').waitFor({ timeout: 30000 });
   await page.waitForFunction(() => { const img = document.querySelector('.hero-visual img'); return img && img.complete && img.naturalWidth > 0; }, null, { timeout: 20000 });
@@ -115,9 +130,14 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.locator('.specs-section').screenshot({ path: resolve(output, 'qa-watch-specs.png') });
-  await page.route('**/chat.js', (route) => route.fulfill({ contentType: 'text/javascript', body: 'export async function openChat(products) { window.__chatProducts = products; }' }));
+  let chatMockRequests = 0;
+  await page.route(/\/chat\.js(?:\?.*)?$/, (route) => {
+    chatMockRequests++;
+    return route.fulfill({ contentType: 'text/javascript', body: 'export async function openChat(products) { window.__chatMockLoaded = true; window.__chatProducts = products; } export async function watchChat() {}' });
+  });
   await page.locator('.inquiry-button').click();
-  await page.waitForFunction(() => window.__chatProducts?.length === 1);
+  await page.waitForFunction(() => window.__chatMockLoaded === true && window.__chatProducts?.length === 1);
+  assert.equal(chatMockRequests, 1, 'The versioned chat module request must use the inquiry mock.');
   assert.equal(await page.evaluate(() => window.__chatProducts[0].id), 'AP-001');
   assert.match(await page.evaluate(() => window.__chatProducts[0].url), /\/watch\/AP-001$/);
   await page.locator('.favorite-detail').click();
@@ -143,7 +163,8 @@ try {
 
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const mobilePage = await mobile.newPage();
-  mobilePage.on('pageerror', (error) => errors.push(error.message));
+  activePage = mobilePage;
+  attachDiagnostics(mobilePage, 'mobile');
   await mobilePage.goto(base + '/', { waitUntil: 'domcontentloaded' });
   await mobilePage.locator('.hero h1').waitFor({ timeout: 30000 });
   assert.equal(await mobilePage.locator('.floating-chat').isVisible(), true);
@@ -166,9 +187,17 @@ try {
   await mobilePage.locator('.mobile-inquiry-bar').waitFor({ timeout: 30000 });
   assert.equal(await mobilePage.locator('.mobile-inquiry-bar').isVisible(), true);
   assert.equal(await mobilePage.locator('.specs-grid').evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(' ').length), 1, 'Phone specifications should use one column');
+  assert.deepEqual(pageErrors, [], 'No browser JavaScript errors expected');
   await mobile.close();
-  assert.deepEqual(errors, [], 'No browser JavaScript errors expected');
   console.log(`Browser QA passed: desktop catalog/search/filter/sort/favorites/inquiry, mobile layout/navigation/detail action; sold-out journey used ${realSoldOut ? 'live stock' : 'a clearly labeled test fixture'}.`);
+} catch (error) {
+  let pageState;
+  if (activePage && !activePage.isClosed()) {
+    await activePage.screenshot({ path: resolve(output, 'qa-browser-failure.png'), fullPage: true }).catch(() => {});
+    pageState = await activePage.evaluate(() => ({ url: location.href, title: document.title, chatProducts: window.__chatProducts || null, chatMockLoaded: window.__chatMockLoaded === true })).catch(() => null);
+  }
+  console.error(`Browser QA diagnostics: ${JSON.stringify({ pageState, pageErrors, consoleErrors, failedRequests, httpFailures }, null, 2)}`);
+  throw error;
 } finally {
   await browser.close();
 }
