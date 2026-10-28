@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { feedbackAssets } from './feedback-assets.mjs';
 import { loadPublicCatalog } from './public-catalog.mjs';
 import { writeSiteFingerprint } from './site-fingerprint.mjs';
@@ -66,7 +68,56 @@ function imageDimensions(bytes, type) {
       offset += length + 2;
     }
   }
+  if (type === 'webp' && bytes.subarray(0, 4).equals(Buffer.from('RIFF')) && bytes.subarray(8, 12).equals(Buffer.from('WEBP'))) {
+    const chunk = bytes.subarray(12, 16).toString('ascii');
+    if (chunk === 'VP8 ' && bytes.length >= 30 && bytes.subarray(23, 26).equals(Buffer.from([0x9d, 0x01, 0x2a]))) {
+      return { width: bytes.readUInt16LE(26) & 0x3fff, height: bytes.readUInt16LE(28) & 0x3fff };
+    }
+    if (chunk === 'VP8L' && bytes.length >= 25 && bytes[20] === 0x2f) {
+      const value = bytes.readUInt32LE(21);
+      return { width: (value & 0x3fff) + 1, height: ((value >> 14) & 0x3fff) + 1 };
+    }
+    if (chunk === 'VP8X' && bytes.length >= 30) {
+      return { width: bytes.readUIntLE(24, 3) + 1, height: bytes.readUIntLE(27, 3) + 1 };
+    }
+  }
   return null;
+}
+
+function resizeImage(bytes, ext, maximum, label) {
+  const directory = mkdtempSync(join(tmpdir(), 'ggm-image-'));
+  const input = join(directory, `source.${ext}`);
+  const outputFile = join(directory, `resized.${ext}`);
+  writeFileSync(input, bytes);
+  const commands = process.platform === 'win32' ? ['magick.exe', 'magick', 'convert.exe', 'convert'] : ['magick', 'convert'];
+  let unavailable = true;
+  let failure;
+  try {
+    for (const command of commands) {
+      const result = spawnSync(command, [input, '-auto-orient', '-resize', `${maximum}x${maximum}>`, outputFile], { encoding: 'utf8' });
+      if (result.error?.code === 'ENOENT') continue;
+      unavailable = false;
+      if (result.status === 0 && existsSync(outputFile)) return readFileSync(outputFile);
+      failure = result.error?.message || result.stderr || `exit code ${result.status}`;
+      break;
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+  if (unavailable) throw new Error(`${label} is larger than ${maximum}px and ImageMagick is unavailable. Install ImageMagick or run the GitHub Actions CI workflow.`);
+  throw new Error(`${label} could not be resized to ${maximum}px: ${String(failure).trim()}`);
+}
+
+function normalizeImage(bytes, ext, maximum, label) {
+  const original = imageDimensions(bytes, ext);
+  if (!original) throw new Error(`${label} has unsupported or unreadable ${ext.toUpperCase()} dimensions.`);
+  if (Math.max(original.width, original.height) <= maximum) return { bytes, dimensions: original };
+  const resized = resizeImage(bytes, ext, maximum, label);
+  const dimensions = imageDimensions(resized, ext);
+  if (!dimensions || Math.max(dimensions.width, dimensions.height) > maximum) {
+    throw new Error(`${label} still exceeds the ${maximum}px bound after resizing.`);
+  }
+  return { bytes: resized, dimensions };
 }
 
 function writeHostedImage(id, variant, bytes, ext) {
@@ -105,15 +156,25 @@ async function downloadImageVariant(watch, variant) {
     if (!existing) throw new Error(`${watch.id} ${variant}: ${lastError?.message || 'image unavailable'}`);
   }
   const ext = existing.split('.').pop();
-  return writeHostedImage(watch.id, variant, readFileSync(join(cache, existing)), ext);
+  const cached = readFileSync(join(cache, existing));
+  const normalized = normalizeImage(cached, ext, size, `${watch.id} ${variant}`);
+  if (!normalized.bytes.equals(cached)) writeFileSync(join(cache, existing), normalized.bytes);
+  return writeHostedImage(watch.id, variant, normalized.bytes, ext);
 }
 
 async function downloadImage(watch) {
   const embedded = embeddedImages.get(watch.id);
   if (embedded) {
-    const detail = writeHostedImage(watch.id, 'detail', embedded.bytes, embedded.extension);
+    const detailSource = normalizeImage(embedded.bytes, embedded.extension, imageSize.detail, `${watch.id} detail`);
+    const detail = writeHostedImage(watch.id, 'detail', detailSource.bytes, embedded.extension);
     watch.localImage = detail.path;
-    watch.thumbnailImage = detail.path;
+    if (detail.dimensions && Math.max(detail.dimensions.width, detail.dimensions.height) <= imageSize.thumbnail) {
+      watch.thumbnailImage = detail.path;
+    } else {
+      const thumbnailSource = normalizeImage(embedded.bytes, embedded.extension, imageSize.thumbnail, `${watch.id} thumbnail`);
+      watch.thumbnailImage = writeHostedImage(watch.id, 'thumbnail', thumbnailSource.bytes, embedded.extension).path;
+      thumbnailsGenerated++;
+    }
     watch.image = watch.localImage;
     return;
   }

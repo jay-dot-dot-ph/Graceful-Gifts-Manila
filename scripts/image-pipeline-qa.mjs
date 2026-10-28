@@ -26,6 +26,19 @@ function dimensions(bytes, extension) {
       offset += length + 2;
     }
   }
+  if (extension === 'webp' && bytes.subarray(0, 4).equals(Buffer.from('RIFF')) && bytes.subarray(8, 12).equals(Buffer.from('WEBP'))) {
+    const chunk = bytes.subarray(12, 16).toString('ascii');
+    if (chunk === 'VP8 ' && bytes.length >= 30 && bytes.subarray(23, 26).equals(Buffer.from([0x9d, 0x01, 0x2a]))) {
+      return { width: bytes.readUInt16LE(26) & 0x3fff, height: bytes.readUInt16LE(28) & 0x3fff };
+    }
+    if (chunk === 'VP8L' && bytes.length >= 25 && bytes[20] === 0x2f) {
+      const value = bytes.readUInt32LE(21);
+      return { width: (value & 0x3fff) + 1, height: ((value >> 14) & 0x3fff) + 1 };
+    }
+    if (chunk === 'VP8X' && bytes.length >= 30) {
+      return { width: bytes.readUIntLE(24, 3) + 1, height: bytes.readUIntLE(27, 3) + 1 };
+    }
+  }
   return null;
 }
 
@@ -53,10 +66,12 @@ for (const watch of catalog.watches) {
   const thumbnailExtension = thumbnailFile.split('.').pop();
   const detail = dimensions(readFileSync(detailFile), detailExtension);
   const thumbnail = dimensions(readFileSync(thumbnailFile), thumbnailExtension);
-  if (detail) assert.ok(Math.max(detail.width, detail.height) <= 800, `Detail image exceeds the 800px source bound for ${watch.id}`);
-  if (thumbnail && watch.thumbnailImage !== watch.localImage) {
+  assert.ok(detail, `Detail image dimensions are unreadable for ${watch.id}`);
+  assert.ok(thumbnail, `Thumbnail image dimensions are unreadable for ${watch.id}`);
+  assert.ok(Math.max(detail.width, detail.height) <= 800, `Detail image exceeds the 800px source bound for ${watch.id}`);
+  assert.ok(Math.max(thumbnail.width, thumbnail.height) <= 480, `Thumbnail image exceeds the 480px source bound for ${watch.id}`);
+  if (watch.thumbnailImage !== watch.localImage) {
     thumbnails++;
-    assert.ok(Math.max(thumbnail.width, thumbnail.height) <= 480, `Thumbnail exceeds 480px for ${watch.id}`);
   }
 }
 
