@@ -28,6 +28,11 @@ assert.equal(
   'unexpected-third-party',
   'a URL that only shares the preview-origin prefix must not count as Firebase Hosting traffic',
 );
+assert.equal(
+  classifyNetworkRequest('https://graceful-gifts-manila.web.app/images/AP-001-detail-example.webp', previewOrigin).kind,
+  'unexpected-third-party',
+  'a production-hosted product image must fail a local-preview benchmark',
+);
 
 const summary = summarizeNetworkEntries([
   { url: `${previewOrigin}/app.js`, status: 200, encodedDataLength: 120, fromDiskCache: false, fromServiceWorker: false },

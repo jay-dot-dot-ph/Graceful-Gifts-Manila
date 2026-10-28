@@ -6,6 +6,8 @@ import { resolve } from 'node:path';
 const executablePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH
   || (process.platform === 'win32' ? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe' : undefined);
 const base = process.argv[2] || process.env.QA_BASE || 'http://127.0.0.1:4173';
+const baseOrigin = new URL(base).origin;
+const productionOrigin = 'https://graceful-gifts-manila.web.app';
 const catalogEndpoint = process.argv[3] || process.env.QA_CATALOG_URL || '/api/catalog.json';
 const output = resolve('.sites-runtime');
 mkdirSync(output, { recursive: true });
@@ -14,11 +16,18 @@ const pageErrors = [];
 const consoleErrors = [];
 const failedRequests = [];
 const httpFailures = [];
+const productionImageRequests = [];
 let activePage;
 function attachDiagnostics(page, label) {
   page.on('pageerror', (error) => pageErrors.push(`[${label}] ${error.message}`));
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(`[${label}] ${message.text()}`);
+  });
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (baseOrigin !== productionOrigin && url.origin === productionOrigin && url.pathname.startsWith('/images/')) {
+      productionImageRequests.push(`[${label}] ${request.url()}`);
+    }
   });
   page.on('requestfailed', (request) => failedRequests.push(`[${label}] ${request.url()} — ${request.failure()?.errorText || 'unknown failure'}`));
   page.on('response', (response) => {
@@ -194,6 +203,7 @@ try {
   await mobilePage.locator('[data-photo-zoom]').tap({ position: { x: 40, y: 40 } });
   assert.equal(await mobilePage.locator('[data-photo-zoom]').evaluate((photo) => photo.classList.contains('zoom-active')), true, 'Phone watch photo zoom activates');
   assert.equal(await mobilePage.locator('.specs-grid').evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(' ').length), 1, 'Phone specifications should use one column');
+  assert.deepEqual(productionImageRequests, [], 'Local preview must not request production-hosted product images.');
   assert.deepEqual(pageErrors, [], 'No browser JavaScript errors expected');
   await mobile.close();
   console.log(`Browser QA passed: desktop catalog/search/filter/sort/favorites/inquiry, mobile layout/navigation/detail action; sold-out journey used ${realSoldOut ? 'live stock' : 'a clearly labeled test fixture'}.`);
@@ -203,7 +213,7 @@ try {
     await activePage.screenshot({ path: resolve(output, 'qa-browser-failure.png'), fullPage: true }).catch(() => {});
     pageState = await activePage.evaluate(() => ({ url: location.href, title: document.title, chatProducts: window.__chatProducts || null, chatMockLoaded: window.__chatMockLoaded === true })).catch(() => null);
   }
-  console.error(`Browser QA diagnostics: ${JSON.stringify({ pageState, pageErrors, consoleErrors, failedRequests, httpFailures }, null, 2)}`);
+  console.error(`Browser QA diagnostics: ${JSON.stringify({ pageState, pageErrors, consoleErrors, failedRequests, httpFailures, productionImageRequests }, null, 2)}`);
   throw error;
 } finally {
   await browser.close();

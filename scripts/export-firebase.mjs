@@ -245,7 +245,17 @@ writeFileSync(join(output, '404.html'), '<!doctype html><html lang="en"><meta ch
 
 for (const watch of catalog.watches) {
   let html = versionedPage(await readRoute(`/watch/${encodeURIComponent(watch.id)}`));
-  if (watch.localImage) html = html.replaceAll(`/image/${encodeURIComponent(watch.id)}`, watch.localImage);
+  if (watch.localImage) {
+    const id = encodeURIComponent(watch.id);
+    const visibleImage = `src="/image/${id}"`;
+    const socialImage = `<meta property="og:image" content="${origin}/image/${id}">`;
+    if (!html.includes(visibleImage)) throw new Error(`Watch page is missing its visible image placeholder for ${watch.id}`);
+    if (!html.includes(socialImage)) throw new Error(`Watch page is missing its Open Graph image placeholder for ${watch.id}`);
+    html = html
+      .replaceAll(visibleImage, `src="${watch.localImage}"`)
+      .replaceAll(socialImage, `<meta property="og:image" content="${origin}${watch.localImage}">`);
+    if (html.includes(`src="${origin}/images/`)) throw new Error(`Watch page has a production-hosted visible image for ${watch.id}`);
+  }
   writeFileSync(join(output, 'watch', `${watch.id}.html`), html);
 }
 const escapeXml = (value) => value.replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&apos;' })[char]);

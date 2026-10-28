@@ -8,6 +8,7 @@ import { hasAlpha, imageDimensions, imageMime, inspectWithImageMagick } from './
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, 'hosting-dist');
 const imagesRoot = resolve(output, 'images');
+const productionOrigin = 'https://graceful-gifts-manila.web.app';
 const catalogPath = resolve(output, 'api/catalog.json');
 const reportPath = resolve(output, 'api/image-pipeline-report.json');
 assert.ok(existsSync(catalogPath) && existsSync(reportPath), 'Run npm run build:firebase before image pipeline QA.');
@@ -41,6 +42,10 @@ for (const watch of catalog.watches) {
   assert.ok(watch.thumbnailImage, `Missing thumbnail image for ${watch.id}`);
   const detailFile = localFile(watch.localImage);
   const thumbnailFile = localFile(watch.thumbnailImage);
+  const page = readFileSync(resolve(output, 'watch', `${watch.id}.html`), 'utf8');
+  assert.ok(page.includes(`src="${watch.localImage}"`), `Watch page visible image must be same-origin for ${watch.id}`);
+  assert.ok(page.includes(`<meta property="og:image" content="${productionOrigin}${watch.localImage}">`), `Watch page Open Graph image must keep its absolute canonical URL for ${watch.id}`);
+  assert.doesNotMatch(page, /<img\b[^>]*\bsrc="https:\/\/graceful-gifts-manila\.web\.app\/images\//, `Watch page must not embed a production-hosted visible image for ${watch.id}`);
   assert.match(watch.localImage, new RegExp(`^/images/${watch.id}-detail-[a-f0-9]{12}\\.(jpg|png|webp)$`), `Detail image is not content versioned for ${watch.id}`);
   assert.match(watch.thumbnailImage, new RegExp(`^/images/${watch.id}-(detail|thumbnail)-[a-f0-9]{12}\\.(jpg|png|webp)$`), `Thumbnail image is not content versioned for ${watch.id}`);
   imageReferences.add(watch.localImage);
