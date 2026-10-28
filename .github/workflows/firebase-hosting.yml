@@ -24,14 +24,18 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - name: Check Firebase Hosting bandwidth status
+        id: quota_check
+        if: github.event_name == 'schedule'
+        run: node scripts/check-sheet-sync.mjs availability
       - name: Check whether the public Sheet changed
         id: source_check
-        if: github.event_name == 'schedule' && github.event.schedule != '17 * * * *'
+        if: github.event_name == 'schedule' && steps.quota_check.outputs.quota_blocked != 'true' && github.event.schedule != '17 * * * *'
         run: node scripts/check-sheet-sync.mjs source
       - run: npm ci
-        if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'
+        if: github.event_name != 'schedule' || (steps.quota_check.outputs.quota_blocked != 'true' && steps.source_check.outputs.changed != 'false')
       - name: Install ImageMagick for verified image bounds
-        if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'
+        if: github.event_name != 'schedule' || (steps.quota_check.outputs.quota_blocked != 'true' && steps.source_check.outputs.changed != 'false')
         run: |
           sudo apt-get update
           sudo apt-get install --yes imagemagick
@@ -44,20 +48,16 @@ jobs:
             exit 1
           fi
       - run: npm run build:firebase
-        if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'
+        if: github.event_name != 'schedule' || (steps.quota_check.outputs.quota_blocked != 'true' && steps.source_check.outputs.changed != 'false')
         env:
           GGM_FCM_VAPID_PUBLIC_KEY: '${{ secrets.GGM_FCM_VAPID_PUBLIC_KEY }}'
           GGM_CHAT_MEDIA_ENABLED: 'false'
       - name: Check whether the built site changed
         id: artifact_check
-        if: github.event_name != 'schedule' || steps.source_check.outputs.changed != 'false'
+        if: github.event_name != 'schedule' || (steps.quota_check.outputs.quota_blocked != 'true' && steps.source_check.outputs.changed != 'false')
         run: node scripts/check-sheet-sync.mjs artifact
-      - name: Set minimum Hosting retention
-        id: retention
-        if: steps.artifact_check.outputs.changed == 'true'
-        run: node scripts/set-hosting-retention.mjs --apply
         env:
-          GOOGLE_SERVICE_ACCOUNT_JSON: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA }}'
+          ALLOW_QUOTA_DEPLOY: ${{ github.event_name != 'schedule' }}
       - id: deploy
         uses: FirebaseExtended/action-hosting-deploy@v0
         if: steps.artifact_check.outputs.changed == 'true'
@@ -65,9 +65,3 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA }}'
           projectId: graceful-gifts-manila
           channelId: live
-      - name: Delete older Hosting versions
-        if: steps.deploy.outcome == 'success'
-        run: node scripts/cleanup-hosting-versions.mjs --apply
-        env:
-          GOOGLE_SERVICE_ACCOUNT_JSON: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GRACEFUL_GIFTS_MANILA }}'
-          PREVIOUS_VERSION: '${{ steps.retention.outputs.previous_version }}'

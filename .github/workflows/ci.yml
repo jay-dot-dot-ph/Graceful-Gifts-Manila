@@ -52,6 +52,9 @@ jobs:
       - name: Validate build artifact
         run: npm run validate
 
+      - name: Verify sheet synchronization behavior
+        run: npm run test:sheet-sync
+
       - name: Verify image pipeline
         run: npm run test:image-pipeline
 
