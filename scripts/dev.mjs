@@ -6,6 +6,12 @@ const root = resolve('hosting-dist');
 if (!existsSync(resolve(root, 'api/catalog.json'))) throw new Error('Run npm run build:firebase before starting the local preview.');
 const port = Number(process.env.PORT || 4173);
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
+function cacheControl(relative) {
+  if (/^(images|feedback)\/.+/.test(relative) || /^(app-|styles-|chunk-|index\.esm-).+\.(?:js|css)$/.test(relative)) return 'public, max-age=31536000, immutable';
+  if (relative === 'api/catalog.json') return 'public, max-age=300, stale-while-revalidate=86400';
+  if (relative === 'firebase-config.json' || relative === 'push-config.json' || relative === 'media-config.json') return 'public, max-age=300';
+  return 'public, max-age=0, must-revalidate';
+}
 http.createServer((request, response) => {
   try {
     const pathname = decodeURIComponent(new URL(request.url, `http://127.0.0.1:${port}`).pathname);
@@ -15,7 +21,7 @@ http.createServer((request, response) => {
     else if (/^(watches(?:\/[a-z0-9-]+)?|brands|favorites|contact)$/.test(relative)) relative = 'index.html';
     let path = resolve(root, relative);
     if (!path.startsWith(root + sep) || !existsSync(path)) path = resolve(root, '404.html');
-    response.writeHead(path.endsWith('404.html') ? 404 : 200, { 'content-type': types[extname(path)] || 'application/octet-stream', 'cache-control': 'no-store' });
+    response.writeHead(path.endsWith('404.html') ? 404 : 200, { 'content-type': types[extname(path)] || 'application/octet-stream', 'cache-control': cacheControl(relative) });
     response.end(readFileSync(path));
   } catch (error) {
     console.error(error);

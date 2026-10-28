@@ -119,6 +119,11 @@ try {
   await page.locator('.detail-copy h1').waitFor({ timeout: 30000 });
   assert.match(await page.locator('.detail-copy h1').innerText(), /Royal Oak/i);
   assert.equal(await page.locator('.detail-stock').count(), 0, 'In-stock watch does not show its quantity');
+  const detailPhoto = page.locator('[data-photo-zoom]');
+  await detailPhoto.hover({ position: { x: 40, y: 40 } });
+  assert.equal(await detailPhoto.evaluate((photo) => photo.classList.contains('zoom-active')), true, 'Desktop watch photo zoom activates');
+  await page.locator('.detail-copy h1').hover();
+  assert.equal(await detailPhoto.evaluate((photo) => photo.classList.contains('zoom-active')), false, 'Desktop watch photo zoom resets when the pointer leaves');
   for (const width of [1440, 1000]) {
     await page.setViewportSize({ width, height: 1000 });
     const columnGap = await page.locator('.specs-grid').evaluate((grid) => {
@@ -186,6 +191,8 @@ try {
   await mobilePage.goto(base + '/watch/AP-001');
   await mobilePage.locator('.mobile-inquiry-bar').waitFor({ timeout: 30000 });
   assert.equal(await mobilePage.locator('.mobile-inquiry-bar').isVisible(), true);
+  await mobilePage.locator('[data-photo-zoom]').tap({ position: { x: 40, y: 40 } });
+  assert.equal(await mobilePage.locator('[data-photo-zoom]').evaluate((photo) => photo.classList.contains('zoom-active')), true, 'Phone watch photo zoom activates');
   assert.equal(await mobilePage.locator('.specs-grid').evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(' ').length), 1, 'Phone specifications should use one column');
   assert.deepEqual(pageErrors, [], 'No browser JavaScript errors expected');
   await mobile.close();

@@ -1,57 +1,38 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { hasAlpha, imageDimensions, imageMime, inspectWithImageMagick } from './image-tools.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, 'hosting-dist');
+const imagesRoot = resolve(output, 'images');
 const catalogPath = resolve(output, 'api/catalog.json');
-assert.ok(existsSync(catalogPath), 'Run npm run build:firebase before image pipeline QA.');
+const reportPath = resolve(output, 'api/image-pipeline-report.json');
+assert.ok(existsSync(catalogPath) && existsSync(reportPath), 'Run npm run build:firebase before image pipeline QA.');
 const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
-
-function dimensions(bytes, extension) {
-  if (extension === 'png' && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
-    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
-  }
-  if (extension === 'jpg' && bytes[0] === 0xff && bytes[1] === 0xd8) {
-    for (let offset = 2; offset < bytes.length - 9;) {
-      if (bytes[offset] !== 0xff) break;
-      const marker = bytes[offset + 1];
-      if (marker === 0xd9 || marker === 0xda) break;
-      const length = bytes.readUInt16BE(offset + 2);
-      if (length < 2 || offset + length + 2 > bytes.length) break;
-      if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
-        return { width: bytes.readUInt16BE(offset + 7), height: bytes.readUInt16BE(offset + 5) };
-      }
-      offset += length + 2;
-    }
-  }
-  if (extension === 'webp' && bytes.subarray(0, 4).equals(Buffer.from('RIFF')) && bytes.subarray(8, 12).equals(Buffer.from('WEBP'))) {
-    const chunk = bytes.subarray(12, 16).toString('ascii');
-    if (chunk === 'VP8 ' && bytes.length >= 30 && bytes.subarray(23, 26).equals(Buffer.from([0x9d, 0x01, 0x2a]))) {
-      return { width: bytes.readUInt16LE(26) & 0x3fff, height: bytes.readUInt16LE(28) & 0x3fff };
-    }
-    if (chunk === 'VP8L' && bytes.length >= 25 && bytes[20] === 0x2f) {
-      const value = bytes.readUInt32LE(21);
-      return { width: (value & 0x3fff) + 1, height: ((value >> 14) & 0x3fff) + 1 };
-    }
-    if (chunk === 'VP8X' && bytes.length >= 30) {
-      return { width: bytes.readUIntLE(24, 3) + 1, height: bytes.readUIntLE(27, 3) + 1 };
-    }
-  }
-  return null;
-}
+const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+const supported = new Set(Object.keys(imageMime));
 
 function localFile(url) {
   assert.match(url, /^\/images\/[A-Za-z0-9._-]+$/, `Invalid hosted image URL: ${url}`);
   const file = resolve(output, url.slice(1));
-  assert.ok(file.startsWith(output), `Image escaped hosting output: ${url}`);
+  assert.ok(file.startsWith(imagesRoot + '\\') || file.startsWith(imagesRoot + '/'), `Image escaped hosting output: ${url}`);
   assert.ok(existsSync(file), `Missing exported image: ${url}`);
   return file;
 }
 
+function actualExtension(bytes) {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'jpg';
+  if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return 'png';
+  if (bytes.subarray(0, 4).equals(Buffer.from('RIFF')) && bytes.subarray(8, 12).equals(Buffer.from('WEBP'))) return 'webp';
+  return null;
+}
+
 const ids = new Set();
-let thumbnails = 0;
+const imageReferences = new Set();
+let generatedThumbnails = 0;
 for (const watch of catalog.watches) {
   assert.match(watch.id || '', /^[A-Z0-9-]{2,20}$/, `Invalid watch ID: ${watch.id}`);
   assert.ok(!ids.has(watch.id), `Duplicate watch ID: ${watch.id}`);
@@ -62,17 +43,53 @@ for (const watch of catalog.watches) {
   const thumbnailFile = localFile(watch.thumbnailImage);
   assert.match(watch.localImage, new RegExp(`^/images/${watch.id}-detail-[a-f0-9]{12}\\.(jpg|png|webp)$`), `Detail image is not content versioned for ${watch.id}`);
   assert.match(watch.thumbnailImage, new RegExp(`^/images/${watch.id}-(detail|thumbnail)-[a-f0-9]{12}\\.(jpg|png|webp)$`), `Thumbnail image is not content versioned for ${watch.id}`);
-  const detailExtension = detailFile.split('.').pop();
-  const thumbnailExtension = thumbnailFile.split('.').pop();
-  const detail = dimensions(readFileSync(detailFile), detailExtension);
-  const thumbnail = dimensions(readFileSync(thumbnailFile), thumbnailExtension);
-  assert.ok(detail, `Detail image dimensions are unreadable for ${watch.id}`);
-  assert.ok(thumbnail, `Thumbnail image dimensions are unreadable for ${watch.id}`);
-  assert.ok(Math.max(detail.width, detail.height) <= 800, `Detail image exceeds the 800px source bound for ${watch.id}`);
-  assert.ok(Math.max(thumbnail.width, thumbnail.height) <= 480, `Thumbnail image exceeds the 480px source bound for ${watch.id}`);
-  if (watch.thumbnailImage !== watch.localImage) {
-    thumbnails++;
+  imageReferences.add(watch.localImage);
+  imageReferences.add(watch.thumbnailImage);
+  if (watch.thumbnailImage !== watch.localImage) generatedThumbnails++;
+  for (const [variant, file, maximum] of [['detail', detailFile, 800], ['thumbnail', thumbnailFile, 480]]) {
+    const extension = file.split('.').pop().toLowerCase();
+    const bytes = readFileSync(file);
+    assert.ok(supported.has(extension), `Unsupported ${variant} extension for ${watch.id}: ${extension}`);
+    assert.equal(actualExtension(bytes), extension, `${variant} extension and encoded format differ for ${watch.id}`);
+    const dimensions = imageDimensions(bytes, extension);
+    assert.ok(dimensions, `${variant} ${imageMime[extension]} dimensions are unreadable for ${watch.id}`);
+    assert.ok(Math.max(dimensions.width, dimensions.height) <= maximum, `${variant} image exceeds ${maximum}px for ${watch.id}`);
+    const digest = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
+    assert.match(file, new RegExp(`-${digest}\\.${extension}$`), `${variant} filename must hash final emitted bytes for ${watch.id}`);
   }
+}
+
+assert.equal(report.schemaVersion, 1, 'Image pipeline report schema must be recognized.');
+assert.equal(report.sourceImageCount, catalog.watches.length, 'Every catalog watch must have an image export source.');
+assert.deepEqual(report.settings.maximumDimensions, { thumbnail: 480, detail: 800 }, 'Image size limits changed unexpectedly.');
+assert.deepEqual(report.settings.webpQuality, { thumbnail: 80, detail: 85 }, 'WebP quality settings changed unexpectedly.');
+assert.ok(report.emittedFormatCounts.webp > 0, 'Expected at least one smaller WebP derivative.');
+assert.equal(new Set(report.images.map((image) => image.path)).size, report.images.length, 'Image pipeline report contains duplicate output paths.');
+for (const image of report.images) {
+  assert.ok(imageReferences.has(image.path), `Unreferenced generated product image: ${image.path}`);
+  assert.ok(existsSync(resolve(root, '.image-cache', image.sourceCacheFile)), `Missing source cache entry for ${image.path}`);
+  assert.ok(supported.has(image.emittedFormat), `Unknown emitted format for ${image.path}`);
+  assert.equal(image.emittedBytes, readFileSync(localFile(image.path)).length, `Recorded byte size differs for ${image.path}`);
+  if (image.sourceHasAlpha) assert.equal(image.emittedHasAlpha, true, `Transparency was not preserved for ${image.path}`);
+  if (image.emittedFormat === 'webp') assert.equal(image.fallbackReason, null, `WebP output should not have a fallback reason for ${image.path}`);
+}
+
+const generatedFiles = readdirSync(imagesRoot)
+  .filter((name) => /^[A-Z0-9-]+-(?:detail|thumbnail)-[a-f0-9]{12}\.(?:jpg|png|webp)$/.test(name))
+  .map((name) => `/images/${name}`);
+assert.deepEqual(new Set(generatedFiles), imageReferences, 'Generated product output contains missing or unreferenced files.');
+
+const decoded = inspectWithImageMagick([...imageReferences].map(localFile));
+assert.equal(decoded.length, imageReferences.size, 'ImageMagick did not decode every emitted product image.');
+for (const [index, line] of decoded.entries()) {
+  const [format, width, height, channels] = line.split('|');
+  const file = localFile([...imageReferences][index]);
+  const extension = file.split('.').pop().toLowerCase();
+  assert.equal(format.toLowerCase(), extension === 'jpg' ? 'jpeg' : extension, `ImageMagick format mismatch for ${file}`);
+  const parsed = imageDimensions(readFileSync(file), extension);
+  assert.equal(Number(width), parsed.width, `ImageMagick width mismatch for ${file}`);
+  assert.equal(Number(height), parsed.height, `ImageMagick height mismatch for ${file}`);
+  if (hasAlpha(readFileSync(file), extension)) assert.match(channels.toLowerCase(), /a/, `ImageMagick did not retain alpha for ${file}`);
 }
 
 const client = readFileSync(resolve(root, 'worker/client.js'), 'utf8');
@@ -83,4 +100,4 @@ assert.match(client, /watch\.thumbnailImage \|\| watch\.localImage/, 'Chat produ
 const firebase = JSON.parse(readFileSync(resolve(root, 'firebase.json'), 'utf8'));
 assert.ok(firebase.hosting.headers.some((entry) => entry.source === '/images/**' && /immutable/.test(entry.headers?.[0]?.value || '')), 'Content-hashed images require immutable cache headers.');
 
-console.log(`Image pipeline QA passed: ${catalog.watches.length} watches, ${thumbnails} generated thumbnails, ${ids.size} stable catalog mappings.`);
+console.log(`Image pipeline QA passed: ${catalog.watches.length} watches, ${generatedThumbnails} generated thumbnails, ${report.emittedFormatCounts.webp} WebP files, ${Object.values(report.fallbackCounts).reduce((sum, count) => sum + count, 0)} validated original-format fallbacks.`);

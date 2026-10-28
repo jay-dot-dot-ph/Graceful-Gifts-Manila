@@ -36,14 +36,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes imagemagick
-          if command -v magick > /dev/null; then
-            magick -version
-          elif command -v convert > /dev/null; then
-            convert -version
-          else
-            echo 'ImageMagick installation did not provide magick or convert.' >&2
-            exit 1
-          fi
+          node scripts/verify-image-tools.mjs
 
       - name: Build Firebase Hosting artifact
         id: build
@@ -58,6 +51,9 @@ jobs:
       - name: Verify image pipeline
         run: npm run test:image-pipeline
 
+      - name: Create WebP visual review
+        run: npm run test:image-quality
+
       - name: Start local preview
         run: |
           npm run dev > "$RUNNER_TEMP/graceful-gifts-preview.log" 2>&1 &
@@ -70,6 +66,9 @@ jobs:
           done
           cat "$RUNNER_TEMP/graceful-gifts-preview.log"
           exit 1
+
+      - name: Measure local browser transfer
+        run: npm run benchmark:network
 
       - name: Verify opening experience
         run: npm run test:opening
@@ -94,3 +93,16 @@ jobs:
           path: |
             .sites-runtime/qa-browser-failure.png
             ${{ runner.temp }}/graceful-gifts-preview.log
+
+      - name: Upload performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-evidence
+          if-no-files-found: warn
+          path: |
+            .sites-runtime/network-benchmark.json
+            .sites-runtime/network-benchmark.md
+            .sites-runtime/network-benchmark-*.png
+            .sites-runtime/image-quality-review/image-quality-contact-sheet.png
+            .sites-runtime/image-quality-review/image-quality-review.md

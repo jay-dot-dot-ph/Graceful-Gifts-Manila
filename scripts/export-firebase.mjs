@@ -1,13 +1,12 @@
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tmpdir } from 'node:os';
-import { spawnSync } from 'node:child_process';
 import { feedbackAssets } from './feedback-assets.mjs';
 import { loadPublicCatalog } from './public-catalog.mjs';
 import { writeSiteFingerprint } from './site-fingerprint.mjs';
 import { build as bundle } from 'esbuild';
+import { extensionForContentType, hasAlpha, hasNonDefaultOrientation, imageDimensions, transformImage } from './image-tools.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, 'hosting-dist');
@@ -43,88 +42,72 @@ let nextImage = 0;
 const failures = [];
 let downloaded = 0;
 let thumbnailsGenerated = 0;
-const extension = (type) => type.startsWith('image/jpeg') ? 'jpg' : type.startsWith('image/png') ? 'png' : type.startsWith('image/webp') ? 'webp' : null;
 const imageSize = { thumbnail: 480, detail: 800 };
+const webpQuality = { thumbnail: 80, detail: 85 };
+const webpMinimumSourceBytes = 4_096;
+const imageRecords = [];
 
 function resizedImageUrl(source, size) {
   if (!/=w\d+-h\d+$/.test(source)) throw new Error(`Image URL is missing its Google Sheets size suffix: ${source}`);
   return source.replace(/=w\d+-h\d+$/, `=w${size}-h${size}`);
 }
 
-function imageDimensions(bytes, type) {
-  if (type === 'png' && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
-    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
-  }
-  if (type === 'jpg' && bytes[0] === 0xff && bytes[1] === 0xd8) {
-    for (let offset = 2; offset < bytes.length - 9;) {
-      if (bytes[offset] !== 0xff) break;
-      const marker = bytes[offset + 1];
-      if (marker === 0xd9 || marker === 0xda) break;
-      const length = bytes.readUInt16BE(offset + 2);
-      if (length < 2 || offset + length + 2 > bytes.length) break;
-      if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
-        return { width: bytes.readUInt16BE(offset + 7), height: bytes.readUInt16BE(offset + 5) };
-      }
-      offset += length + 2;
-    }
-  }
-  if (type === 'webp' && bytes.subarray(0, 4).equals(Buffer.from('RIFF')) && bytes.subarray(8, 12).equals(Buffer.from('WEBP'))) {
-    const chunk = bytes.subarray(12, 16).toString('ascii');
-    if (chunk === 'VP8 ' && bytes.length >= 30 && bytes.subarray(23, 26).equals(Buffer.from([0x9d, 0x01, 0x2a]))) {
-      return { width: bytes.readUInt16LE(26) & 0x3fff, height: bytes.readUInt16LE(28) & 0x3fff };
-    }
-    if (chunk === 'VP8L' && bytes.length >= 25 && bytes[20] === 0x2f) {
-      const value = bytes.readUInt32LE(21);
-      return { width: (value & 0x3fff) + 1, height: ((value >> 14) & 0x3fff) + 1 };
-    }
-    if (chunk === 'VP8X' && bytes.length >= 30) {
-      return { width: bytes.readUIntLE(24, 3) + 1, height: bytes.readUIntLE(27, 3) + 1 };
-    }
-  }
-  return null;
-}
-
-function resizeImage(bytes, ext, maximum, label) {
-  const directory = mkdtempSync(join(tmpdir(), 'ggm-image-'));
-  const input = join(directory, `source.${ext}`);
-  const outputFile = join(directory, `resized.${ext}`);
-  writeFileSync(input, bytes);
-  const commands = process.platform === 'win32' ? ['magick.exe', 'magick', 'convert.exe', 'convert'] : ['magick', 'convert'];
-  let unavailable = true;
-  let failure;
-  try {
-    for (const command of commands) {
-      const result = spawnSync(command, [input, '-auto-orient', '-resize', `${maximum}x${maximum}>`, outputFile], { encoding: 'utf8' });
-      if (result.error?.code === 'ENOENT') continue;
-      unavailable = false;
-      if (result.status === 0 && existsSync(outputFile)) return readFileSync(outputFile);
-      failure = result.error?.message || result.stderr || `exit code ${result.status}`;
-      break;
-    }
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
-  if (unavailable) throw new Error(`${label} is larger than ${maximum}px and ImageMagick is unavailable. Install ImageMagick or run the GitHub Actions CI workflow.`);
-  throw new Error(`${label} could not be resized to ${maximum}px: ${String(failure).trim()}`);
-}
-
 function normalizeImage(bytes, ext, maximum, label) {
   const original = imageDimensions(bytes, ext);
   if (!original) throw new Error(`${label} has unsupported or unreadable ${ext.toUpperCase()} dimensions.`);
-  if (Math.max(original.width, original.height) <= maximum) return { bytes, dimensions: original };
-  const resized = resizeImage(bytes, ext, maximum, label);
+  if (Math.max(original.width, original.height) <= maximum && !hasNonDefaultOrientation(bytes, ext)) return { bytes, dimensions: original };
+  const resized = transformImage(bytes, ext, ext, maximum, undefined, `${label} resize`);
   const dimensions = imageDimensions(resized, ext);
   if (!dimensions || Math.max(dimensions.width, dimensions.height) > maximum) {
     throw new Error(`${label} still exceeds the ${maximum}px bound after resizing.`);
   }
+  if (hasAlpha(bytes, ext) && !hasAlpha(resized, ext)) throw new Error(`${label} lost transparency while resizing.`);
   return { bytes: resized, dimensions };
 }
 
-function writeHostedImage(id, variant, bytes, ext) {
-  const digest = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
+function prepareImage(bytes, ext, variant, label) {
+  const maximum = imageSize[variant];
+  const normalized = normalizeImage(bytes, ext, maximum, label);
+  const sourceHasAlpha = hasAlpha(normalized.bytes, ext);
+  if (ext === 'webp') return { ...normalized, ext, sourceExtension: ext, sourceBytes: normalized.bytes.length, sourceHasAlpha, fallbackReason: 'already-webp' };
+  if (normalized.bytes.length < webpMinimumSourceBytes) return { ...normalized, ext, sourceExtension: ext, sourceBytes: normalized.bytes.length, sourceHasAlpha, fallbackReason: 'source-under-4kb' };
+  const webp = transformImage(normalized.bytes, ext, 'webp', maximum, webpQuality[variant], `${label} WebP conversion`);
+  const dimensions = imageDimensions(webp, 'webp');
+  if (!dimensions || Math.max(dimensions.width, dimensions.height) > maximum) throw new Error(`${label} WebP output exceeds the ${maximum}px bound.`);
+  if (sourceHasAlpha && !hasAlpha(webp, 'webp')) throw new Error(`${label} WebP conversion lost transparency.`);
+  if (webp.length >= normalized.bytes.length) return { ...normalized, ext, sourceExtension: ext, sourceBytes: normalized.bytes.length, sourceHasAlpha, fallbackReason: 'webp-not-smaller' };
+  return { bytes: webp, dimensions, ext: 'webp', sourceExtension: ext, sourceBytes: normalized.bytes.length, sourceHasAlpha, fallbackReason: null };
+}
+
+function writeHostedImage(id, variant, prepared, sourceCacheFile) {
+  const digest = createHash('sha256').update(prepared.bytes).digest('hex').slice(0, 12);
+  const ext = prepared.ext;
   const filename = `${id}-${variant}-${digest}.${ext}`;
-  writeFileSync(join(output, 'images', filename), bytes);
-  return { path: `/images/${filename}`, dimensions: imageDimensions(bytes, ext) };
+  const path = `/images/${filename}`;
+  writeFileSync(join(output, 'images', filename), prepared.bytes);
+  imageRecords.push({
+    id, variant, path, sourceCacheFile, sourceFormat: prepared.sourceExtension, emittedFormat: ext,
+    sourceBytes: prepared.sourceBytes, emittedBytes: prepared.bytes.length,
+    dimensions: prepared.dimensions, sourceHasAlpha: prepared.sourceHasAlpha,
+    emittedHasAlpha: hasAlpha(prepared.bytes, ext), fallbackReason: prepared.fallbackReason,
+  });
+  return { path, dimensions: prepared.dimensions };
+}
+
+function cacheKey(watch, variant, sourceIdentity) {
+  const size = imageSize[variant];
+  // The WebP settings are part of the source-cache identity so a quality or encoder-policy change cannot reuse an old variant source.
+  return `${watch.id}-${variant}-${sourceIdentity}-max${size}-webp-q${webpQuality[variant]}`;
+}
+
+function cacheEmbeddedImage(watch, variant, embedded) {
+  const sourceIdentity = `embedded-${createHash('sha256').update(embedded.bytes).digest('hex').slice(0, 12)}`;
+  const prefix = cacheKey(watch, variant, sourceIdentity);
+  const existing = readdirSync(cache).find((name) => name.startsWith(`${prefix}.`));
+  if (existing) return { bytes: readFileSync(join(cache, existing)), ext: existing.split('.').pop(), file: existing };
+  const file = `${prefix}.${embedded.extension}`;
+  writeFileSync(join(cache, file), embedded.bytes);
+  return { bytes: embedded.bytes, ext: embedded.extension, file };
 }
 
 async function downloadImageVariant(watch, variant) {
@@ -132,19 +115,19 @@ async function downloadImageVariant(watch, variant) {
   const source = new URL(resizedImageUrl(watch.image, size));
   if (source.protocol !== 'https:' || source.hostname !== 'docs.google.com' || !source.pathname.startsWith('/sheets-images-rt/')) throw new Error(`Unexpected image host for ${watch.id}`);
   const urlDigest = createHash('sha256').update(source.toString()).digest('hex').slice(0, 12);
-  const prefix = `${watch.id}-${variant}-${urlDigest}.`;
-  let existing = readdirSync(cache).find((name) => name.startsWith(prefix));
+  const prefix = cacheKey(watch, variant, urlDigest);
+  let existing = readdirSync(cache).find((name) => name.startsWith(`${prefix}.`));
   if (!existing) {
     let lastError;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const response = await fetch(source.toString(), { signal: AbortSignal.timeout(25000) });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const ext = extension(response.headers.get('content-type') || '');
+        const ext = extensionForContentType(response.headers.get('content-type') || '');
         if (!ext) throw new Error(`Unsupported image type: ${response.headers.get('content-type')}`);
         const bytes = Buffer.from(await response.arrayBuffer());
         if (bytes.length < 100 || bytes.length > 5_000_000) throw new Error(`Unexpected image size: ${bytes.length}`);
-        existing = `${prefix}${ext}`;
+        existing = `${prefix}.${ext}`;
         writeFileSync(join(cache, existing), bytes);
         downloaded++;
         break;
@@ -157,22 +140,20 @@ async function downloadImageVariant(watch, variant) {
   }
   const ext = existing.split('.').pop();
   const cached = readFileSync(join(cache, existing));
-  const normalized = normalizeImage(cached, ext, size, `${watch.id} ${variant}`);
-  if (!normalized.bytes.equals(cached)) writeFileSync(join(cache, existing), normalized.bytes);
-  return writeHostedImage(watch.id, variant, normalized.bytes, ext);
+  return writeHostedImage(watch.id, variant, prepareImage(cached, ext, variant, `${watch.id} ${variant}`), existing);
 }
 
 async function downloadImage(watch) {
   const embedded = embeddedImages.get(watch.id);
   if (embedded) {
-    const detailSource = normalizeImage(embedded.bytes, embedded.extension, imageSize.detail, `${watch.id} detail`);
-    const detail = writeHostedImage(watch.id, 'detail', detailSource.bytes, embedded.extension);
+    const detailCached = cacheEmbeddedImage(watch, 'detail', embedded);
+    const detail = writeHostedImage(watch.id, 'detail', prepareImage(detailCached.bytes, detailCached.ext, 'detail', `${watch.id} detail`), detailCached.file);
     watch.localImage = detail.path;
     if (detail.dimensions && Math.max(detail.dimensions.width, detail.dimensions.height) <= imageSize.thumbnail) {
       watch.thumbnailImage = detail.path;
     } else {
-      const thumbnailSource = normalizeImage(embedded.bytes, embedded.extension, imageSize.thumbnail, `${watch.id} thumbnail`);
-      watch.thumbnailImage = writeHostedImage(watch.id, 'thumbnail', thumbnailSource.bytes, embedded.extension).path;
+      const thumbnailCached = cacheEmbeddedImage(watch, 'thumbnail', embedded);
+      watch.thumbnailImage = writeHostedImage(watch.id, 'thumbnail', prepareImage(thumbnailCached.bytes, thumbnailCached.ext, 'thumbnail', `${watch.id} thumbnail`), thumbnailCached.file).path;
       thumbnailsGenerated++;
     }
     watch.image = watch.localImage;
@@ -195,6 +176,15 @@ async function imagePool() {
 }
 await Promise.all(Array.from({ length: 8 }, imagePool));
 if (failures.length) throw new Error(`Image export failed for ${failures.length} watches: ${failures.slice(0, 12).join('; ')}`);
+const fallbackCounts = Object.fromEntries(Object.entries(Object.groupBy(imageRecords.filter((record) => record.fallbackReason && record.fallbackReason !== 'already-webp'), (record) => record.fallbackReason)).map(([reason, records]) => [reason, records.length]));
+writeFileSync(join(output, 'api', 'image-pipeline-report.json'), JSON.stringify({
+  schemaVersion: 1,
+  sourceImageCount: imageWatches.length,
+  settings: { maximumDimensions: imageSize, webpQuality, webpMinimumSourceBytes },
+  emittedFormatCounts: Object.fromEntries(Object.entries(Object.groupBy(imageRecords, (record) => record.emittedFormat)).map(([format, records]) => [format, records.length])),
+  fallbackCounts,
+  images: imageRecords,
+}));
 for (const watch of catalog.watches) if (watch.localImage) watch.image = watch.localImage;
 setCatalogForBuild(catalog);
 
