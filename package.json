@@ -15,6 +15,7 @@
     "test:sheet-sync": "node scripts/check-sheet-sync-qa.mjs",
     "test:image-pipeline": "node scripts/image-pipeline-qa.mjs",
     "test:image-quality": "node scripts/image-quality-review.mjs",
+    "test:network-benchmark": "node scripts/network-benchmark-qa.mjs",
     "benchmark:network": "node scripts/network-benchmark.mjs",
     "report:performance": "node scripts/ci-performance-report.mjs",
     "test:opening": "node scripts/opening-qa.mjs",

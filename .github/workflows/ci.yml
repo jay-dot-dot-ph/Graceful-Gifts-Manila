@@ -67,6 +67,9 @@ jobs:
           cat "$RUNNER_TEMP/graceful-gifts-preview.log"
           exit 1
 
+      - name: Verify network benchmark request classification
+        run: npm run test:network-benchmark
+
       - name: Measure local browser transfer
         run: npm run benchmark:network
 

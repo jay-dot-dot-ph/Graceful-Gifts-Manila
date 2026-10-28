@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright-core';
+import { summarizeNetworkEntries } from './network-classification.mjs';
 
 const base = process.argv[2] || process.env.QA_BASE || 'http://127.0.0.1:4173';
 const baseOrigin = new URL(base).origin;
@@ -49,24 +50,15 @@ function networkProbe(page) {
     async summary(from) {
       await ready;
       const measured = entries.slice(from);
-      const external = measured.filter((entry) => /^https?:/.test(entry.url) && !entry.url.startsWith(baseOrigin));
-      assert.equal(external.length, 0, `Benchmark must not include third-party transfers: ${external.map((entry) => entry.url).join(', ')}`);
-      const local = measured.filter((entry) => entry.url.startsWith(baseOrigin));
-      const categories = {};
-      for (const entry of local) {
-        const name = category(entry);
-        const cacheHit = entry.fromDiskCache || entry.status === 304 || (entry.status === 200 && entry.encodedDataLength === 0);
-        const value = categories[name] || { transferredBytes: 0, requestCount: 0, cacheHits: 0 };
-        value.transferredBytes += entry.encodedDataLength;
-        value.requestCount++;
-        if (cacheHit) value.cacheHits++;
-        categories[name] = value;
-      }
+      const totals = summarizeNetworkEntries(measured, baseOrigin, category);
+      assert.equal(
+        totals.unexpected.length,
+        0,
+        `Benchmark found unexpected third-party transfers: ${totals.unexpected.map((item) => item.url).join(', ')}`,
+      );
       return {
-        transferredBytes: Object.values(categories).reduce((sum, value) => sum + value.transferredBytes, 0),
-        requestCount: local.length,
-        cacheHits: Object.values(categories).reduce((sum, value) => sum + value.cacheHits, 0),
-        categories,
+        ...totals.hosting,
+        googleFonts: totals.googleFonts,
       };
     },
   };
@@ -99,11 +91,14 @@ function markdown(report) {
   const lines = [
     '# Local browser transfer benchmark',
     '',
-    'Measured with Chromium CDP `Network.loadingFinished.encodedDataLength` against the local preview. Cache hits use CDP disk-cache/status/zero-transfer evidence. Values are directional and are not Firebase CDN or monthly Hosting usage measurements.',
+    'Measured with Chromium CDP `Network.loadingFinished.encodedDataLength` against the local preview. Firebase Hosting totals include only the exact local preview origin. Google Fonts traffic is reported separately and excluded from Hosting totals; any other third-party request fails the benchmark. Cache hits use CDP disk-cache/service-worker/status/zero-transfer evidence. Values are directional and are not Firebase CDN or monthly Hosting usage measurements.',
     '',
-    '| Scenario | Cache | Transfer bytes | Requests | Cache hits |',
-    '| --- | --- | ---: | ---: | ---: |',
-    ...report.scenarios.map((item) => `| ${item.scenario} | ${item.cache} | ${bytes(item.transferredBytes)} | ${item.requestCount} | ${item.cacheHits} |`),
+    '| Scenario | Cache | Firebase Hosting transfer bytes | Hosting requests | Hosting cache hits | Google Fonts transfer bytes | Google Fonts requests | Google Fonts cache hits |',
+    '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+    ...report.scenarios.map((item) => {
+      const fonts = item.googleFonts || { transferredBytes: 0, requestCount: 0, cacheHits: 0 };
+      return `| ${item.scenario} | ${item.cache} | ${bytes(item.transferredBytes)} | ${item.requestCount} | ${item.cacheHits} | ${bytes(fonts.transferredBytes)} | ${fonts.requestCount} | ${fonts.cacheHits} |`;
+    }),
   ];
   for (const item of report.scenarios) {
     lines.push('', `## ${item.scenario} (${item.cache})`, '', '| Category | Transfer bytes | Requests | Cache hits |', '| --- | ---: | ---: | ---: |');
@@ -165,7 +160,7 @@ try {
   scenarios.push({ scenario: 'catalog-additional-24', cache: 'warm', ...(await warmProbe.summary(more)) });
   await warmContext.close();
 
-  const report = { schemaVersion: 1, base, viewport: { width: 1440, height: 1000, deviceScaleFactor: 1 }, scenarios };
+  const report = { schemaVersion: 2, base, firstPartyOrigin: baseOrigin, viewport: { width: 1440, height: 1000, deviceScaleFactor: 1 }, scenarios };
   writeFileSync(resolve(output, 'network-benchmark.json'), JSON.stringify(report, null, 2));
   writeFileSync(resolve(output, 'network-benchmark.md'), markdown(report));
   console.log(markdown(report));

@@ -88,9 +88,12 @@ const lines = [
 ];
 
 if (benchmark) {
-  lines.push('| Scenario | Cache | Browser-reported transfer bytes | Requests | Cache hits |', '| --- | --- | ---: | ---: | ---: |');
-  for (const scenario of benchmark.scenarios) lines.push(`| ${scenario.scenario} | ${scenario.cache} | ${bytes(scenario.transferredBytes)} | ${scenario.requestCount} | ${scenario.cacheHits} |`);
-  lines.push('', 'These are local Chromium transfer measurements using CDP encoded transfer bytes. A same-snapshot Phase-2 legacy-format browser build was not run, so no real before/after transfer reduction is claimed. Firebase CDN delivery and monthly Hosting usage require a separately approved deployment and live measurement.');
+  lines.push('| Scenario | Cache | Firebase Hosting transfer bytes | Hosting requests | Hosting cache hits | Google Fonts transfer bytes | Google Fonts requests |', '| --- | --- | ---: | ---: | ---: | ---: | ---: |');
+  for (const scenario of benchmark.scenarios) {
+    const fonts = scenario.googleFonts || { transferredBytes: 0, requestCount: 0 };
+    lines.push(`| ${scenario.scenario} | ${scenario.cache} | ${bytes(scenario.transferredBytes)} | ${scenario.requestCount} | ${scenario.cacheHits} | ${bytes(fonts.transferredBytes)} | ${fonts.requestCount} |`);
+  }
+  lines.push('', 'These are local Chromium transfer measurements using CDP encoded transfer bytes. Firebase Hosting columns include only requests from the exact local preview origin. The explicitly allowed Google Fonts domains are reported separately; unexpected third-party requests fail the benchmark. A same-snapshot Phase-2 legacy-format browser build was not run, so no real before/after transfer reduction is claimed. Firebase CDN delivery and monthly Hosting usage require a separately approved deployment and live measurement.');
 } else {
   lines.push('Network benchmark artifact is unavailable. This report intentionally does not claim browser-transfer savings without measurement.');
 }
