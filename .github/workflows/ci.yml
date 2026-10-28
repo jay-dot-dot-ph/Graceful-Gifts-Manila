@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: 0
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for browser checks
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Build Firebase Hosting artifact
+        run: npm run build:firebase
+
+      - name: Validate build artifact
+        run: npm run validate
+
+      - name: Verify image pipeline
+        run: npm run test:image-pipeline
+
+      - name: Start local preview
+        run: |
+          npm run dev > "$RUNNER_TEMP/graceful-gifts-preview.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/graceful-gifts-preview.pid"
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:4173/api/catalog.json > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/graceful-gifts-preview.log"
+          exit 1
+
+      - name: Verify opening experience
+        run: npm run test:opening
+
+      - name: Verify browser experience
+        run: npm run test:browser
+
+      - name: Write performance report
+        if: success()
+        run: npm run report:performance
+
+      - name: Show local preview log on failure
+        if: failure()
+        run: cat "$RUNNER_TEMP/graceful-gifts-preview.log" || true

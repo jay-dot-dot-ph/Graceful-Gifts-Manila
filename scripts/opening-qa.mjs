@@ -6,7 +6,9 @@ import { chromium } from 'playwright-core';
 const base = process.argv[2] || process.env.QA_BASE || 'http://127.0.0.1:4173';
 const fixture = { watches: [], brands: [] };
 const feedbackCount = readdirSync(resolve('feedback')).filter((name) => /\.jpe?g$/i.test(name)).length;
-const browser = await chromium.launch({ executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', headless: true });
+const executablePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH
+  || (process.platform === 'win32' ? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe' : undefined);
+const browser = await chromium.launch({ ...(executablePath ? { executablePath } : {}), headless: true });
 
 try {
   for (const [label, width, height] of [['desktop', 1440, 900], ['small-desktop', 1100, 600], ['tablet', 820, 1180], ['mobile', 390, 844], ['small-mobile', 320, 568]]) {
@@ -15,7 +17,7 @@ try {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.route('**/api/catalog*', (route) => route.fulfill({ json: fixture }));
-    if (label === 'desktop') await page.route('**/styles.css', async (route) => {
+    if (label === 'desktop') await page.route('**/styles*.css', async (route) => {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 1000));
       await route.continue();
     });
@@ -33,7 +35,7 @@ try {
         delay: getComputedStyle(screen).animationDelay,
         duration: getComputedStyle(screen).animationDuration,
         cards: screen.querySelectorAll('.opening-feedback').length,
-        inlineImages: screen.querySelectorAll('.opening-feedback img[src^="data:image/jpeg;base64,"]').length,
+        hostedImages: screen.querySelectorAll('.opening-feedback img[src^="/feedback/"]').length,
       };
     });
     assert.equal(first.screenVisible && first.logoTopmost && first.appHidden, true, `${label}: opening covers the main page at first paint`);
@@ -41,7 +43,7 @@ try {
     assert.equal(first.delay, '3s', `${label}: opening holds for three seconds`);
     assert.equal(first.duration, '0.001s', `${label}: exit has no half-second pause`);
     assert.equal(first.cards, feedbackCount, `${label}: all supplied feedback pictures remain in the opening`);
-    assert.equal(first.inlineImages, feedbackCount, `${label}: feedback previews load with the page`);
+    assert.equal(first.hostedImages, feedbackCount, `${label}: feedback previews use cacheable Hosting files`);
     await page.waitForFunction(() => [...document.querySelectorAll('.opening-feedback')].some((card) => Number(getComputedStyle(card).opacity) > 0.2), null, { timeout: 3500 });
     if (label.endsWith('desktop')) {
       await page.waitForFunction((count) => [...document.querySelectorAll('.opening-feedback')].filter((card) => Number(getComputedStyle(card).opacity) >= 0.95).length === count, feedbackCount, { timeout: 3500 });

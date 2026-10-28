@@ -3,12 +3,13 @@ import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const executablePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH
+  || (process.platform === 'win32' ? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe' : undefined);
 const base = process.argv[2] || process.env.QA_BASE || 'http://127.0.0.1:4173';
 const catalogEndpoint = process.argv[3] || process.env.QA_CATALOG_URL || '/api/catalog.json';
 const output = resolve('.sites-runtime');
 mkdirSync(output, { recursive: true });
-const browser = await chromium.launch({ executablePath: edge, headless: true });
+const browser = await chromium.launch({ ...(executablePath ? { executablePath } : {}), headless: true });
 const errors = [];
 try {
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 1000 }, permissions: ['clipboard-read', 'clipboard-write'] });

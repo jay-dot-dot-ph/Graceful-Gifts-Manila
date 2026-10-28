@@ -40,27 +40,54 @@ const imageWatches = catalog.watches.filter((watch) => watch.image || embeddedIm
 let nextImage = 0;
 const failures = [];
 let downloaded = 0;
+let thumbnailsGenerated = 0;
 const extension = (type) => type.startsWith('image/jpeg') ? 'jpg' : type.startsWith('image/png') ? 'png' : type.startsWith('image/webp') ? 'webp' : null;
-async function downloadImage(watch) {
-  const embedded = embeddedImages.get(watch.id);
-  if (embedded) {
-    const digest = createHash('sha256').update(embedded.bytes).digest('hex').slice(0, 12);
-    const filename = `${watch.id}-${digest}.${embedded.extension}`;
-    writeFileSync(join(output, 'images', filename), embedded.bytes);
-    watch.localImage = `/images/${filename}`;
-    watch.image = watch.localImage;
-    return;
+const imageSize = { thumbnail: 480, detail: 800 };
+
+function resizedImageUrl(source, size) {
+  if (!/=w\d+-h\d+$/.test(source)) throw new Error(`Image URL is missing its Google Sheets size suffix: ${source}`);
+  return source.replace(/=w\d+-h\d+$/, `=w${size}-h${size}`);
+}
+
+function imageDimensions(bytes, type) {
+  if (type === 'png' && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
   }
-  const source = new URL(watch.image);
+  if (type === 'jpg' && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    for (let offset = 2; offset < bytes.length - 9;) {
+      if (bytes[offset] !== 0xff) break;
+      const marker = bytes[offset + 1];
+      if (marker === 0xd9 || marker === 0xda) break;
+      const length = bytes.readUInt16BE(offset + 2);
+      if (length < 2 || offset + length + 2 > bytes.length) break;
+      if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+        return { width: bytes.readUInt16BE(offset + 7), height: bytes.readUInt16BE(offset + 5) };
+      }
+      offset += length + 2;
+    }
+  }
+  return null;
+}
+
+function writeHostedImage(id, variant, bytes, ext) {
+  const digest = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
+  const filename = `${id}-${variant}-${digest}.${ext}`;
+  writeFileSync(join(output, 'images', filename), bytes);
+  return { path: `/images/${filename}`, dimensions: imageDimensions(bytes, ext) };
+}
+
+async function downloadImageVariant(watch, variant) {
+  const size = imageSize[variant];
+  const source = new URL(resizedImageUrl(watch.image, size));
   if (source.protocol !== 'https:' || source.hostname !== 'docs.google.com' || !source.pathname.startsWith('/sheets-images-rt/')) throw new Error(`Unexpected image host for ${watch.id}`);
-  const digest = createHash('sha256').update(watch.image).digest('hex').slice(0, 12);
-  const prefix = `${watch.id}-${digest}.`;
+  const urlDigest = createHash('sha256').update(source.toString()).digest('hex').slice(0, 12);
+  const prefix = `${watch.id}-${variant}-${urlDigest}.`;
   let existing = readdirSync(cache).find((name) => name.startsWith(prefix));
   if (!existing) {
     let lastError;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const response = await fetch(source, { signal: AbortSignal.timeout(25000) });
+        const response = await fetch(source.toString(), { signal: AbortSignal.timeout(25000) });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const ext = extension(response.headers.get('content-type') || '');
         if (!ext) throw new Error(`Unsupported image type: ${response.headers.get('content-type')}`);
@@ -75,13 +102,28 @@ async function downloadImage(watch) {
         if (attempt < 2) await new Promise((resolveDelay) => setTimeout(resolveDelay, 500 * (attempt + 1)));
       }
     }
-    if (!existing) throw new Error(`${watch.id}: ${lastError?.message || 'image unavailable'}`);
+    if (!existing) throw new Error(`${watch.id} ${variant}: ${lastError?.message || 'image unavailable'}`);
   }
-  const bytes = readFileSync(join(cache, existing));
-  const contentDigest = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
-  const filename = `${watch.id}-${contentDigest}.${existing.split('.').pop()}`;
-  writeFileSync(join(output, 'images', filename), bytes);
-  watch.localImage = `/images/${filename}`;
+  const ext = existing.split('.').pop();
+  return writeHostedImage(watch.id, variant, readFileSync(join(cache, existing)), ext);
+}
+
+async function downloadImage(watch) {
+  const embedded = embeddedImages.get(watch.id);
+  if (embedded) {
+    const detail = writeHostedImage(watch.id, 'detail', embedded.bytes, embedded.extension);
+    watch.localImage = detail.path;
+    watch.thumbnailImage = detail.path;
+    watch.image = watch.localImage;
+    return;
+  }
+  const detail = await downloadImageVariant(watch, 'detail');
+  watch.localImage = detail.path;
+  watch.thumbnailImage = detail.dimensions && Math.max(detail.dimensions.width, detail.dimensions.height) <= imageSize.thumbnail
+    ? detail.path
+    : (await downloadImageVariant(watch, 'thumbnail')).path;
+  if (watch.thumbnailImage !== detail.path) thumbnailsGenerated++;
+  watch.image = watch.localImage;
 }
 async function imagePool() {
   while (nextImage < imageWatches.length) {
@@ -100,7 +142,10 @@ const readRoute = async (path) => {
   if (!response.ok) throw new Error(`${path} returned ${response.status}`);
   return response.text();
 };
-writeFileSync(join(output, 'styles.css'), await readRoute('/styles.css'));
+const styles = await readRoute('/styles.css');
+writeFileSync(join(output, 'styles.css'), styles);
+const versionedStyles = `styles-${createHash('sha256').update(styles).digest('hex').slice(0, 12)}.css`;
+writeFileSync(join(output, versionedStyles), styles);
 copyFileSync(join(root, 'worker', 'admin.css'), join(output, 'admin.css'));
 copyFileSync(join(root, 'worker', 'admin.html'), join(output, 'admin.html'));
 await bundle({ entryPoints: [join(root, 'chat', 'customer.js'), join(root, 'chat', 'admin.js')], outdir: output, entryNames: '[name]', bundle: true, format: 'esm', splitting: true, minify: true, target: 'es2022' });
@@ -111,10 +156,11 @@ const adminVersion = createHash('sha256')
   .update(readFileSync(join(output, 'admin.css')))
   .digest('hex').slice(0, 12);
 const adminPage = readFileSync(join(output, 'admin.html'), 'utf8');
-if (!adminPage.includes('href="/admin.css"') || !adminPage.includes('src="/admin.js"')) {
+if (!adminPage.includes('href="/styles.css"') || !adminPage.includes('href="/admin.css"') || !adminPage.includes('src="/admin.js"')) {
   throw new Error('Admin page is missing its expected stylesheet or script.');
 }
 writeFileSync(join(output, 'admin.html'), adminPage
+  .replace('href="/styles.css"', `href="/${versionedStyles}"`)
   .replace('href="/admin.css"', `href="/admin.css?v=${adminVersion}"`)
   .replace('src="/admin.js"', `src="/admin.js?v=${adminVersion}"`));
 const localFirebaseConfig = join(root, 'firebase-config.local.json');
@@ -135,7 +181,10 @@ const versionedClient = `app-${createHash('sha256').update(staticClient).digest(
 writeFileSync(join(output, versionedClient), staticClient);
 const versionedPage = (html) => {
   if (!html.includes('src="/app.js"')) throw new Error('Page is missing the catalog browser script.');
-  return html.replace('src="/app.js"', `src="/${versionedClient}"`);
+  if (!html.includes('href="/styles.css"')) throw new Error('Page is missing the site stylesheet.');
+  return html
+    .replaceAll('href="/styles.css"', `href="/${versionedStyles}"`)
+    .replace('src="/app.js"', `src="/${versionedClient}"`);
 };
 writeFileSync(join(output, 'favicon.svg'), await readRoute('/favicon.svg'));
 writeFileSync(join(output, 'robots.txt'), await readRoute('/robots.txt'));
@@ -152,5 +201,5 @@ const escapeXml = (value) => value.replace(/[&<>"']/g, (char) => ({ '&':'&amp;',
 const urls = ['/', '/watches', '/brands', '/favorites', '/contact', ...catalog.brands.map((brand) => `/watches/${brand.slug}`), ...catalog.watches.map((watch) => `/watch/${encodeURIComponent(watch.id)}`)];
 writeFileSync(join(output, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map((path) => `<url><loc>${escapeXml(origin + path)}</loc></url>`).join('')}</urlset>`);
 const { fingerprint } = writeSiteFingerprint(output);
-console.log(`Firebase export ready: ${catalog.watches.length} watches, ${imageWatches.length} images (${downloaded} downloaded, ${imageWatches.length - downloaded} cached), ${catalog.brands.length} brands.`);
+console.log(`Firebase export ready: ${catalog.watches.length} watches, ${imageWatches.length} detail images, ${thumbnailsGenerated} responsive thumbnails (${downloaded} image variants downloaded), ${catalog.brands.length} brands.`);
 console.log(`Site fingerprint: ${fingerprint}`);

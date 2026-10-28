@@ -16,7 +16,11 @@
     ],
     "headers": [
       { "source": "/images/**", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
+      { "source": "/feedback/**", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
       { "source": "/app-*.js", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
+      { "source": "/styles-*.css", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
+      { "source": "/chunk-*.js", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
+      { "source": "/index.esm-*.js", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
       { "source": "/app.js", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/chat.js", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/admin.js", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
@@ -34,7 +38,7 @@
       { "source": "/favorites", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/contact", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
       { "source": "/watch/**", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
-      { "source": "/api/catalog.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=60" }] },
+      { "source": "/api/catalog.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300, stale-while-revalidate=86400" }] },
       { "source": "**/*.html", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] }
     ]
   },
