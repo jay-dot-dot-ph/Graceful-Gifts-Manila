@@ -41,17 +41,52 @@ function toggleMessageTime(bubble) {
   bubble.title = show ? 'Click to hide date and time' : 'Click to show date and time';
 }
 
+function closeChat() {
+  state.open = false;
+  state.activeMessageId = null;
+  state.menuMessageId = null;
+  render();
+}
 function ensureRoot() {
   let root = document.getElementById('ggm-chat'); if (root) return root;
   root = document.createElement('aside'); root.id = 'ggm-chat'; root.className = 'ggm-chat'; root.setAttribute('aria-label', 'Graceful Gifts Manila customer support');
-  root.innerHTML = `<div class="ggm-chat-head"><span class="chat-store-avatar" aria-hidden="true">G</span><div class="chat-store-label"><strong>Graceful Gifts Manila</strong><span>Customer Support</span></div><button type="button" class="chat-sound" data-sound aria-label="Mute sounds"></button><button type="button" class="chat-close" data-chat-close aria-label="Close chat">×</button></div><div class="ggm-chat-body" id="ggm-chat-body" role="log" aria-label="Conversation messages"></div><div class="ggm-chat-identity"><label>Your name (optional)<input name="name" maxlength="80" autocomplete="name"></label><label>Email or phone (optional)<input name="contact" maxlength="120" autocomplete="email"></label></div><div class="chat-attachment-preview" id="ggm-attachment-preview" hidden></div><form id="ggm-chat-form" class="ggm-chat-form"><label class="chat-attach" id="ggm-attach-label" hidden title="Send a message first to start the conversation">＋<span class="visually-hidden">Attach photo or video</span><input id="ggm-chat-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" hidden></label><label for="ggm-chat-message" class="visually-hidden">Your message</label><textarea id="ggm-chat-message" maxlength="2000" rows="2" placeholder="Write your message…"></textarea><button type="submit">Send</button></form><p class="ggm-chat-error" role="alert" hidden></p>`;
+  root.innerHTML = `<button type="button" class="chat-drag-handle" aria-label="Drag down to close chat"><span></span></button><div class="ggm-chat-head"><span class="chat-store-avatar" aria-hidden="true">G</span><div class="chat-store-label"><strong>Graceful Gifts Manila</strong><span>Customer Support</span></div><button type="button" class="chat-sound" data-sound aria-label="Mute sounds"></button><button type="button" class="chat-close" data-chat-close aria-label="Close chat">×</button></div><div class="ggm-chat-body" id="ggm-chat-body" role="log" aria-label="Conversation messages"></div><div class="ggm-chat-identity"><label>Your name (optional)<input name="name" maxlength="80" autocomplete="name"></label><label>Email or phone (optional)<input name="contact" maxlength="120" autocomplete="email"></label></div><div class="chat-attachment-preview" id="ggm-attachment-preview" hidden></div><form id="ggm-chat-form" class="ggm-chat-form"><label class="chat-attach" id="ggm-attach-label" hidden title="Send a message first to start the conversation">＋<span class="visually-hidden">Attach photo or video</span><input id="ggm-chat-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" hidden></label><label for="ggm-chat-message" class="visually-hidden">Your message</label><textarea id="ggm-chat-message" maxlength="2000" rows="2" placeholder="Write your message…"></textarea><button type="submit">Send</button></form><p class="ggm-chat-error" role="alert" hidden></p>`;
   document.body.append(root);
   const chatMenu = document.createElement('details');
   chatMenu.className = 'chat-header-menu';
   chatMenu.innerHTML = '<summary aria-label="Chat options" title="Chat options">⋮</summary><div><strong>Graceful Gifts Manila</strong><span>Customer Support</span><button type="button" data-menu-close>Close chat</button></div>';
   root.querySelector('.ggm-chat-head').append(chatMenu);
   chatMenu.querySelector('[data-menu-close]').onclick = () => root.querySelector('[data-chat-close]').click();
-  root.querySelector('[data-chat-close]').onclick = () => { state.open = false; state.activeMessageId = null; state.menuMessageId = null; render(); };
+  root.querySelector('[data-chat-close]').onclick = closeChat;
+  const dragHandle = root.querySelector('.chat-drag-handle');
+  let dragStart = null;
+  let suppressHandleClick = false;
+  dragHandle.onpointerdown = (event) => {
+    if (window.innerWidth > 760 || !state.open) return;
+    suppressHandleClick = false;
+    dragStart = { id: event.pointerId, y: event.clientY, moved: false };
+    dragHandle.setPointerCapture(event.pointerId);
+  };
+  dragHandle.onpointermove = (event) => {
+    if (!dragStart || event.pointerId !== dragStart.id) return;
+    const distance = Math.max(0, event.clientY - dragStart.y);
+    if (distance > 8) dragStart.moved = true;
+    root.style.transform = `translateY(${distance}px)`;
+  };
+  const finishDrag = (event) => {
+    if (!dragStart || event.pointerId !== dragStart.id) return;
+    const distance = Math.max(0, event.clientY - dragStart.y);
+    suppressHandleClick = dragStart.moved;
+    dragStart = null;
+    root.style.transform = '';
+    if (distance > Math.min(100, root.getBoundingClientRect().height * 0.22)) closeChat();
+  };
+  dragHandle.onpointerup = finishDrag;
+  dragHandle.onpointercancel = finishDrag;
+  dragHandle.onclick = () => {
+    if (suppressHandleClick) { suppressHandleClick = false; return; }
+    closeChat();
+  };
   root.querySelector('[data-sound]').onclick = () => sound.toggle();
   root.querySelector('#ggm-chat-form').onsubmit = submit;
   root.querySelector('#ggm-chat-message').oninput = (event) => { state.draft = event.target.value; if (state.draft !== state.generatedDraft) state.generatedDraft = ''; };

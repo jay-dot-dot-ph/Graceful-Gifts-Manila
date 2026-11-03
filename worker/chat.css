@@ -99,3 +99,14 @@
 :root[data-theme=dark] .ggm-chat-bubble.has-product .chat-product{background:linear-gradient(145deg,#fffdfa,#f1e7d9);color:#292d1e}
 @media(max-width:760px){.ggm-chat{inset:auto 0 0;width:100vw;max-width:100vw;height:var(--ggm-viewport-height,100dvh);max-height:var(--ggm-viewport-height,100dvh);top:var(--ggm-viewport-top,0px);bottom:auto;border:0;border-radius:0}.ggm-chat-head{min-height:60px;padding:calc(9px + env(safe-area-inset-top)) 12px 9px}.ggm-chat-body{padding:14px 6% 24px}.ggm-chat-form{padding:12px 4% calc(13px + env(safe-area-inset-bottom))}.ggm-chat-form textarea{font-size:16px}}
 @media(max-width:390px){.ggm-chat-head{gap:8px;padding-left:12px;padding-right:12px}.ggm-chat-head .chat-store-avatar{width:41px;height:41px}.ggm-chat-head .chat-store-label{padding-left:8px}.ggm-chat-head .chat-store-label strong{font-size:1.06rem}.ggm-chat-head .chat-store-label span{font-size:.68rem}.ggm-chat-head .chat-sound{width:36px;height:36px;min-width:36px;min-height:36px}.ggm-chat-bubble.has-product{width:96%;max-width:96%}.ggm-chat-form{gap:6px}.ggm-chat-form button[type=submit]{padding:10px 12px}}
+
+/* Mobile chat opens as a shorter sheet with a pull-down handle. */
+.chat-drag-handle{display:none}
+@media(max-width:760px){
+  .ggm-chat{--ggm-chat-mobile-height:min(72dvh,600px,calc(var(--ggm-viewport-height,100dvh) - 12px));inset:auto 0 auto;width:100vw;max-width:100vw;height:var(--ggm-chat-mobile-height);max-height:var(--ggm-chat-mobile-height);top:calc(var(--ggm-viewport-top,0px) + var(--ggm-viewport-height,100dvh) - var(--ggm-chat-mobile-height));border:2px solid #d5bf9f;border-bottom:0;border-radius:22px 22px 0 0;box-shadow:0 -12px 40px #18180f50}
+  .chat-drag-handle{display:grid;place-items:center;flex:none;width:100%;height:26px;padding:0;border:0;background:#202515;touch-action:none;cursor:grab}
+  .chat-drag-handle:active{cursor:grabbing}
+  .chat-drag-handle span{display:block;width:42px;height:5px;border-radius:999px;background:#cfb783}
+  .ggm-chat-head{min-height:56px}
+  .ggm-chat-head::before{border-radius:0}
+}
