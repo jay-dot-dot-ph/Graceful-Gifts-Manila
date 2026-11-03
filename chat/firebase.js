@@ -67,39 +67,44 @@ export async function sendMessage(db, conversationId, uid, role, text, products 
   const conversation = doc(db, 'conversations', conversationId);
   if (!/^[A-Za-z0-9]{20}$/.test(messageId)) throw new Error('Invalid message ID.');
   const message = doc(collection(conversation, 'messages'), messageId);
-  await runTransaction(db, async (tx) => {
-    const snapshot = await tx.get(conversation);
-    if (snapshot.exists()) {
-      const previous = await tx.get(message);
-      if (previous.exists()) {
-        if (previous.data().senderUid !== uid || previous.data().message !== summary) throw new Error('Message ID already used.');
-        return;
-      }
+  const snapshot = role === 'customer' ? await getDoc(conversation) : null;
+  const now = serverTimestamp();
+  const base = {
+    lastMessage: summary, lastMessageAt: now, lastMessageId: message.id,
+    lastSenderUid: uid, lastSenderRole: role, updatedAt: now
+  };
+  const batch = writeBatch(db);
+  if (snapshot && !snapshot.exists()) {
+    if (conversationId !== uid) throw new Error('Conversation unavailable.');
+    batch.set(conversation, {
+      customerUid: uid, customerName: String(identity.name || '').trim().slice(0, 80), customerContact: String(identity.contact || '').trim().slice(0, 120), assignedStaffUid: null,
+      status: 'new', createdAt: now, customerReadAt: now, staffReadAt: null,
+      productReferences: products.slice(0, 8).map(safeProduct), ...base
+    });
+  } else {
+    if (snapshot && snapshot.data().customerUid !== uid) throw new Error('Conversation unavailable.');
+    const merged = products.length && snapshot ? [...snapshot.data().productReferences, ...products.map(safeProduct)] : [];
+    const unique = [...new Map(merged.map((product) => [product.id, product])).values()].slice(0, 8);
+    batch.update(conversation, {
+      ...base,
+      ...(role === 'customer' ? { ...(products.length ? { productReferences: unique } : {}), customerReadAt: now } : { staffReadAt: now })
+    });
+  }
+  batch.set(message, { senderUid: uid, senderRole: role, message: summary, createdAt: now, productReferences: products.slice(0, 8).map(safeProduct), ...(media ? { media } : {}) });
+  try { await batch.commit(); }
+  catch (error) {
+    // A retry can arrive after the original commit succeeded but its response was lost.
+    if (['unavailable', 'deadline-exceeded', 'aborted', 'unknown', 'permission-denied'].includes(error?.code)) {
+      try {
+        const previous = await getDoc(message);
+        if (previous.exists()) {
+          if (previous.data().senderUid !== uid || previous.data().message !== summary) throw new Error('Message ID already used.');
+          return message.id;
+        }
+      } catch (lookupError) { if (lookupError?.message === 'Message ID already used.') throw lookupError; }
     }
-    const now = serverTimestamp();
-    const base = {
-      lastMessage: summary, lastMessageAt: now, lastMessageId: message.id,
-      lastSenderUid: uid, lastSenderRole: role, updatedAt: now
-    };
-    if (!snapshot.exists()) {
-      if (role !== 'customer' || conversationId !== uid) throw new Error('Conversation unavailable.');
-      tx.set(conversation, {
-        customerUid: uid, customerName: String(identity.name || '').trim().slice(0, 80), customerContact: String(identity.contact || '').trim().slice(0, 120), assignedStaffUid: null,
-        status: 'new', createdAt: now, customerReadAt: now, staffReadAt: null,
-        productReferences: products.slice(0, 8).map(safeProduct), ...base
-      });
-    } else {
-      const data = snapshot.data();
-      if (role === 'customer' && data.customerUid !== uid) throw new Error('Conversation unavailable.');
-      const merged = products.length ? [...data.productReferences, ...products.map(safeProduct)] : data.productReferences;
-      const unique = [...new Map(merged.map((product) => [product.id, product])).values()].slice(0, 8);
-      tx.update(conversation, {
-        ...base,
-        ...(role === 'customer' ? { productReferences: unique, customerReadAt: now } : { staffReadAt: now })
-      });
-    }
-    tx.set(message, { senderUid: uid, senderRole: role, message: summary, createdAt: now, productReferences: products.slice(0, 8).map(safeProduct), ...(media ? { media } : {}) });
-  });
+    throw error;
+  }
   return message.id;
 }
 

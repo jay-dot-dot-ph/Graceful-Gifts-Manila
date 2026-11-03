@@ -132,7 +132,7 @@ function renderChrome() {
   const soundButton = root.querySelector('[data-sound]'); soundButton.innerHTML = soundIcon(sound.enabled); soundButton.setAttribute('aria-label', sound.label()); soundButton.title = sound.label(); soundButton.setAttribute('aria-pressed', String(sound.enabled));
   root.querySelector('.ggm-chat-identity').hidden = !!state.conversation;
   const composer = root.querySelector('#ggm-chat-message'); if (composer.value !== state.draft) composer.value = state.draft;
-  composer.disabled = state.sending || state.loading;
+  composer.disabled = state.sending;
   if (state.open && state.focusComposer && !composer.disabled) {
     state.focusComposer = false;
     requestAnimationFrame(() => { if (state.open && !composer.disabled) { composer.focus({ preventScroll: true }); composer.setSelectionRange(composer.value.length, composer.value.length); } });

@@ -90,6 +90,10 @@ try {
   await assertFails(updateDoc(doc(staff, 'conversations', 'customer-uid', 'messages', replyId), { message: 'Message unsent', unsentAt: serverTimestamp(), productReferences: [] }));
   await assertSucceeds(unsendMessage(staff, 'customer-uid', replyId, 'staff-uid'));
   assert.equal((await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessage, 'Message unsent');
+  await assertSucceeds(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Thank you for the quick reply.'));
+  const quickReplyId = (await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessageId;
+  assert.equal(await assertSucceeds(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Thank you for the quick reply.', [], {}, quickReplyId)), quickReplyId);
+  await assertFails(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Another message too fast'));
   await assertFails(updateDoc(doc(staff, 'conversations', 'customer-uid', 'messages', replyId), { message: 'Restored', editedAt: serverTimestamp() }));
   await environment.withSecurityRulesDisabled(async (context) => {
     await updateDoc(doc(context.firestore(), 'conversations', 'customer-uid'), { productReferences: [{ id: 'AP-001', name: 'Royal Oak', brand: 'Audemars Piguet', price: 5950, image: '/images/AP-001-test.jpg', url: 'https://graceful-gifts-manila.web.app/watch/AP-001', size: '42mm', stock: 20 }] });
