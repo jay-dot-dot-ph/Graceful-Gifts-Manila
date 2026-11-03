@@ -84,7 +84,11 @@ function mixedBrandPreview(watches, limit, previousIds = []) {
   return preview;
 }
 function home() {
-  const visual = catalog.watches.find((watch) => watch.id === 'ROLEX-001' && watch.image) || catalog.watches.find((watch) => watch.image && watch.stock !== 0);
+  let previousHeroId = '';
+  try { previousHeroId = sessionStorage.getItem('ggm-home-hero') || ''; } catch {}
+  const visual = mixedBrandPreview(catalog.watches.filter((watch) => watch.stock !== 0), 1, previousHeroId ? [previousHeroId] : [])[0]
+    || catalog.watches.find((watch) => watch.image && watch.stock !== 0);
+  try { if (visual) sessionStorage.setItem('ggm-home-hero', visual.id); } catch {}
 
   const bestSellers = bestSellerIds.map((id) => catalog.watches.find((watch) => watch.id === id)).filter(Boolean);
   let previousPreview = [];
