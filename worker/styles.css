@@ -218,3 +218,20 @@
 :root[data-theme=dark] .soldout-notice strong{color:#f3eadb}
 :root[data-theme=dark] .soldout-notice p{color:#c8c0b1}
 @media(max-width:760px){.soldout-notice{gap:14px;padding:18px}.soldout-notice>div{padding-left:14px}.soldout-image-message{top:61%}.soldout-image-message strong{font-size:clamp(1.15rem,5vw,1.5rem)}.soldout-image-message small{margin-top:5px;font-size:.48rem;letter-spacing:.1em}}
+
+/* Featured watch navigation */
+.hero-visual-wrap{position:relative;display:grid;min-width:0}
+.hero-watch-arrow{position:absolute;z-index:2;top:50%;display:grid;place-items:center;width:48px;height:48px;padding:0;border:1px solid #b8a37f;border-radius:50%;background:#fffdf0ed;color:#292b24;box-shadow:0 6px 20px #29261f24;transform:translateY(-50%);transition:background .2s,box-shadow .2s}
+.hero-watch-arrow:hover{background:#fff;box-shadow:0 8px 24px #29261f38}
+.hero-watch-arrow svg{width:22px;height:22px}
+.hero-watch-prev{left:1%}
+.hero-watch-next{right:1%}
+:root[data-theme=dark] .hero-watch-arrow{background:#252a21;color:#f3efe6;border-color:#b89b6a}
+:root[data-theme=dark] .hero-watch-arrow:hover{background:#353c30}
+@media(max-width:760px){
+  .hero-visual-wrap{margin:15px -22px 0}
+  .hero-visual{margin:0}
+  .hero-watch-arrow{width:42px;height:42px}
+  .hero-watch-prev{left:12px}
+  .hero-watch-next{right:12px}
+}
