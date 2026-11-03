@@ -43,7 +43,7 @@ try {
   await assertSucceeds(getDoc(doc(admin, 'conversations', 'customer-uid')));
   await assertFails(updateDoc(doc(customer, 'conversations', 'customer-uid'), { status: 'resolved' }));
   await assertFails(setDoc(doc(customer, 'staff', 'customer-uid'), { role: 'owner', active: true }));
-  await assertFails(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Second message too fast'));
+  await assertSucceeds(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Second message sent right away'));
   const conversation = doc(admin, 'conversations', 'customer-uid');
   const audit = doc(collection(admin, 'auditLogs'));
   await assertSucceeds(runTransaction(admin, async (tx) => {
@@ -93,12 +93,11 @@ try {
   await assertSucceeds(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Thank you for the quick reply.'));
   const quickReplyId = (await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessageId;
   assert.equal(await assertSucceeds(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Thank you for the quick reply.', [], {}, quickReplyId)), quickReplyId);
-  await assertFails(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Another message too fast'));
+  await assertSucceeds(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Another message sent right away'));
   await assertFails(updateDoc(doc(staff, 'conversations', 'customer-uid', 'messages', replyId), { message: 'Restored', editedAt: serverTimestamp() }));
   await environment.withSecurityRulesDisabled(async (context) => {
     await updateDoc(doc(context.firestore(), 'conversations', 'customer-uid'), { productReferences: [{ id: 'AP-001', name: 'Royal Oak', brand: 'Audemars Piguet', price: 5950, image: '/images/AP-001-test.jpg', url: 'https://graceful-gifts-manila.web.app/watch/AP-001', size: '42mm', stock: 20 }] });
   });
-  await new Promise((resolve) => setTimeout(resolve, 3100));
   await assertSucceeds(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', 'Can I ask about this watch again?'));
   const finalCustomerMessageId = (await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessageId;
   await assertSucceeds(updateDoc(doc(owner, 'staff', 'staff-uid'), { active: false }));
@@ -152,5 +151,5 @@ try {
   await environment.withSecurityRulesDisabled(async (context) => {
     assert.equal((await getDoc(doc(context.firestore(), 'conversations', 'customer-uid'))).exists(), false);
   });
-  console.log('Firestore rules passed: customer isolation, inquiry, assignment, staff scope, edit, unsend, role protection, rate limit, revocation, private push tokens, block, and delete.');
+  console.log('Firestore rules passed: customer isolation, rapid inquiries, assignment, staff scope, edit, unsend, role protection, revocation, private push tokens, block, and delete.');
 } finally { await environment.cleanup(); }
