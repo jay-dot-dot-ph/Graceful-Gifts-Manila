@@ -103,7 +103,7 @@
 /* Mobile chat opens as a shorter sheet with a pull-down handle. */
 .chat-drag-handle{display:none}
 @media(max-width:760px){
-  .ggm-chat{--ggm-chat-mobile-height:min(72dvh,600px,calc(var(--ggm-viewport-height,100dvh) - 12px));inset:auto 0 auto;width:100vw;max-width:100vw;height:var(--ggm-chat-mobile-height);max-height:var(--ggm-chat-mobile-height);top:calc(var(--ggm-viewport-top,0px) + var(--ggm-viewport-height,100dvh) - var(--ggm-chat-mobile-height));border:2px solid #d5bf9f;border-bottom:0;border-radius:22px 22px 0 0;box-shadow:0 -12px 40px #18180f50}
+  .ggm-chat{--ggm-chat-mobile-height:min(84dvh,840px,calc(var(--ggm-viewport-height,100dvh) - 12px));inset:auto 0 auto;width:100vw;max-width:100vw;height:var(--ggm-chat-mobile-height);max-height:var(--ggm-chat-mobile-height);top:calc(var(--ggm-viewport-top,0px) + var(--ggm-viewport-height,100dvh) - var(--ggm-chat-mobile-height));border:2px solid #d5bf9f;border-bottom:0;border-radius:22px 22px 0 0;box-shadow:0 -12px 40px #18180f50}
   .chat-drag-handle{display:grid;place-items:center;flex:none;width:100%;height:26px;padding:0;border:0;background:#202515;touch-action:none;cursor:grab}
   .chat-drag-handle:active{cursor:grabbing}
   .chat-drag-handle span{display:block;width:42px;height:5px;border-radius:999px;background:#cfb783}
