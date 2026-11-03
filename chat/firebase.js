@@ -1,6 +1,7 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, connectAuthEmulator, setPersistence, browserLocalPersistence, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, doc, collection, query, where, orderBy, limit, startAfter, getDoc, getDocs, onSnapshot, runTransaction, writeBatch, serverTimestamp, updateDoc, setDoc, deleteDoc, deleteField } from 'firebase/firestore';
+import { pauseReceiptWrites } from './receipts.js';
 
 let services;
 export async function firebase() {
@@ -67,6 +68,8 @@ export async function sendMessage(db, conversationId, uid, role, text, products 
   const conversation = doc(db, 'conversations', conversationId);
   if (!/^[A-Za-z0-9]{20}$/.test(messageId)) throw new Error('Invalid message ID.');
   const message = doc(collection(conversation, 'messages'), messageId);
+  const resumeReceipts = pauseReceiptWrites();
+  try {
   const snapshot = role === 'customer' ? await getDoc(conversation) : null;
   const now = serverTimestamp();
   const base = {
@@ -106,6 +109,7 @@ export async function sendMessage(db, conversationId, uid, role, text, products 
     throw error;
   }
   return message.id;
+  } finally { resumeReceipts(); }
 }
 
 export async function editMessage(db, conversationId, messageId, uid, text) {

@@ -66,7 +66,11 @@ try {
   assert.equal((await assertSucceeds(getDoc(doc(owner, 'conversations', 'customer-uid')))).data().status, 'open');
   await assertFails(getDocs(query(collection(staff, 'auditLogs'), orderBy('createdAt', 'desc'))));
   await assertSucceeds(getDocs(query(collection(owner, 'auditLogs'), orderBy('createdAt', 'desc'))));
+  const burstIds = [];
+  for (let index = 0; index < 6; index++) burstIds.push(await assertSucceeds(sendMessage(customer, 'customer-uid', 'customer-uid', 'customer', `Burst message ${index + 1}`)));
+  const burstReceipts = burstIds.map((id) => assertSucceeds(acknowledge(staff, 'customer-uid', { id, senderUid: 'customer-uid', senderRole: 'customer' }, 'staff-uid')));
   await assertSucceeds(sendMessage(staff, 'customer-uid', 'staff-uid', 'staff', 'It is available.'));
+  await Promise.all(burstReceipts);
   assert.equal((await assertSucceeds(getDoc(doc(customer, 'conversations', 'customer-uid')))).data().lastMessage, 'It is available.');
   const replyId = (await getDoc(doc(customer, 'conversations', 'customer-uid'))).data().lastMessageId;
   await assertSucceeds(editMessage(customer, 'customer-uid', firstMessageId, 'customer-uid', 'Is the Royal Oak available today?'));
