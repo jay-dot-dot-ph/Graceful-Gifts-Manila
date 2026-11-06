@@ -220,7 +220,10 @@ async function connect() {
   state.unsubSettings = onSnapshot(doc(db, 'settings', 'chat'), (snapshot) => { const path = snapshot.data()?.storeAvatarUrl || ''; state.avatarUrl = /^\/images\/[A-Za-z0-9._-]+$/.test(path) ? path : ''; renderMessages(); }, () => {});
   state.unsubConversation = onSnapshot(ref, { includeMetadataChanges: true }, (snapshot) => {
     state.conversation = snapshot.exists() ? snapshot.data() : null;
-    if (snapshot.exists() && !state.unsubMessages) {
+    // A newly created conversation appears in the local cache before its batch
+    // reaches the server. Subscribing to children then can be denied because
+    // their rules read the parent document, which does not exist remotely yet.
+    if (snapshot.exists() && !snapshot.metadata.hasPendingWrites && !state.unsubMessages) {
       state.unsubReceipts = subscribeReceipts(db, uid, (receipts) => { state.receipts = new Map([...state.receipts, ...receipts]); renderMessages(); if (receipts.get(state.conversation?.lastMessageId)?.seenAt) advanceRead(state.conversation.lastMessageId); }, (error) => { state.error = displayError(error); renderChrome(); });
       state.unsubMessages = onSnapshot(query(collection(ref, 'messages'), orderBy('createdAt', 'desc'), limit(40)), { includeMetadataChanges: true }, (messages) => {
         const incoming = messages.docs.filter((item) => item.data().senderRole !== 'customer' && !item.data().unsentAt && !item.metadata.hasPendingWrites);

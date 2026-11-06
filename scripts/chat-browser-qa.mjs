@@ -105,6 +105,7 @@ try {
   await customerTime.waitFor({ state: 'hidden' });
   try { await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').last().getByText('Sent').waitFor({ timeout: 10000 }); }
   catch (error) { console.error('Initial inquiry diagnosis:', await customer.locator('.ggm-chat').innerText()); throw error; }
+  assert.equal(await customer.locator('.ggm-chat-error:visible').count(), 0, 'A first inquiry must not leave an access error after it is sent');
   await customer.locator('.ggm-chat-form button:not([disabled])').waitFor();
   let persisted = false;
   for (let attempt = 0; attempt < 30 && !persisted; attempt++) {
