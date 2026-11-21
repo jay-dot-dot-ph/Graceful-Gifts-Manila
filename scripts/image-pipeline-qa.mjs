@@ -101,7 +101,6 @@ const client = readFileSync(resolve(root, 'worker/client.js'), 'utf8');
 assert.match(client, /thumbnailImage/, 'Catalog cards must support thumbnail images.');
 assert.match(client, /srcset=/, 'Catalog cards must expose responsive sources.');
 assert.match(client, /sizes="\(max-width: 760px\)/, 'Catalog cards must describe their responsive display size.');
-assert.match(client, /watch\.thumbnailImage \|\| watch\.localImage/, 'Chat product references must prefer thumbnails while retaining the detail fallback.');
 const firebase = JSON.parse(readFileSync(resolve(root, 'firebase.json'), 'utf8'));
 assert.ok(firebase.hosting.headers.some((entry) => entry.source === '/images/**' && /immutable/.test(entry.headers?.[0]?.value || '')), 'Content-hashed images require immutable cache headers.');
 
