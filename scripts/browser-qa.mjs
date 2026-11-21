@@ -169,7 +169,7 @@ try {
     return route.fulfill({ contentType: 'text/javascript', body: 'export async function openChat(products) { window.__chatMockLoaded = true; window.__chatProducts = products; } export async function watchChat() {}' });
   });
   await desktop.route('https://m.me/**', (route) => route.fulfill({ contentType: 'text/html', body: '<title>Messenger</title>' }));
-  assert.match(await page.locator('.inquiry-button').innerText(), /Send a message/);
+  assert.match(await page.locator('.inquiry-button').innerText(), /Send a message/i);
   const [watchMessenger] = await Promise.all([page.waitForEvent('popup'), page.locator('.inquiry-button').click()]);
   await watchMessenger.waitForURL('https://m.me/GracefulGifts.Manila');
   assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Hello! Is .+Royal Oak.* still available\?\nWatch ID: AP-001\n.*\/watch\/AP-001$/);

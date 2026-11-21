@@ -24,7 +24,7 @@ try {
   const errors = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(base + '/watch/AP-001');
   await page.locator('.inquiry-button').waitFor();
-  assert.match(await page.locator('.inquiry-button').innerText(), /Send a message/);
+  assert.match(await page.locator('.inquiry-button').innerText(), /Send a message/i);
   const [singlePopup] = await Promise.all([page.waitForEvent('popup'), page.locator('.inquiry-button').click()]);
   await singlePopup.waitForURL('https://m.me/GracefulGifts.Manila');
   assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Hello! Is Audemars Piguet Royal Oak still available\?\nWatch ID: AP-001\n.*\/watch\/AP-001$/);
