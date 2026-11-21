@@ -157,10 +157,6 @@ try {
   assert.match(await page.locator('.detail-copy h1').innerText(), /Royal Oak/i);
   assert.equal(await page.locator('.detail-stock').count(), 0, 'In-stock watch does not show its quantity');
   const detailPhoto = page.locator('[data-photo-zoom]');
-  await detailPhoto.hover({ position: { x: 40, y: 40 } });
-  assert.equal(await detailPhoto.evaluate((photo) => photo.classList.contains('zoom-active')), true, 'Desktop watch photo zoom activates');
-  await page.locator('.detail-copy h1').hover();
-  assert.equal(await detailPhoto.evaluate((photo) => photo.classList.contains('zoom-active')), false, 'Desktop watch photo zoom resets when the pointer leaves');
   const photoFits = await detailPhoto.evaluate((photo) => {
     const frame = photo.getBoundingClientRect();
     const image = photo.querySelector('img').getBoundingClientRect();
@@ -168,6 +164,10 @@ try {
       && image.bottom <= frame.bottom + 1 && image.right <= frame.right + 1;
   });
   assert.equal(photoFits, true, 'The full watch photo must fit inside its frame');
+  await detailPhoto.hover({ position: { x: 40, y: 40 } });
+  assert.equal(await detailPhoto.evaluate((photo) => photo.classList.contains('zoom-active')), true, 'Desktop watch photo zoom activates');
+  await page.locator('.detail-copy h1').hover();
+  assert.equal(await detailPhoto.evaluate((photo) => photo.classList.contains('zoom-active')), false, 'Desktop watch photo zoom resets when the pointer leaves');
   await page.locator('[data-photo-open]').click();
   assert.equal(await page.locator('.detail-photo-dialog').evaluate((dialog) => dialog.open), true, 'Full photo viewer opens');
   await page.keyboard.press('Escape');
