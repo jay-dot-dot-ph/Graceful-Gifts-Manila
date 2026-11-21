@@ -178,14 +178,17 @@ try {
     return route.fulfill({ contentType: 'text/javascript', body: 'export async function openChat(products) { window.__chatMockLoaded = true; window.__chatProducts = products; } export async function watchChat() {}' });
   });
   await desktop.route('https://m.me/**', (route) => route.fulfill({ contentType: 'text/html', body: '<title>Messenger</title>' }));
-  assert.match(await page.locator('.inquiry-button').innerText(), /Send a message/i);
+  assert.match(await page.locator('.inquiry-button').innerText(), /Copy message/i);
   await page.evaluate(() => {
     navigator.clipboard.writeText = () => { throw new Error('Clipboard API unavailable'); };
   });
+  await page.locator('.inquiry-button').click();
+  assert.equal(desktop.pages().length, 1, 'Copying should not open Messenger yet');
+  assert.match(await page.locator('.inquiry-button').innerText(), /Send a message/i);
+  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Hello! Is .+Royal Oak.* still available\?\nWatch ID: AP-001\n.*\/watch\/AP-001$/);
+  assert.match(await page.locator('#live-notice').innerText(), /Click Send a message/);
   const [watchMessenger] = await Promise.all([page.waitForEvent('popup'), page.locator('.inquiry-button').click()]);
   await watchMessenger.waitForURL('https://m.me/GracefulGifts.Manila');
-  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Hello! Is .+Royal Oak.* still available\?\nWatch ID: AP-001\n.*\/watch\/AP-001$/);
-  assert.match(await page.locator('#live-notice').innerText(), /Paste it into Messenger/);
   await watchMessenger.close();
   await page.goto(base + '/');
   await page.locator('.floating-chat').waitFor();
@@ -201,17 +204,21 @@ try {
   await page.locator('.favorite-row').waitFor({ timeout: 30000 });
   await page.locator('[data-select]').check();
   assert.equal(await page.locator('[data-inquire-selected]').isEnabled(), true);
+  await page.locator('[data-inquire-selected]').click();
+  assert.match(await page.locator('[data-inquire-selected]').innerText(), /Send a message/i);
+  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /AP-001[\s\S]*\/watch\/AP-001/);
   const [favoritesMessenger] = await Promise.all([page.waitForEvent('popup'), page.locator('[data-inquire-selected]').click()]);
   await favoritesMessenger.waitForURL('https://m.me/GracefulGifts.Manila');
-  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /AP-001[\s\S]*\/watch\/AP-001/);
   await favoritesMessenger.close();
   await page.goto(`${base}/watch/${soldOut.id}`);
   await page.locator('.detail-copy h1').waitFor({ timeout: 30000 });
   assert.match(await page.locator('.detail-stock').innerText(), /Sold out/i);
   assert.match(await page.locator('.soldout-notice').innerText(), /This item is currently unavailable/i);
+  await page.locator('.inquiry-button').click();
+  assert.match(await page.locator('.inquiry-button').innerText(), /Send a message/i);
+  assert.match(await page.evaluate(() => navigator.clipboard.readText()), new RegExp(`Do you have another unit of[\\s\\S]*Watch ID: ${soldOut.id}`));
   const [soldOutMessenger] = await Promise.all([page.waitForEvent('popup'), page.locator('.inquiry-button').click()]);
   await soldOutMessenger.waitForURL('https://m.me/GracefulGifts.Manila');
-  assert.match(await page.evaluate(() => navigator.clipboard.readText()), new RegExp(`Do you have another unit of[\\s\\S]*Watch ID: ${soldOut.id}`));
   await soldOutMessenger.close();
   await page.goto(base + '/contact');
   await page.locator('.contact-method').first().waitFor({ timeout: 30000 });
@@ -219,7 +226,7 @@ try {
   assert.equal(await page.locator('a[href="viber://chat?number=%2B639755996605"]').count() > 0, true);
   await desktop.close();
 
-  const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, permissions: ['clipboard-read', 'clipboard-write'] });
   const mobilePage = await mobile.newPage();
   activePage = mobilePage;
   attachDiagnostics(mobilePage, 'mobile');
@@ -244,6 +251,10 @@ try {
   await mobilePage.goto(base + '/watch/AP-001');
   await mobilePage.locator('.mobile-inquiry-bar').waitFor({ timeout: 30000 });
   assert.equal(await mobilePage.locator('.mobile-inquiry-bar').isVisible(), true);
+  assert.match(await mobilePage.locator('.mobile-inquiry-bar button').innerText(), /Copy message/i);
+  await mobilePage.locator('.mobile-inquiry-bar button').click();
+  assert.match(await mobilePage.locator('.mobile-inquiry-bar button').innerText(), /Send a message/i);
+  assert.match(await mobilePage.locator('.inquiry-button').innerText(), /Send a message/i);
   await mobilePage.locator('[data-photo-zoom]').tap({ position: { x: 40, y: 40 } });
   assert.equal(await mobilePage.locator('[data-photo-zoom]').evaluate((photo) => photo.classList.contains('zoom-active')), true, 'Phone watch photo zoom activates');
   assert.equal(await mobilePage.locator('.specs-grid').evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(' ').length), 1, 'Phone specifications should use one column');

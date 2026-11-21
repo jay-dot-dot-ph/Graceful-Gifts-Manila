@@ -24,26 +24,33 @@ try {
   const errors = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(base + '/watch/AP-001');
   await page.locator('.inquiry-button').waitFor();
+  assert.match(await page.locator('.inquiry-button').innerText(), /Copy message/i);
+  await page.locator('.inquiry-button').click();
+  assert.equal(context.pages().length, 1);
   assert.match(await page.locator('.inquiry-button').innerText(), /Send a message/i);
+  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Hello! Is Audemars Piguet Royal Oak still available\?\nWatch ID: AP-001\n.*\/watch\/AP-001$/);
   const [singlePopup] = await Promise.all([page.waitForEvent('popup'), page.locator('.inquiry-button').click()]);
   await singlePopup.waitForURL('https://m.me/GracefulGifts.Manila');
-  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Hello! Is Audemars Piguet Royal Oak still available\?\nWatch ID: AP-001\n.*\/watch\/AP-001$/);
   await singlePopup.close();
 
   await page.goto(base + '/watch/MK-001');
   await page.locator('.inquiry-button').waitFor();
+  await page.locator('.inquiry-button').click();
+  assert.match(await page.locator('.inquiry-button').innerText(), /Send a message/i);
+  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Do you have another unit of Michael Kors Chronograph or a similar watch available\?/);
   const [soldOutPopup] = await Promise.all([page.waitForEvent('popup'), page.locator('.inquiry-button').click()]);
   await soldOutPopup.waitForURL('https://m.me/GracefulGifts.Manila');
-  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Do you have another unit of Michael Kors Chronograph or a similar watch available\?/);
   await soldOutPopup.close();
 
   await page.goto(base + '/favorites');
   await page.evaluate(() => localStorage.setItem('ggm-favorites', JSON.stringify(['AP-001', 'MK-001'])));
   await page.reload();
   await page.locator('[data-select-all]').click();
+  await page.locator('[data-inquire-selected]').click();
+  assert.match(await page.locator('[data-inquire-selected]').innerText(), /Send a message/i);
+  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /AP-001[\s\S]*MK-001/);
   const [selectedPopup] = await Promise.all([page.waitForEvent('popup'), page.locator('[data-inquire-selected]').click()]);
   await selectedPopup.waitForURL('https://m.me/GracefulGifts.Manila');
-  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /AP-001[\s\S]*MK-001/);
   await selectedPopup.close();
   assert.deepEqual(errors, []);
   console.log('Inquiry clipboard and Messenger checks passed.');
