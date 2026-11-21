@@ -306,6 +306,10 @@ function detailPage(watch) {
           <h1>${esc(watch.model || 'Watch details on request')}</h1>
           <p class="watch-id">Watch ID: ${esc(watch.id)}</p>
           <div class="detail-price-row"><div class="detail-price">${money(watch.price)}</div>${watch.stock === 0 ? '<div class="detail-stock soldout"><span class="stock-dot"></span>Sold out</div>' : ''}</div>
+          <div class="detail-benefits" aria-label="Delivery and inclusions">
+            <div class="detail-benefit"><span class="detail-benefit-icon" aria-hidden="true">↗</span><div><strong>Free delivery &amp; COD nationwide</strong><small>Delivered to your doorstep</small></div></div>
+            <div class="detail-benefit"><span class="detail-benefit-icon" aria-hidden="true">✦</span><div><strong>Complete inclusions</strong><small>Box, paper bag &amp; care card</small></div></div>
+          </div>
           ${watch.stock === 0 ? `<div class="soldout-notice" role="status"><span class="soldout-notice-icon" aria-hidden="true">!</span><div><strong>This item is currently unavailable.</strong><p>Check back later for restocks or explore more watches from ${esc(watch.brand)} and other brands.</p></div></div>` : ''}
           <div class="detail-actions"><button class="button button-dark inquiry-button" type="button" data-inquire="${esc(watch.id)}">${inquiryIcon}<span>${inquiryLabel}</span></button><button class="button button-outline favorite-detail ${favorites.has(watch.id) ? 'saved' : ''}" type="button" data-favorite="${esc(watch.id)}">${favorites.has(watch.id) ? '♥ Saved' : '♡ Favorite'}</button></div>
           <p class="inquiry-note">We'll copy your inquiry and open Messenger. Paste the message there to send it.</p>
