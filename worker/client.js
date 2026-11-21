@@ -364,21 +364,32 @@ async function copyText(text) {
     const copied = document.execCommand('copy'); box.remove(); return copied;
   }
 }
+function copyTextOnClick(text) {
+  const box = document.createElement('textarea');
+  box.value = text;
+  box.setAttribute('readonly', '');
+  box.style.position = 'fixed';
+  box.style.opacity = '0';
+  document.body.appendChild(box);
+  box.select();
+  try { return document.execCommand('copy'); }
+  catch { return false; }
+  finally { box.remove(); }
+}
 async function handleInquiry(watches) {
   if (!watches.length) { notice('Select a watch to inquire about.'); return; }
   if (watches.length > 8) { notice('Select up to 8 watches for one inquiry.'); return; }
   const message = watches.length === 1
     ? `Hello! ${watches[0].stock === 0 ? 'Do you have another unit of' : 'Is'} ${watchName(watches[0])}${watches[0].stock === 0 ? ' or a similar watch available?' : ' still available?'}\nWatch ID: ${watches[0].id}\n${watchUrl(watches[0])}`
     : `Hello! Are these watches available?\n${watches.map((watch, index) => `${index + 1}. ${watchName(watch)} (ID: ${watch.id})\n${watchUrl(watch)}`).join('\n')}`;
-  const chatWindow = window.open('about:blank', '_blank');
-  if (chatWindow) chatWindow.opener = null;
   try {
-    if (!await copyText(message)) throw new Error('Could not copy the message. Please try again.');
+    if (!copyTextOnClick(message) && !await copyText(message)) throw new Error('Could not copy the message. Please try again.');
     notice('Message copied. Paste it into Messenger to send.');
-    if (chatWindow) chatWindow.location.replace(config.messenger);
+    const chatWindow = window.open(config.messenger, '_blank');
+    if (chatWindow) chatWindow.opener = null;
     else location.assign(config.messenger);
   }
-  catch (error) { chatWindow?.close(); notice(error?.message || 'Could not copy the message. Please try again.'); }
+  catch (error) { notice(error?.message || 'Could not copy the message. Please try again.'); }
 }
 async function openWebsiteChat() {
   try { const { openChat } = await import('/chat.js'); await openChat([]); }

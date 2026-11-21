@@ -170,6 +170,9 @@ try {
   });
   await desktop.route('https://m.me/**', (route) => route.fulfill({ contentType: 'text/html', body: '<title>Messenger</title>' }));
   assert.match(await page.locator('.inquiry-button').innerText(), /Send a message/i);
+  await page.evaluate(() => {
+    navigator.clipboard.writeText = () => { throw new Error('Clipboard API unavailable'); };
+  });
   const [watchMessenger] = await Promise.all([page.waitForEvent('popup'), page.locator('.inquiry-button').click()]);
   await watchMessenger.waitForURL('https://m.me/GracefulGifts.Manila');
   assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Hello! Is .+Royal Oak.* still available\?\nWatch ID: AP-001\n.*\/watch\/AP-001$/);
