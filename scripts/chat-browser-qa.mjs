@@ -36,6 +36,9 @@ async function openWatchChat(page, ids) {
     await openChat(products, { prefillInquiry: true });
   }, ids);
 }
+async function openCustomerChat(page) {
+  await page.evaluate(async () => { const { openChat } = await import('/chat.js'); await openChat([]); });
+}
 try {
   await environment.clearFirestore();
   const ownerEmail = `owner-${Date.now()}@example.com`;
@@ -329,7 +332,7 @@ try {
   await owner.locator('.admin-message.staff .chat-receipt').last().getByText('Sent').waitFor();
   await customer.evaluate(() => { delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange')); });
   await owner.locator('.admin-message.staff .chat-receipt').last().getByText('Delivered').waitFor();
-  await customer.locator('[data-open-chat]').click();
+  await openCustomerChat(customer);
   await customer.getByText('Yes, AP-001 is available.').waitFor();
   assert.ok(await customer.locator('.ggm-chat-bubble.incoming').last().evaluate((bubble) => bubble.getBoundingClientRect().width < bubble.parentElement.getBoundingClientRect().width * .8), 'Short customer chat bubble fits its text');
   assert.equal(await owner.locator('.admin-message.staff .chat-receipt').filter({ hasText: 'Seen' }).count(), 0, 'Admin has no duplicate Seen receipt');
@@ -343,10 +346,9 @@ try {
   await owner.locator('#admin-thread-body').getByText('We can also show similar watches.').waitFor();
   await customer.locator('#ggm-chat-notice:not([hidden])').waitFor();
   await customer.reload();
-  await customer.locator('[data-chat-badge]:not([hidden])').waitFor();
-  await customer.locator('[data-open-chat]').click();
+  await customer.locator('.ggm-chat').waitFor();
+  await openCustomerChat(customer);
   await customer.getByText('We can also show similar watches.').waitFor();
-  await customer.waitForFunction(() => document.querySelector('[data-chat-badge]')?.hidden === true);
   await owner.goto(base + '/admin/staff');
   await owner.locator('#staff-form').waitFor();
   assert.equal(await owner.locator('.admin-staff-back').getAttribute('href'), '/admin/chat', 'Staff page has a back link to the inbox');

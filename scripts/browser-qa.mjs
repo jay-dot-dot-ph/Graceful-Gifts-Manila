@@ -53,7 +53,7 @@ try {
   await page.locator('.hero-watch-prev').click();
   assert.notEqual(await page.locator('.hero-watch-note span').innerText(), firstHeroBrand, 'Previous should also show a different brand');
   assert.match(await page.locator('.trust-banner').innerText(), /Cash on Delivery Nationwide[\s\S]*Inspect Before Paying[\s\S]*Forbes Commercial/);
-  assert.equal(await page.locator('.floating-chat').getAttribute('data-open-chat'), '');
+  assert.equal(await page.locator('.floating-chat').getAttribute('href'), 'https://m.me/GracefulGifts.Manila');
   assert.equal(await page.locator('.card-inquire, .watch-modal').count(), 0, 'Card inquiry and specs modal are removed');
   await page.screenshot({ path: resolve(output, 'qa-desktop.png') });
   await page.locator('.desktop-nav a[href="/brands"]').click();
@@ -172,11 +172,6 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.locator('.specs-section').screenshot({ path: resolve(output, 'qa-watch-specs.png') });
-  let chatMockRequests = 0;
-  await page.route(/\/chat\.js(?:\?.*)?$/, (route) => {
-    chatMockRequests++;
-    return route.fulfill({ contentType: 'text/javascript', body: 'export async function openChat(products) { window.__chatMockLoaded = true; window.__chatProducts = products; } export async function watchChat() {}' });
-  });
   await desktop.route('https://m.me/**', (route) => route.fulfill({ contentType: 'text/html', body: '<title>Messenger</title>' }));
   assert.match(await page.locator('.inquiry-button').innerText(), /Copy message/i);
   await page.evaluate(() => {
@@ -192,9 +187,9 @@ try {
   await watchMessenger.close();
   await page.goto(base + '/');
   await page.locator('.floating-chat').waitFor();
-  await page.locator('.floating-chat').click();
-  await page.waitForFunction(() => window.__chatMockLoaded === true && window.__chatProducts?.length === 0);
-  assert.equal(chatMockRequests, 1, 'The website chat remains available through its separate button.');
+  const [floatingMessenger] = await Promise.all([page.waitForEvent('popup'), page.locator('.floating-chat').click()]);
+  await floatingMessenger.waitForURL('https://m.me/GracefulGifts.Manila');
+  await floatingMessenger.close();
   await page.goto(base + '/watch/AP-001');
   await page.locator('.favorite-detail').waitFor();
   await page.locator('.favorite-detail').click();
