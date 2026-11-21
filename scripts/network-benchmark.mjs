@@ -133,7 +133,7 @@ try {
   scenarios.push(await withColdPage(browser, 'customer-chat-open', async (page) => {
     activePage = page;
     await page.route(/\/chat\.js(?:\?.*)?$/, (route) => route.fulfill({ contentType: 'text/javascript', body: 'export async function openChat(products) { window.__benchmarkInquiry = products; } export async function watchChat() {}' }));
-    await page.goto(`${base}/watch/AP-001`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
     await page.locator('.floating-chat').click();
     await page.waitForFunction(() => Array.isArray(window.__benchmarkInquiry), null, { timeout: 30000 });
     assert.equal(await page.evaluate(() => window.__benchmarkInquiry.length), 0);

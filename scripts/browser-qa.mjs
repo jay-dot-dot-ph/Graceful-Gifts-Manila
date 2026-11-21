@@ -156,9 +156,13 @@ try {
   assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Hello! Is .+Royal Oak.* still available\?\nWatch ID: AP-001\n.*\/watch\/AP-001$/);
   assert.match(await page.locator('#live-notice').innerText(), /Paste it into Messenger/);
   await watchMessenger.close();
+  await page.goto(base + '/');
+  await page.locator('.floating-chat').waitFor();
   await page.locator('.floating-chat').click();
   await page.waitForFunction(() => window.__chatMockLoaded === true && window.__chatProducts?.length === 0);
   assert.equal(chatMockRequests, 1, 'The website chat remains available through its separate button.');
+  await page.goto(base + '/watch/AP-001');
+  await page.locator('.favorite-detail').waitFor();
   await page.locator('.favorite-detail').click();
   await page.goto(base + '/favorites');
   await page.locator('.favorite-row').waitFor({ timeout: 30000 });
