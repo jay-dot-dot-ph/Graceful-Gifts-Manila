@@ -161,6 +161,17 @@ try {
   assert.equal(await detailPhoto.evaluate((photo) => photo.classList.contains('zoom-active')), true, 'Desktop watch photo zoom activates');
   await page.locator('.detail-copy h1').hover();
   assert.equal(await detailPhoto.evaluate((photo) => photo.classList.contains('zoom-active')), false, 'Desktop watch photo zoom resets when the pointer leaves');
+  const photoFits = await detailPhoto.evaluate((photo) => {
+    const frame = photo.getBoundingClientRect();
+    const image = photo.querySelector('img').getBoundingClientRect();
+    return image.top >= frame.top - 1 && image.left >= frame.left - 1
+      && image.bottom <= frame.bottom + 1 && image.right <= frame.right + 1;
+  });
+  assert.equal(photoFits, true, 'The full watch photo must fit inside its frame');
+  await page.locator('[data-photo-open]').click();
+  assert.equal(await page.locator('.detail-photo-dialog').evaluate((dialog) => dialog.open), true, 'Full photo viewer opens');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.detail-photo-dialog').evaluate((dialog) => dialog.open), false, 'Escape closes the full photo viewer');
   for (const width of [1440, 1000]) {
     await page.setViewportSize({ width, height: 1000 });
     const columnGap = await page.locator('.specs-grid').evaluate((grid) => {

@@ -313,6 +313,16 @@ function setupDetailZoom() {
   });
 }
 
+function setupDetailViewer() {
+  const openButton = document.querySelector('[data-photo-open]');
+  const dialog = document.querySelector('.detail-photo-dialog');
+  if (!openButton || !dialog) return;
+  openButton.addEventListener('click', () => dialog.showModal());
+  dialog.querySelector('[data-photo-close]').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+  dialog.addEventListener('close', () => openButton.focus());
+}
+
 function detailPage(watch) {
   document.title = `${watch ? watchName(watch) : 'Watch not found'} | Graceful Gifts Manila`;
   if (!watch) { app.innerHTML = nav('Watches') + `<main class="container empty-state"><h1>Watch not found</h1><p>This watch may no longer be listed.</p><a class="button button-dark" href="/watches">Browse watches</a></main>` + footer(); afterRender(); return; }
@@ -324,7 +334,7 @@ function detailPage(watch) {
     <main class="container detail-page">
       <div class="detail-topline"><button class="detail-back" type="button" data-detail-back="${esc(watch.brandSlug)}"><span aria-hidden="true">←</span> Back to watches</button></div>
       <div class="detail-grid">
-        <div class="detail-image" ${watch.image ? 'data-photo-zoom' : ''}>${watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" width="800" height="800"><span class="detail-zoom-hint" aria-hidden="true">Tap to zoom</span>` : `<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>`}</div>
+        <div class="detail-visual"><div class="detail-image" ${watch.image ? 'data-photo-zoom' : ''}>${watch.image ? `<img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" width="800" height="800"><span class="detail-zoom-hint" aria-hidden="true">Tap to zoom</span>` : `<div class="image-placeholder"><span>GGM</span><small>Image coming soon</small></div>`}</div>${watch.image ? `<button class="detail-photo-open" type="button" data-photo-open aria-haspopup="dialog" aria-label="View full photo of ${esc(watchName(watch))}"><span aria-hidden="true">⤢</span> View full photo</button>` : ''}</div>
         <div class="detail-copy">
           <p class="eyebrow">${esc(watch.brand)}</p>
           <h1>${esc(watch.model || 'Watch details on request')}</h1>
@@ -340,12 +350,14 @@ function detailPage(watch) {
           <button class="share-link" type="button" data-share="${esc(watch.id)}">Copy link ↗</button>
         </div>
       </div>
+      ${watch.image ? `<dialog class="detail-photo-dialog" aria-label="Photo of ${esc(watchName(watch))}"><button class="detail-photo-close" type="button" data-photo-close aria-label="Close full photo">×</button><img src="${watchImage(watch)}" alt="${esc(watchName(watch))}"><p>${esc(watch.brand)} <span aria-hidden="true">·</span> ${esc(watch.model || watch.id)}</p></dialog>` : ''}
       ${specs.length ? `<section class="specs-section"><h2>Specifications</h2><dl class="specs-grid">${specs.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl></section>` : ''}
       ${related.length ? `<section class="related-section">${sectionHead('', 'More from ' + esc(watch.brand), '/watches/' + watch.brandSlug, 'View all')}<div class="watch-grid">${related.map(card).join('')}</div></section>` : ''}
     </main>
     <div class="mobile-inquiry-bar"><span>${watch.stock === 0 ? 'SOLD OUT' : money(watch.price)}</span><button type="button" data-inquire="${esc(watch.id)}">${inquiryIcon}<span>${inquiryLabel}</span></button></div>` + footer();
   afterRender();
   setupDetailZoom();
+  setupDetailViewer();
 }
 function favoritesPage() {
   const rows = catalog.watches.filter((watch) => favorites.has(watch.id));
