@@ -43,6 +43,15 @@ try {
   await page.locator('.hero h1').waitFor({ timeout: 30000 });
   await page.waitForFunction(() => { const img = document.querySelector('.hero-visual img'); return img && img.complete && img.naturalWidth > 0; }, null, { timeout: 20000 });
   assert.equal(await page.locator('.hero-visual img').evaluate((img) => img.complete && img.naturalWidth > 0), true, 'Hero watch image should load');
+  const firstHeroBrand = await page.locator('.hero-watch-note span').innerText();
+  const firstHeroLink = await page.locator('.hero-visual').getAttribute('href');
+  await page.locator('.hero-watch-next').click();
+  assert.notEqual(await page.locator('.hero-watch-note span').innerText(), firstHeroBrand, 'One click should show a different watch brand');
+  assert.notEqual(await page.locator('.hero-visual').getAttribute('href'), firstHeroLink);
+  await page.locator('.hero-watch-prev').click();
+  assert.equal(await page.locator('.hero-visual').getAttribute('href'), firstHeroLink, 'Previous should return to the featured watch');
+  await page.locator('.hero-watch-prev').click();
+  assert.notEqual(await page.locator('.hero-watch-note span').innerText(), firstHeroBrand, 'Previous should also show a different brand');
   assert.match(await page.locator('.trust-banner').innerText(), /Cash on Delivery Nationwide[\s\S]*Inspect Before Paying[\s\S]*Forbes Commercial/);
   assert.equal(await page.locator('.floating-chat').getAttribute('data-open-chat'), '');
   assert.equal(await page.locator('.card-inquire, .watch-modal').count(), 0, 'Card inquiry and specs modal are removed');

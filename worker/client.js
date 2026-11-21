@@ -26,6 +26,8 @@ let favorites = new Set(stored());
 let selected = new Set();
 let catalog = null;
 let heroWatchId = null;
+let heroSlides = [];
+let heroSlideIndex = -1;
 let shown = 24;
 let feedbackTimer = null;
 // Add current Watch IDs here only when the store selects best sellers.
@@ -94,11 +96,21 @@ function latestArrivals(watches) {
 function heroVisualContent(watch) {
   return watch ? `<div class="hero-orbit"></div><img src="${watchImage(watch)}" alt="${esc(watchName(watch))}" width="680" height="680"><div class="hero-watch-note"><span>${esc(watch.brand)}</span><strong>${esc(watch.model || watch.id)}</strong><small>Explore the collection ↗</small></div>` : '<div class="hero-orbit"></div><div class="hero-monogram">GGM</div>';
 }
+function setHeroSlides(watches, currentWatch) {
+  const byBrand = new Map();
+  for (const watch of watches) {
+    const brand = watch.brandSlug || watch.brand;
+    if (!byBrand.has(brand)) byBrand.set(brand, []);
+    byBrand.get(brand).push(watch);
+  }
+  heroSlides = shuffled([...byBrand.entries()]).map(([brand, group]) => ({ brand, watch: group[Math.floor(Math.random() * group.length)] }));
+  heroSlideIndex = heroSlides.findIndex(({ brand }) => brand === (currentWatch?.brandSlug || currentWatch?.brand));
+  if (heroSlideIndex >= 0) heroSlides[heroSlideIndex].watch = currentWatch;
+}
 function changeHeroWatch(step) {
-  const watches = catalog.watches.filter((watch) => watch.stock !== 0 && watch.image && watch.model);
-  if (watches.length < 2) return;
-  const current = watches.findIndex((watch) => watch.id === heroWatchId);
-  const next = watches[(current + step + watches.length) % watches.length];
+  if (heroSlides.length < 2) return;
+  heroSlideIndex = (heroSlideIndex + step + heroSlides.length) % heroSlides.length;
+  const next = heroSlides[heroSlideIndex].watch;
   heroWatchId = next.id;
   try { sessionStorage.setItem('ggm-home-hero', next.id); } catch {}
   const link = document.querySelector('.hero-visual');
@@ -118,6 +130,7 @@ function home() {
     try { if (heroWatchId) sessionStorage.setItem('ggm-home-hero', heroWatchId); } catch {}
   }
   const visual = heroWatches.find((watch) => watch.id === heroWatchId);
+  if (heroSlides[heroSlideIndex]?.watch.id !== heroWatchId) setHeroSlides(heroWatches, visual);
 
   const bestSellers = bestSellerIds.map((id) => catalog.watches.find((watch) => watch.id === id)).filter(Boolean);
   let previousPreview = [];
@@ -127,7 +140,7 @@ function home() {
   } catch {}
   const preview = mixedBrandPreview(catalog.watches, 6, previousPreview);
   try { sessionStorage.setItem('ggm-home-preview', JSON.stringify(preview.map((watch) => watch.id))); } catch {}
-  const heroControls = heroWatches.length > 1 ? `<button class="hero-watch-arrow hero-watch-prev" type="button" data-hero-step="-1" aria-label="Previous featured watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button><button class="hero-watch-arrow hero-watch-next" type="button" data-hero-step="1" aria-label="Next featured watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>` : '';
+  const heroControls = heroSlides.length > 1 ? `<button class="hero-watch-arrow hero-watch-prev" type="button" data-hero-step="-1" aria-label="Previous featured watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button><button class="hero-watch-arrow hero-watch-next" type="button" data-hero-step="1" aria-label="Next featured watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>` : '';
   app.innerHTML = nav('Home') + `<main><section class="hero"><div class="container hero-inner"><div class="hero-copy"><h1>Inspired By<br><em>Love and Elegance</em></h1><div class="hero-actions"><a class="button button-dark" href="/watches">Explore watches <span>↗</span></a><a class="button button-outline" href="/brands">Shop by brand</a></div><div class="hero-stats"><div><strong>${catalog.watches.length}</strong><span>Watches to explore</span></div><div><strong>${catalog.brands.filter((brand) => brand.count).length}</strong><span>Brands in the collection</span></div></div></div><div class="hero-visual-wrap"><a href="/watch/${visual ? encodeURIComponent(visual.id) : ''}" class="hero-visual" aria-label="Explore ${visual ? esc(watchName(visual)) : 'watches'}">${heroVisualContent(visual)}</a>${heroControls}</div></div></section><section class="intro-strip"><div class="container intro-strip-inner"><span>01 &nbsp; DISCOVER</span><i></i><span>02 &nbsp; SAVE YOUR FAVORITES</span><i></i><span>03 &nbsp; INQUIRE DIRECTLY</span></div></section>${bestSellers.length ? `<section class="section container best-sellers-section">${sectionHead('WATCH HIGHLIGHTS', 'Best sellers', '/watches', 'View all watches')}<div class="watch-grid">${bestSellers.map(card).join('')}</div></section>` : ''}<section class="section brands-section" id="brands"><div class="container">${sectionHead('', 'Shop by brand')}${brandTiles(catalog.brands, 8)}<div class="brands-more"><a class="button button-outline" href="/brands">See more brands</a></div></div></section><section class="section container collection-section">${sectionHead('THE COLLECTION', 'Find the one that stays with you', '/watches', 'View all watches')}<div class="watch-grid">${preview.map(card).join('')}</div></section><section class="story-section visit-section" id="physical-store"><div class="container visit-layout"><div class="visit-intro"><p class="eyebrow">VISIT OUR STORE</p><h2>A closer look at<br><em>Graceful Gifts Manila.</em></h2><a class="button button-light" href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=14.6084144%2C120.9940068&heading=231.21&pitch=-2.39&fov=75" target="_blank" rel="noopener">View store <span aria-hidden="true">↗</span></a></div><aside class="visit-card"><p class="visit-card-label">FORBES COMMERCIAL</p><address>785 Lacson Ave.<br>Sampaloc, Manila 1008</address><dl class="visit-facts"><div><dt>OPEN DAILY</dt><dd>11:00 AM – 8:00 PM</dd></div><div><dt>CALL THE STORE</dt><dd><a href="tel:+639755996605">0975 599 6605</a></dd></div></dl></aside></div></section>${feedbackSection()}</main>` + footer();
   if (arrivals.length) {
     app.querySelector('.intro-strip')?.insertAdjacentHTML('afterend', `<section class="section container new-arrivals-section" aria-labelledby="new-arrivals-title"><div class="section-head"><div><p class="eyebrow">JUST ADDED</p><h2 id="new-arrivals-title">New arrivals</h2></div><a class="text-link" href="/watches">View all watches <span aria-hidden="true">↗</span></a></div><div class="watch-grid">${arrivals.map(card).join('')}</div></section>`);
