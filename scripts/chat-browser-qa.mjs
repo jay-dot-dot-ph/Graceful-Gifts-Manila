@@ -23,6 +23,19 @@ async function login(page, email) {
   await page.locator('#admin-login-form button').click();
   await page.locator('.admin-inbox').waitFor();
 }
+async function openWatchChat(page, ids) {
+  await page.evaluate(async (watchIds) => {
+    const catalog = await (await fetch('/api/catalog.json')).json();
+    const products = watchIds.map((id) => {
+      const watch = catalog.watches.find((item) => item.id === id);
+      const model = (watch.model || 'Watch').trim();
+      const name = model.toLowerCase().startsWith(watch.brand.toLowerCase() + ' ') ? model : `${watch.brand} ${model}`;
+      return { id, name, brand: watch.brand, price: watch.price, image: watch.thumbnailImage || watch.localImage || '', url: `${location.origin}/watch/${encodeURIComponent(id)}`, size: watch.size, stock: watch.stock };
+    });
+    const { openChat } = await import('/chat.js');
+    await openChat(products, { prefillInquiry: true });
+  }, ids);
+}
 try {
   await environment.clearFirestore();
   const ownerEmail = `owner-${Date.now()}@example.com`;
@@ -47,7 +60,7 @@ try {
   const relatedImage = await customer.locator('.related-section .card-image').first().boundingBox();
   const relatedHeart = await customer.locator('.related-section .heart').first().boundingBox();
   assert.ok(relatedHeart && relatedHeart.width >= 44 && Math.abs(relatedImage.x + relatedImage.width - relatedHeart.x - relatedHeart.width - 12) < 2, 'Related watch heart stays anchored to the image corner');
-  await customer.locator('.mobile-inquiry-bar [data-inquire]').click();
+  await openWatchChat(customer, ['AP-001']);
   await customer.locator('.ggm-chat.is-open').waitFor();
   await customer.waitForFunction(() => document.activeElement?.id === 'ggm-chat-message');
   const storeLabel = await customer.locator('.chat-store-label').boundingBox();
@@ -74,7 +87,7 @@ try {
   assert.doesNotMatch(await customer.locator('#ggm-chat-message').inputValue(), /Royal Oak/, 'The old watch is removed from the draft');
   assert.equal(await customer.locator('.ggm-chat-products').count(), 0, 'Changing watches does not show a pending card');
   await customer.locator('.ggm-chat [data-chat-close]').click();
-  await customer.locator('.mobile-inquiry-bar [data-inquire]').click();
+  await openWatchChat(customer, ['AP-001']);
   await customer.waitForFunction(() => document.querySelector('#ggm-chat-message')?.value.includes('Royal Oak'));
   const initialInquiry = await customer.locator('#ggm-chat-message').inputValue();
   assert.match(initialInquiry, /^Hello! Is .+Royal Oak.* still available\?$/, 'Watch inquiry is ready to send without its ID');
@@ -114,7 +127,7 @@ try {
   }
   assert.equal(persisted, true, 'The first inquiry must be committed before refresh');
   await customer.reload();
-  await customer.locator('.mobile-inquiry-bar [data-inquire]').click();
+  await openWatchChat(customer, ['AP-001']);
   await customer.getByText(initialInquiry).waitFor();
   await customer.setViewportSize({ width: 390, height: 844 });
   const mobileChat = await customer.locator('.ggm-chat.is-open').boundingBox();
@@ -126,7 +139,7 @@ try {
   await customer.evaluate(() => localStorage.setItem('ggm-favorites', JSON.stringify(['AP-001', 'AP-002'])));
   await customer.goto(base + '/favorites');
   await customer.locator('[data-select-all]').click();
-  await customer.locator('[data-inquire-selected]').click();
+  await openWatchChat(customer, ['AP-001', 'AP-002']);
   assert.equal(await customer.locator('.ggm-chat-products').count(), 0, 'Favorites do not show a pending watch panel');
   await customer.waitForFunction(() => document.querySelector('#ggm-chat-message')?.value.includes('\n2. '));
   const favoritesInquiry = await customer.locator('#ggm-chat-message').inputValue();

@@ -17,7 +17,10 @@ try {
   const customerContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const customer = await customerContext.newPage(); customer.on('pageerror', (error) => errors.push(error.message));
   await customer.goto(base + '/watch/AP-001');
-  await customer.locator('.mobile-inquiry-bar [data-inquire]').click();
+  await customer.evaluate(async () => {
+    const { openChat } = await import('/chat.js');
+    await openChat([]);
+  });
   await customer.locator('#ggm-chat-message').fill('Can I see photos?');
   await customer.locator('#ggm-chat-form button[type=submit]').click();
   await customer.locator('.ggm-chat-bubble.outgoing .chat-receipt').getByText('Sent').waitFor();

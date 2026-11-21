@@ -294,7 +294,7 @@ function detailPage(watch) {
   if (!watch) { app.innerHTML = nav('Watches') + `<main class="container empty-state"><h1>Watch not found</h1><p>This watch may no longer be listed.</p><a class="button button-dark" href="/watches">Browse watches</a></main>` + footer(); afterRender(); return; }
   const specs = [['Size', watch.size], ['Category', watch.category], ['Dial color', watch.dialColor], ['Case material', watch.caseMaterial], ['Strap material', watch.strapMaterial], ['Movement', watch.movement]].filter(([, value]) => value);
   const related = catalog.watches.filter((item) => item.id !== watch.id && item.brandSlug === watch.brandSlug).slice(0, 4);
-  const inquiryLabel = watch.stock === 0 ? 'Ask about this watch' : 'Message to inquire';
+  const inquiryLabel = 'Send a message';
   const inquiryIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-8 8 8.7 8.7 0 0 1-3.5-.7L4 20l1.3-4A8 8 0 1 1 20 11.5Z"/><path d="M8 12h8"/></svg>';
   app.innerHTML = nav('Watches') + `
     <main class="container detail-page">
@@ -308,7 +308,7 @@ function detailPage(watch) {
           <div class="detail-price-row"><div class="detail-price">${money(watch.price)}</div>${watch.stock === 0 ? '<div class="detail-stock soldout"><span class="stock-dot"></span>Sold out</div>' : ''}</div>
           ${watch.stock === 0 ? `<div class="soldout-notice" role="status"><span class="soldout-notice-icon" aria-hidden="true">!</span><div><strong>This item is currently unavailable.</strong><p>Check back later for restocks or explore more watches from ${esc(watch.brand)} and other brands.</p></div></div>` : ''}
           <div class="detail-actions"><button class="button button-dark inquiry-button" type="button" data-inquire="${esc(watch.id)}">${inquiryIcon}<span>${inquiryLabel}</span></button><button class="button button-outline favorite-detail ${favorites.has(watch.id) ? 'saved' : ''}" type="button" data-favorite="${esc(watch.id)}">${favorites.has(watch.id) ? '♥ Saved' : '♡ Favorite'}</button></div>
-          <p class="inquiry-note">Ask us here and return to this browser to see our reply.</p>
+          <p class="inquiry-note">We'll copy your inquiry and open Messenger. Paste the message there to send it.</p>
           <button class="share-link" type="button" data-share="${esc(watch.id)}">Copy link ↗</button>
         </div>
       </div>
@@ -322,7 +322,7 @@ function detailPage(watch) {
 function favoritesPage() {
   const rows = catalog.watches.filter((watch) => favorites.has(watch.id));
   selected = new Set([...selected].filter((id) => favorites.has(id)));
-  app.innerHTML = nav('Favorites') + `<main><section class="page-heading"><div class="container"><p class="eyebrow">YOUR SHORTLIST</p><h1>My favorites</h1></div></section><section class="container favorites-content">${rows.length ? `<div class="favorites-toolbar"><span>${rows.length} saved ${rows.length === 1 ? 'watch' : 'watches'}</span><button type="button" data-select-all>${selected.size === rows.length ? 'Deselect all' : 'Select all'}</button></div><div class="favorites-list">${rows.map((watch) => `<div class="favorite-row"><label class="select-watch"><input type="checkbox" data-select="${esc(watch.id)}" ${selected.has(watch.id) ? 'checked' : ''}><span class="visually-hidden">Select ${esc(watchName(watch))}</span></label><a href="/watch/${encodeURIComponent(watch.id)}" class="favorite-photo">${watch.image ? `<img src="${watchImage(watch, 'thumbnail')}" alt="${esc(watchName(watch))}" loading="lazy">` : '<span>GGM</span>'}</a><div class="favorite-description"><p class="eyebrow">${esc(watch.brand)}</p><h2><a href="/watch/${encodeURIComponent(watch.id)}">${esc(watch.model || watch.id)}</a></h2><small>${esc(watch.id)}${watch.stock === 0 ? ' - Sold out' : ''}</small></div><strong>${money(watch.price)}</strong><button type="button" class="remove-favorite" data-favorite="${esc(watch.id)}" aria-label="Remove ${esc(watchName(watch))} from favorites">×</button></div>`).join('')}</div><div class="favorites-actions"><span>${selected.size} selected</span><button class="button button-dark" type="button" data-inquire-selected ${selected.size ? '' : 'disabled'}>Inquire about selected ↗</button></div>` : `<div class="empty-state"><h2>You haven't saved any watches yet.</h2><p>Explore the collection and tap a heart to make your shortlist.</p><a class="button button-dark" href="/watches">Browse watches ↗</a></div>`}</section></main>` + footer();
+  app.innerHTML = nav('Favorites') + `<main><section class="page-heading"><div class="container"><p class="eyebrow">YOUR SHORTLIST</p><h1>My favorites</h1></div></section><section class="container favorites-content">${rows.length ? `<div class="favorites-toolbar"><span>${rows.length} saved ${rows.length === 1 ? 'watch' : 'watches'}</span><button type="button" data-select-all>${selected.size === rows.length ? 'Deselect all' : 'Select all'}</button></div><div class="favorites-list">${rows.map((watch) => `<div class="favorite-row"><label class="select-watch"><input type="checkbox" data-select="${esc(watch.id)}" ${selected.has(watch.id) ? 'checked' : ''}><span class="visually-hidden">Select ${esc(watchName(watch))}</span></label><a href="/watch/${encodeURIComponent(watch.id)}" class="favorite-photo">${watch.image ? `<img src="${watchImage(watch, 'thumbnail')}" alt="${esc(watchName(watch))}" loading="lazy">` : '<span>GGM</span>'}</a><div class="favorite-description"><p class="eyebrow">${esc(watch.brand)}</p><h2><a href="/watch/${encodeURIComponent(watch.id)}">${esc(watch.model || watch.id)}</a></h2><small>${esc(watch.id)}${watch.stock === 0 ? ' - Sold out' : ''}</small></div><strong>${money(watch.price)}</strong><button type="button" class="remove-favorite" data-favorite="${esc(watch.id)}" aria-label="Remove ${esc(watchName(watch))} from favorites">×</button></div>`).join('')}</div><div class="favorites-actions"><span>${selected.size} selected</span><button class="button button-dark" type="button" data-inquire-selected ${selected.size ? '' : 'disabled'}>Send a message ↗</button></div>` : `<div class="empty-state"><h2>You haven't saved any watches yet.</h2><p>Explore the collection and tap a heart to make your shortlist.</p><a class="button button-dark" href="/watches">Browse watches ↗</a></div>`}</section></main>` + footer();
   afterRender();
 }
 function contactPage() {
@@ -349,11 +349,24 @@ async function copyText(text) {
     const copied = document.execCommand('copy'); box.remove(); return copied;
   }
 }
-async function handleInquiry(button, watches) {
-  if (!watches.length && button?.hasAttribute('data-inquire')) { notice('Watch not found.'); return; }
+async function handleInquiry(watches) {
+  if (!watches.length) { notice('Select a watch to inquire about.'); return; }
   if (watches.length > 8) { notice('Select up to 8 watches for one inquiry.'); return; }
-  const products = watches.map((watch) => ({ id: watch.id, name: watchName(watch), brand: watch.brand, price: watch.price, image: watch.thumbnailImage || watch.localImage || '', url: 'https://graceful-gifts-manila.web.app/watch/' + encodeURIComponent(watch.id), ...(watch.size ? { size: watch.size } : {}), ...(Number.isInteger(watch.stock) && watch.stock >= 0 ? { stock: watch.stock } : {}) }));
-  try { const { openChat } = await import('/chat.js'); await openChat(products, { prefillInquiry: watches.length > 0 }); }
+  const message = watches.length === 1
+    ? `Hello! ${watches[0].stock === 0 ? 'Do you have another unit of' : 'Is'} ${watchName(watches[0])}${watches[0].stock === 0 ? ' or a similar watch available?' : ' still available?'}\nWatch ID: ${watches[0].id}\n${watchUrl(watches[0])}`
+    : `Hello! Are these watches available?\n${watches.map((watch, index) => `${index + 1}. ${watchName(watch)} (ID: ${watch.id})\n${watchUrl(watch)}`).join('\n')}`;
+  const chatWindow = window.open('about:blank', '_blank');
+  if (chatWindow) chatWindow.opener = null;
+  try {
+    if (!await copyText(message)) throw new Error('Could not copy the message. Please try again.');
+    notice('Message copied. Paste it into Messenger to send.');
+    if (chatWindow) chatWindow.location.replace(config.messenger);
+    else location.assign(config.messenger);
+  }
+  catch (error) { chatWindow?.close(); notice(error?.message || 'Could not copy the message. Please try again.'); }
+}
+async function openWebsiteChat() {
+  try { const { openChat } = await import('/chat.js'); await openChat([]); }
   catch (error) { notice(error?.message || 'Chat is unavailable right now. Please try again.'); }
 }
 function afterRender() {
@@ -478,9 +491,9 @@ document.addEventListener('click', async (event) => {
     filters = { query:'', brand:'', size:'', dial:'', movement:'', category:'', availability:'', min:'', max:'', sort:'newest' }; shown = 24; catalogPage(); return;
   }
   if (button.matches('[data-load-more]')) { shown += 24; updateResults(); return; }
-  if (button.matches('[data-open-chat]')) { await handleInquiry(button, []); return; }
-  if (button.matches('[data-inquire]')) { const watch = catalog.watches.find((item) => item.id === button.dataset.inquire); await handleInquiry(button, watch ? [watch] : []); return; }
-  if (button.matches('[data-inquire-selected]')) { await handleInquiry(button, catalog.watches.filter((watch) => selected.has(watch.id))); return; }
+  if (button.matches('[data-open-chat]')) { await openWebsiteChat(); return; }
+  if (button.matches('[data-inquire]')) { const watch = catalog.watches.find((item) => item.id === button.dataset.inquire); await handleInquiry(watch ? [watch] : []); return; }
+  if (button.matches('[data-inquire-selected]')) { await handleInquiry(catalog.watches.filter((watch) => selected.has(watch.id))); return; }
   if (button.matches('[data-select-all]')) { const rows = catalog.watches.filter((watch) => favorites.has(watch.id)); selected = selected.size === rows.length ? new Set() : new Set(rows.map((watch) => watch.id)); favoritesPage(); return; }
   if (button.matches('[data-share]')) { const watch = catalog.watches.find((item) => item.id === button.dataset.share); if (watch && await copyText(watchUrl(watch))) notice('Watch link copied.'); return; }
   if (button.matches('[data-dismiss-feedback]')) { document.getElementById('feedback-float')?.remove(); return; }

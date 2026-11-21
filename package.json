@@ -10,6 +10,7 @@
     "test:unit": "node scripts/unit.mjs",
     "test:live": "node scripts/smoke.mjs",
     "test:browser": "node scripts/browser-qa.mjs",
+    "test:inquiry": "node scripts/inquiry-qa.mjs",
     "test:history": "node scripts/history-qa.mjs",
     "test:search": "node scripts/search-qa.mjs",
     "test:sheet-sync": "node scripts/check-sheet-sync-qa.mjs",

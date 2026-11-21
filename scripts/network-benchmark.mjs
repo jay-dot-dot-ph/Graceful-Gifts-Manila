@@ -130,13 +130,13 @@ try {
     await page.goto(`${base}/watch/AP-001`, { waitUntil: 'domcontentloaded' });
     await page.locator('.detail-copy h1').waitFor({ timeout: 30000 });
   }));
-  scenarios.push(await withColdPage(browser, 'customer-inquiry-preview', async (page) => {
+  scenarios.push(await withColdPage(browser, 'customer-chat-open', async (page) => {
     activePage = page;
     await page.route(/\/chat\.js(?:\?.*)?$/, (route) => route.fulfill({ contentType: 'text/javascript', body: 'export async function openChat(products) { window.__benchmarkInquiry = products; } export async function watchChat() {}' }));
     await page.goto(`${base}/watch/AP-001`, { waitUntil: 'domcontentloaded' });
-    await page.locator('.inquiry-button').click();
-    await page.waitForFunction(() => window.__benchmarkInquiry?.length === 1, null, { timeout: 30000 });
-    assert.equal(await page.evaluate(() => window.__benchmarkInquiry[0].id), 'AP-001');
+    await page.locator('.floating-chat').click();
+    await page.waitForFunction(() => Array.isArray(window.__benchmarkInquiry), null, { timeout: 30000 });
+    assert.equal(await page.evaluate(() => window.__benchmarkInquiry.length), 0);
   }));
 
   const warmContext = await browser.newContext({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1, serviceWorkers: 'block' });
